@@ -1,0 +1,19 @@
+generated: '2026-07-18'
+method: searched
+source: openapi/distru-openapi.yml
+docs: https://help.distru.com/en/articles/12314293-distru-api-faq
+notes: >-
+  Single scheme: a Bearer API key generated in the Distru app under Settings >
+  Integrations > Distru API. Keys expire one year from issue date. No OAuth,
+  OpenID Connect, or scopes surface. There is no separate sandbox/test mode.
+summary:
+  types:
+  - http
+schemes:
+- name: bearerAuth
+  type: http
+  scheme: bearer
+  description: 'API key issued in the Distru app under Settings > Integrations > Distru API,
+    sent as `Authorization: Bearer <API_KEY>`. Keys expire one year from issue date.'
+  sources:
+  - openapi/distru-openapi.yml
