@@ -1,0 +1,23 @@
+overlay: 1.0.0
+info:
+  title: API Evangelist enhancements for Distru Public API
+  version: 1.0.0
+extends: openapi/distru-openapi.yml
+actions:
+- target: $.info
+  update:
+    x-apievangelist-enriched: '2026-07-18'
+    x-apievangelist-source: https://apidocs.distru.dev
+    x-api-evangelist-notes: >-
+      Spec reconstructed from the published Distru API reference; operation
+      paths/methods are faithful, request/response schemas are generic pending a
+      provider-published OpenAPI definition.
+- target: $.info
+  update:
+    x-conventions: conventions/distru-conventions.yml
+    x-errors: errors/distru-problem-types.yml
+    x-authentication: authentication/distru-authentication.yml
+    x-data-model: data-model/distru-data-model.yml
+- target: $.servers
+  update:
+    x-rate-limit-guidance: Recommended maximum ~2 requests/second; no enforced limits or rate-limit headers.

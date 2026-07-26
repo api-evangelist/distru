@@ -1,0 +1,13 @@
+generated: '2026-07-18'
+method: searched
+source: https://apidocs.distru.dev
+docs: https://apidocs.distru.dev
+scheme: continuous
+current_version: v1
+notes: >-
+  The Distru API reference publishes a "Stay Up To Date" section and an email
+  signup for breaking-change notifications rather than a dated, per-release
+  changelog. No structured version-and-date entries are published, so none are
+  fabricated here.
+change_notification_signup: https://share.hsforms.com/1ui8lKXQ2RAaytYEyEphCiQ2usrt
+entries: []

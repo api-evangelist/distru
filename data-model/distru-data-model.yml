@@ -1,0 +1,94 @@
+generated: '2026-07-18'
+method: derived
+source: openapi/distru-openapi.yml
+docs: https://apidocs.distru.dev
+notes: >-
+  Entity graph derived from the resources and model names published in the
+  Distru API reference. Most resources are keyed by UUID. Relationships below
+  reflect id-reference fields documented across the object models; cardinalities
+  are inferred from the resource semantics.
+entities:
+- name: Product
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Strain, via: strain }
+  - { kind: belongs_to, target: Brand, via: brand }
+  - { kind: has_many, target: Batch, via: product }
+  - { kind: has_many, target: Package, via: product }
+- name: Inventory
+  relationships:
+  - { kind: belongs_to, target: Product, via: product }
+  - { kind: belongs_to, target: Location, via: location }
+  - { kind: belongs_to, target: Package, via: package }
+- name: Batch
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Product, via: product }
+  - { kind: has_many, target: TestResult, via: batch }
+- name: Package
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Product, via: product }
+  - { kind: belongs_to, target: Batch, via: batch }
+  - { kind: has_many, target: TestResult, via: package }
+- name: Order
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Company, via: company }
+  - { kind: belongs_to, target: Location, via: location }
+  - { kind: has_many, target: OrderItem, via: order }
+  - { kind: has_many, target: Invoice, via: order }
+- name: OrderItem
+  relationships:
+  - { kind: belongs_to, target: Order, via: order }
+  - { kind: belongs_to, target: Product, via: product }
+- name: Invoice
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Order, via: order }
+  - { kind: belongs_to, target: Company, via: company }
+  - { kind: has_many, target: InvoicePayment, via: invoice }
+  - { kind: has_many, target: InvoiceItem, via: invoice }
+- name: Purchase
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Company, via: company }
+  - { kind: has_many, target: PurchaseOrderItem, via: purchase }
+- name: Assembly
+  id: uuid
+  relationships:
+  - { kind: has_many, target: AssemblyInput, via: assembly }
+  - { kind: has_many, target: AssemblyOutput, via: assembly }
+- name: Company
+  id: uuid
+  relationships:
+  - { kind: has_many, target: Contact, via: company }
+  - { kind: has_many, target: Location, via: company }
+  - { kind: belongs_to, target: CompanyGroup, via: group }
+- name: Contact
+  id: uuid
+  relationships:
+  - { kind: belongs_to, target: Company, via: company }
+- name: Strain
+  id: uuid
+- name: TestResult
+  relationships:
+  - { kind: belongs_to, target: Batch, via: batch }
+  - { kind: belongs_to, target: Package, via: package }
+- name: Location
+  id: uuid
+- name: Menu
+  id: uuid
+  relationships:
+  - { kind: has_many, target: Product, via: menu }
+- name: PaymentMethod
+  id: uuid
+- name: StockAdjustment
+  relationships:
+  - { kind: belongs_to, target: Package, via: package }
+  - { kind: belongs_to, target: Location, via: location }
+- name: CustomField
+  id: integer
+- name: ProductPosMapping
+  relationships:
+  - { kind: belongs_to, target: Product, via: product }

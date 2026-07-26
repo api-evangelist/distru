@@ -1,0 +1,33 @@
+generated: '2026-07-18'
+method: probed
+source: live DNS/TLS/HTTP probes of apis.yml + OpenAPI hosts
+hosts:
+- host: www.distru.com
+  https: true
+  tls_version: TLSv1.3
+  cert_expires: Sep 11 04:44:53 2026 GMT
+  hsts: true
+  hsts_max_age: 31536000
+- host: apidocs.distru.dev
+  https: true
+  tls_version: TLSv1.3
+  cert_expires: Aug 23 12:25:26 2026 GMT
+  hsts: false
+- host: app.distru.com
+  https: true
+  tls_version: TLSv1.3
+  cert_expires: Sep  6 21:27:39 2026 GMT
+  hsts: true
+  hsts_max_age: 31536000
+domains:
+- domain: distru.com
+  dnssec: false
+  caa: []
+  spf: true
+  dmarc: true
+  dmarc_policy: quarantine
+- domain: distru.dev
+  dnssec: true
+  caa: []
+  spf: false
+  dmarc: false

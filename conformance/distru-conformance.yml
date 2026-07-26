@@ -1,0 +1,38 @@
+generated: '2026-07-18'
+method: derived
+source: openapi/distru-openapi.yml
+docs: https://apidocs.distru.dev
+standards:
+- id: oauth2
+  conforms: false
+  evidence: Auth is a static Bearer API key, not OAuth2.
+- id: oidc
+  conforms: false
+- id: rfc9457-problem-details
+  conforms: false
+  evidence: Errors are plain JSON, not application/problem+json.
+- id: json-api
+  conforms: false
+  evidence: Uses page[number]/page[size] query bracket params but not the full JSON:API media type/envelope.
+- id: rest-json
+  conforms: true
+  evidence: Resource-oriented REST over HTTPS returning application/json.
+- id: pagination
+  conforms: true
+  evidence: Page-number pagination via page[number]/page[size] with a next_page URL.
+- id: idempotency
+  conforms: false
+  evidence: No idempotency-key contract documented.
+- id: metrc
+  conforms: true
+  evidence: Distru synchronizes inventory and compliance data with Metrc (state cannabis track-and-trace).
+- id: biotrack
+  conforms: true
+  evidence: Distru integrates with BioTrack state track-and-trace.
+compliance_program:
+  published: false
+  notes: >-
+    No public trust center, SOC 2 / ISO 27001 / HIPAA certification page, or
+    named compliance program was found on distru.com. Cannabis regulatory
+    compliance (Metrc/BioTrack) is a product feature, not a security-certs
+    posture, so no `Compliance` pointer is emitted.

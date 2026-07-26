@@ -1,0 +1,16 @@
+generated: '2026-07-18'
+method: generated
+source: openapi/distru-openapi.yml
+notes: >-
+  Agent Skills generated from the documented Distru API operations (every
+  operationId is verified present in openapi/distru-openapi.yml). No provider-
+  published skills or AGENTS.md were found.
+skills:
+- file: distru-sync-inventory.md
+  name: Sync Distru inventory and products
+  api: openapi/distru-openapi.yml
+  operations: [listProducts, getProduct, listInventory, listBatches, listPackages]
+- file: distru-order-to-invoice.md
+  name: Create a Distru order and invoice it
+  api: openapi/distru-openapi.yml
+  operations: [listCompanies, upsertOrder, getOrder, createInvoice, createInvoicePayment]

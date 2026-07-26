@@ -1,0 +1,31 @@
+generated: '2026-07-18'
+method: derived
+source: openapi/distru-openapi.yml
+docs: https://apidocs.distru.dev
+format: json
+envelope:
+  notes: >-
+    Distru returns a JSON error body on failure. It is not RFC 9457
+    application/problem+json. Status codes observed in the published reference
+    are 400, 401, 404, 422 and 500.
+problems:
+- status: 400
+  title: Bad request
+  meaning: The request was malformed or a parameter was invalid.
+  remediation: Check query parameters and request body against the reference.
+- status: 401
+  title: Unauthorized
+  meaning: Missing or invalid Bearer API key, or an expired key.
+  remediation: Supply a valid Authorization Bearer key; regenerate if expired (keys last one year).
+- status: 404
+  title: Not found
+  meaning: The referenced resource id does not exist or is not visible to the key's account.
+  remediation: Verify the resource id and that it belongs to the authenticated company.
+- status: 422
+  title: Unprocessable entity
+  meaning: The request was well-formed but failed validation.
+  remediation: Inspect the error message for the invalid field and correct it.
+- status: 500
+  title: Internal server error
+  meaning: An unexpected error occurred on the Distru side.
+  remediation: Retry with backoff; contact hello@distru.com if it persists.

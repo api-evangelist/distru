@@ -1,0 +1,38 @@
+# Distru
+
+> Distru is a cannabis-industry ERP and seed-to-sale platform — inventory, orders, invoicing, purchasing, manufacturing/assemblies, cultivation, and compliance (Metrc/BioTrack) for cultivators, manufacturers, distributors, retailers, and multi-state operators. Its public REST API exposes products, inventory, orders, invoices, purchases, companies, contacts, batches, packages, strains, test results, and more.
+
+## API
+
+- [Distru Public API reference](https://apidocs.distru.dev): Full API documentation.
+- Base URL: `https://app.distru.com/public/v1`
+- Auth: `Authorization: Bearer <API_KEY>` — keys created in-app under Settings > Integrations > Distru API; keys expire one year from issue.
+- Pagination: `page[number]` and `page[size]` (max 500); responses include a `next_page` URL.
+- No webhooks; no enforced rate limits (recommended max ~2 req/sec).
+- [API FAQ](https://help.distru.com/en/articles/12314293-distru-api-faq)
+- [Breaking-change notification signup](https://share.hsforms.com/1ui8lKXQ2RAaytYEyEphCiQ2usrt)
+
+## Specs
+
+- [OpenAPI (API Evangelist reconstruction)](openapi/distru-openapi.yml)
+- [Authentication profile](authentication/distru-authentication.yml)
+- [API conventions](conventions/distru-conventions.yml)
+- [Error catalog](errors/distru-problem-types.yml)
+- [Data model](data-model/distru-data-model.yml)
+- [Lifecycle](lifecycle/distru-lifecycle.yml)
+- [Conformance](conformance/distru-conformance.yml)
+
+## Docs
+
+- [Distru API feature page](https://www.distru.com/features/distru-api)
+- [Help Center](https://help.distru.com/en/)
+- [Blog](https://www.distru.com/cannabis-blog)
+- [Integrations](https://www.distru.com/cannabis-software-integrations-partners)
+
+## Product
+
+- [Homepage](https://www.distru.com)
+- [Seed-to-Sale software](https://www.distru.com/seed-to-sale-software)
+- [DistruCommerce wholesale](https://www.distru.com/commerce)
+- [Metrc integration](https://www.distru.com/integrations/metrc)
+- [BioTrack integration](https://www.distru.com/integrations/biotrack)

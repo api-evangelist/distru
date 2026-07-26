@@ -1,0 +1,20 @@
+generated: '2026-07-18'
+method: searched
+source: https://help.distru.com/en/articles/12314293-distru-api-faq
+versioning:
+  scheme: uri-path
+  current: v1
+  base_path: /public/v1
+  docs: https://apidocs.distru.dev
+credentials:
+  api_key_expiry: 1 year from issue date
+  rotation: Keys are created and revoked in-app under Settings > Integrations > Distru API.
+change_notifications:
+  breaking_change_signup: https://share.hsforms.com/1ui8lKXQ2RAaytYEyEphCiQ2usrt
+  notes: >-
+    Distru offers an email signup to be notified of breaking API changes. There
+    is no separately published deprecation-policy page or Sunset/Deprecation
+    header contract, and no public status page was found.
+status_page: null
+deprecation_policy: null
+deprecated_operations: []

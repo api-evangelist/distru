@@ -1,0 +1,51 @@
+generated: '2026-07-18'
+method: searched
+source: https://help.distru.com/en/articles/12314293-distru-api-faq
+docs: https://apidocs.distru.dev
+api: openapi/distru-openapi.yml
+authentication:
+  style: bearer-api-key
+  header: 'Authorization: Bearer <API_KEY>'
+  managed_in_app: Settings > Integrations > Distru API
+  key_expiry: 1 year from issue date
+  ref: authentication/distru-authentication.yml
+idempotency:
+  supported: false
+  notes: >-
+    Distru does not document an idempotency-key header or parameter. Create/
+    update endpoints use upsert semantics (companies, orders, products,
+    strains, purchases) so retries of the same logical entity update in place
+    rather than duplicate, but there is no formal idempotency contract.
+pagination:
+  style: page-number
+  params:
+  - page[number]
+  - page[size]
+  max_page_size: 500
+  response_fields:
+  - next_page
+  notes: >-
+    List endpoints accept page[number] (1-based) and page[size]. Responses
+    include a next_page URL when additional pages exist; it is null/absent on
+    the last page.
+rate_limiting:
+  enforced: false
+  recommended_max: 2 requests/second
+  signaling: none
+  notes: >-
+    Distru does not currently enforce rate limits and does not return rate-limit
+    headers. Documented best practice is a maximum of ~2 calls per second.
+versioning:
+  scheme: uri-path
+  current: v1
+  base_path: /public/v1
+error_envelope:
+  format: json
+  ref: errors/distru-problem-types.yml
+  notes: JSON error body; not RFC 9457 application/problem+json.
+webhooks:
+  supported: false
+  notes: Distru does not currently offer webhooks in the public API.
+data_format:
+  media_type: application/json
+  identifiers: UUID (v4) for most resources; integer ids for custom fields and some POS mappings.

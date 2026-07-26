@@ -1,0 +1,162 @@
+generated: '2026-07-18'
+method: derived
+status: candidate
+source: openapi/distru-openapi.yml
+notes: >-
+  No official hosted/remote MCP server was found for Distru. This is a
+  candidate tool list derived one-to-one from the documented API operations so
+  an MCP server can be generated. Not an official Distru product.
+server:
+  name: distru
+  transport: http
+tools:
+- name: listProducts
+  description: List products
+  source_operation: openapi/distru-openapi.yml#listProducts
+- name: upsertProduct
+  description: Create or update a product
+  source_operation: openapi/distru-openapi.yml#upsertProduct
+- name: getProduct
+  description: Retrieve a product
+  source_operation: openapi/distru-openapi.yml#getProduct
+- name: listInventory
+  description: List inventory
+  source_operation: openapi/distru-openapi.yml#listInventory
+- name: listOrders
+  description: List orders
+  source_operation: openapi/distru-openapi.yml#listOrders
+- name: upsertOrder
+  description: Create or update an order
+  source_operation: openapi/distru-openapi.yml#upsertOrder
+- name: getOrder
+  description: Retrieve an order
+  source_operation: openapi/distru-openapi.yml#getOrder
+- name: listInvoices
+  description: List invoices
+  source_operation: openapi/distru-openapi.yml#listInvoices
+- name: createInvoice
+  description: Create an invoice
+  source_operation: openapi/distru-openapi.yml#createInvoice
+- name: getInvoice
+  description: Retrieve an invoice
+  source_operation: openapi/distru-openapi.yml#getInvoice
+- name: createInvoicePayment
+  description: Record a payment against an invoice
+  source_operation: openapi/distru-openapi.yml#createInvoicePayment
+- name: listPurchases
+  description: List purchases
+  source_operation: openapi/distru-openapi.yml#listPurchases
+- name: upsertPurchase
+  description: Create or update a purchase
+  source_operation: openapi/distru-openapi.yml#upsertPurchase
+- name: getPurchase
+  description: Retrieve a purchase
+  source_operation: openapi/distru-openapi.yml#getPurchase
+- name: createPurchasePayment
+  description: Record a payment against a purchase
+  source_operation: openapi/distru-openapi.yml#createPurchasePayment
+- name: listCompanies
+  description: List companies
+  source_operation: openapi/distru-openapi.yml#listCompanies
+- name: upsertCompany
+  description: Create or update a company
+  source_operation: openapi/distru-openapi.yml#upsertCompany
+- name: getCompany
+  description: Retrieve a company
+  source_operation: openapi/distru-openapi.yml#getCompany
+- name: listContacts
+  description: List contacts
+  source_operation: openapi/distru-openapi.yml#listContacts
+- name: getContact
+  description: Retrieve a contact
+  source_operation: openapi/distru-openapi.yml#getContact
+- name: listBatches
+  description: List batches
+  source_operation: openapi/distru-openapi.yml#listBatches
+- name: createBatch
+  description: Create a batch
+  source_operation: openapi/distru-openapi.yml#createBatch
+- name: getBatch
+  description: Retrieve a batch
+  source_operation: openapi/distru-openapi.yml#getBatch
+- name: listPackages
+  description: List packages
+  source_operation: openapi/distru-openapi.yml#listPackages
+- name: listAssemblies
+  description: List assemblies
+  source_operation: openapi/distru-openapi.yml#listAssemblies
+- name: getAssembly
+  description: Retrieve an assembly
+  source_operation: openapi/distru-openapi.yml#getAssembly
+- name: listStrains
+  description: List strains
+  source_operation: openapi/distru-openapi.yml#listStrains
+- name: upsertStrain
+  description: Create or update a strain
+  source_operation: openapi/distru-openapi.yml#upsertStrain
+- name: getStrain
+  description: Retrieve a strain
+  source_operation: openapi/distru-openapi.yml#getStrain
+- name: listTestResults
+  description: List test results
+  source_operation: openapi/distru-openapi.yml#listTestResults
+- name: createTestResult
+  description: Create a test result
+  source_operation: openapi/distru-openapi.yml#createTestResult
+- name: listLocations
+  description: List locations
+  source_operation: openapi/distru-openapi.yml#listLocations
+- name: getLocation
+  description: Retrieve a location
+  source_operation: openapi/distru-openapi.yml#getLocation
+- name: listMenus
+  description: List menus
+  source_operation: openapi/distru-openapi.yml#listMenus
+- name: getMenu
+  description: Retrieve a menu
+  source_operation: openapi/distru-openapi.yml#getMenu
+- name: listPaymentMethods
+  description: List payment methods
+  source_operation: openapi/distru-openapi.yml#listPaymentMethods
+- name: getPaymentMethod
+  description: Retrieve a payment method
+  source_operation: openapi/distru-openapi.yml#getPaymentMethod
+- name: listReturns
+  description: List returns
+  source_operation: openapi/distru-openapi.yml#listReturns
+- name: getReturn
+  description: Retrieve a return
+  source_operation: openapi/distru-openapi.yml#getReturn
+- name: listAdjustments
+  description: List stock adjustments
+  source_operation: openapi/distru-openapi.yml#listAdjustments
+- name: getAdjustment
+  description: Retrieve a stock adjustment
+  source_operation: openapi/distru-openapi.yml#getAdjustment
+- name: createStockAdjustment
+  description: Create a stock adjustment
+  source_operation: openapi/distru-openapi.yml#createStockAdjustment
+- name: createCustomField
+  description: Create a custom field
+  source_operation: openapi/distru-openapi.yml#createCustomField
+- name: getCustomField
+  description: Retrieve a custom field
+  source_operation: openapi/distru-openapi.yml#getCustomField
+- name: createFileAttachment
+  description: Upload a file attachment
+  source_operation: openapi/distru-openapi.yml#createFileAttachment
+- name: createVehicle
+  description: Create a vehicle
+  source_operation: openapi/distru-openapi.yml#createVehicle
+- name: listProductPosMappings
+  description: List product POS mappings
+  source_operation: openapi/distru-openapi.yml#listProductPosMappings
+- name: createProductPosMapping
+  description: Create a product POS mapping
+  source_operation: openapi/distru-openapi.yml#createProductPosMapping
+- name: getProductPosMapping
+  description: Retrieve a product POS mapping
+  source_operation: openapi/distru-openapi.yml#getProductPosMapping
+- name: deleteProductPosMapping
+  description: Delete a product POS mapping
+  source_operation: openapi/distru-openapi.yml#deleteProductPosMapping
