@@ -418,7 +418,7 @@ common:
 - type: LinkedIn
   url: https://www.linkedin.com/company/distru
 - type: OpenAPI
-  url: openapi/distru-openapi.yml
+  url: openapi/_original/distru-openapi.yml
 - type: Authentication
   url: authentication/distru-authentication.yml
 - type: Conventions
