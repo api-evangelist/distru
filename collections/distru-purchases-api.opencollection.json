@@ -1,0 +1,104 @@
+{
+  "opencollection": "1.0.0",
+  "info": {
+    "name": "Distru Public Assemblies Purchases API",
+    "version": "v1"
+  },
+  "request": {
+    "auth": {
+      "type": "bearer",
+      "token": "{{bearerToken}}"
+    }
+  },
+  "items": [
+    {
+      "info": {
+        "name": "Purchases",
+        "type": "folder"
+      },
+      "items": [
+        {
+          "info": {
+            "name": "List purchases",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/purchases",
+            "params": [
+              {
+                "name": "page[number]",
+                "value": "",
+                "type": "query",
+                "description": "1-based page number."
+              },
+              {
+                "name": "page[size]",
+                "value": "",
+                "type": "query",
+                "description": "Page size (max 500 for most collections)."
+              }
+            ]
+          },
+          "docs": "List purchases"
+        },
+        {
+          "info": {
+            "name": "Create or update a purchase",
+            "type": "http"
+          },
+          "http": {
+            "method": "POST",
+            "url": "https://app.distru.com/public/v1/purchases",
+            "body": {
+              "type": "json",
+              "data": "{}"
+            }
+          },
+          "docs": "Create or update a purchase"
+        },
+        {
+          "info": {
+            "name": "Retrieve a purchase",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/purchases/:id",
+            "params": [
+              {
+                "name": "id",
+                "value": "",
+                "type": "path"
+              }
+            ]
+          },
+          "docs": "Retrieve a purchase"
+        },
+        {
+          "info": {
+            "name": "Record a payment against a purchase",
+            "type": "http"
+          },
+          "http": {
+            "method": "POST",
+            "url": "https://app.distru.com/public/v1/purchases/:id/payments",
+            "params": [
+              {
+                "name": "id",
+                "value": "",
+                "type": "path"
+              }
+            ],
+            "body": {
+              "type": "json",
+              "data": "{}"
+            }
+          },
+          "docs": "Record a payment against a purchase"
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

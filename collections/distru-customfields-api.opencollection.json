@@ -1,0 +1,57 @@
+{
+  "opencollection": "1.0.0",
+  "info": {
+    "name": "Distru Public Assemblies CustomFields API",
+    "version": "v1"
+  },
+  "request": {
+    "auth": {
+      "type": "bearer",
+      "token": "{{bearerToken}}"
+    }
+  },
+  "items": [
+    {
+      "info": {
+        "name": "CustomFields",
+        "type": "folder"
+      },
+      "items": [
+        {
+          "info": {
+            "name": "Create a custom field",
+            "type": "http"
+          },
+          "http": {
+            "method": "POST",
+            "url": "https://app.distru.com/public/v1/custom-fields",
+            "body": {
+              "type": "json",
+              "data": "{}"
+            }
+          },
+          "docs": "Create a custom field"
+        },
+        {
+          "info": {
+            "name": "Retrieve a custom field",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/custom-fields/:id",
+            "params": [
+              {
+                "name": "id",
+                "value": "",
+                "type": "path"
+              }
+            ]
+          },
+          "docs": "Retrieve a custom field"
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

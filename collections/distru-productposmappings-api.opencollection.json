@@ -1,0 +1,100 @@
+{
+  "opencollection": "1.0.0",
+  "info": {
+    "name": "Distru Public Assemblies ProductPosMappings API",
+    "version": "v1"
+  },
+  "request": {
+    "auth": {
+      "type": "bearer",
+      "token": "{{bearerToken}}"
+    }
+  },
+  "items": [
+    {
+      "info": {
+        "name": "ProductPosMappings",
+        "type": "folder"
+      },
+      "items": [
+        {
+          "info": {
+            "name": "List product POS mappings",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/product-pos-mappings",
+            "params": [
+              {
+                "name": "page[number]",
+                "value": "",
+                "type": "query",
+                "description": "1-based page number."
+              },
+              {
+                "name": "page[size]",
+                "value": "",
+                "type": "query",
+                "description": "Page size (max 500 for most collections)."
+              }
+            ]
+          },
+          "docs": "List product POS mappings"
+        },
+        {
+          "info": {
+            "name": "Create a product POS mapping",
+            "type": "http"
+          },
+          "http": {
+            "method": "POST",
+            "url": "https://app.distru.com/public/v1/product-pos-mappings",
+            "body": {
+              "type": "json",
+              "data": "{}"
+            }
+          },
+          "docs": "Create a product POS mapping"
+        },
+        {
+          "info": {
+            "name": "Retrieve a product POS mapping",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/product-pos-mappings/:id",
+            "params": [
+              {
+                "name": "id",
+                "value": "",
+                "type": "path"
+              }
+            ]
+          },
+          "docs": "Retrieve a product POS mapping"
+        },
+        {
+          "info": {
+            "name": "Delete a product POS mapping",
+            "type": "http"
+          },
+          "http": {
+            "method": "DELETE",
+            "url": "https://app.distru.com/public/v1/product-pos-mappings/:id",
+            "params": [
+              {
+                "name": "id",
+                "value": "",
+                "type": "path"
+              }
+            ]
+          },
+          "docs": "Delete a product POS mapping"
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

@@ -2,10 +2,9 @@ generated: '2026-07-18'
 method: derived
 status: candidate
 source: openapi/distru-openapi.yml
-notes: >-
-  No official hosted/remote MCP server was found for Distru. This is a
-  candidate tool list derived one-to-one from the documented API operations so
-  an MCP server can be generated. Not an official Distru product.
+notes: No official hosted/remote MCP server was found for Distru. This is a candidate tool list derived
+  one-to-one from the documented API operations so an MCP server can be generated. Not an official Distru
+  product.
 server:
   name: distru
   transport: http
@@ -160,3 +159,9 @@ tools:
 - name: deleteProductPosMapping
   description: Delete a product POS mapping
   source_operation: openapi/distru-openapi.yml#deleteProductPosMapping
+deployment:
+  mode: none
+  verified: derived
+  tools: 50
+  checked: '2026-08-12'
+  source: catalog MCP census

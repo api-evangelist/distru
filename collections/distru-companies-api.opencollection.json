@@ -1,0 +1,82 @@
+{
+  "opencollection": "1.0.0",
+  "info": {
+    "name": "Distru Public Assemblies Companies API",
+    "version": "v1"
+  },
+  "request": {
+    "auth": {
+      "type": "bearer",
+      "token": "{{bearerToken}}"
+    }
+  },
+  "items": [
+    {
+      "info": {
+        "name": "Companies",
+        "type": "folder"
+      },
+      "items": [
+        {
+          "info": {
+            "name": "List companies",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/companies",
+            "params": [
+              {
+                "name": "page[number]",
+                "value": "",
+                "type": "query",
+                "description": "1-based page number."
+              },
+              {
+                "name": "page[size]",
+                "value": "",
+                "type": "query",
+                "description": "Page size (max 500 for most collections)."
+              }
+            ]
+          },
+          "docs": "List companies"
+        },
+        {
+          "info": {
+            "name": "Create or update a company",
+            "type": "http"
+          },
+          "http": {
+            "method": "POST",
+            "url": "https://app.distru.com/public/v1/companies",
+            "body": {
+              "type": "json",
+              "data": "{}"
+            }
+          },
+          "docs": "Create or update a company"
+        },
+        {
+          "info": {
+            "name": "Retrieve a company",
+            "type": "http"
+          },
+          "http": {
+            "method": "GET",
+            "url": "https://app.distru.com/public/v1/companies/:id",
+            "params": [
+              {
+                "name": "id",
+                "value": "",
+                "type": "path"
+              }
+            ]
+          },
+          "docs": "Retrieve a company"
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}
