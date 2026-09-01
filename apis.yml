@@ -268,7 +268,7 @@ apis:
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - PaymentMethods
+  - Payment Methods
   tags_raw:
   - PaymentMethods
   properties:
@@ -384,7 +384,7 @@ apis:
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - TestResults
+  - Test Results
   tags_raw:
   - TestResults
   properties:
