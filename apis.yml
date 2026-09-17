@@ -131,40 +131,6 @@ apis:
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-customfields-api
-  name: Distru CustomFields API
-  description: The CustomFields API from Distru — 2 operation(s) for customfields.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Custom Fields
-  tags_raw:
-  - CustomFields
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-customfields-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
-- aid: distru:distru-fileattachments-api
-  name: Distru FileAttachments API
-  description: The FileAttachments API from Distru — 1 operation(s) for fileattachments.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - FileAttachments
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-fileattachments-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
 - aid: distru:distru-inventory-api
   name: Distru Inventory API
   description: The Inventory API from Distru — 1 operation(s) for inventory.
@@ -257,24 +223,6 @@ apis:
   properties:
   - type: OpenAPI
     url: openapi/distru-packages-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
-- aid: distru:distru-paymentmethods-api
-  name: Distru PaymentMethods API
-  description: The PaymentMethods API from Distru — 2 operation(s) for paymentmethods.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Payment Methods
-  tags_raw:
-  - PaymentMethods
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-paymentmethods-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
@@ -379,24 +327,6 @@ apis:
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-testresults-api
-  name: Distru TestResults API
-  description: The TestResults API from Distru — 1 operation(s) for testresults.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Test Results
-  tags_raw:
-  - TestResults
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-testresults-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
 - aid: distru:distru-vehicles-api
   name: Distru Vehicles API
   description: The Vehicles API from Distru — 1 operation(s) for vehicles.
@@ -407,6 +337,70 @@ apis:
   properties:
   - type: OpenAPI
     url: openapi/distru-vehicles-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-custom-fields-api
+  name: Distru Custom Fields API
+  description: The Custom Fields API from Distru — 2 operation(s) for custom fields.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Custom Fields
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-custom-fields-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-file-attachments-api
+  name: Distru File Attachments API
+  description: The File Attachments API from Distru — 1 operation(s) for file attachments.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - File Attachments
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-file-attachments-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-payment-methods-api
+  name: Distru Payment Methods API
+  description: The Payment Methods API from Distru — 2 operation(s) for payment methods.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Payment Methods
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-payment-methods-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-test-results-api
+  name: Distru Test Results API
+  description: The Test Results API from Distru — 1 operation(s) for test results.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Test Results
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-test-results-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
