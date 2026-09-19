@@ -169,6 +169,8 @@ apis:
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
+  - Location
+  tags_raw:
   - Locations
   properties:
   - type: OpenAPI
@@ -317,6 +319,8 @@ apis:
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
+  - Strain
+  tags_raw:
   - Strains
   properties:
   - type: OpenAPI
@@ -365,6 +369,8 @@ apis:
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
+  - FileAttachments
+  tags_raw:
   - File Attachments
   properties:
   - type: OpenAPI
