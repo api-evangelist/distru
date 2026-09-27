@@ -66,12 +66,6 @@ paths:
           $ref: '#/components/responses/Unprocessable'
 components:
   responses:
-    Paged:
-      description: A page of results.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Page'
     Unprocessable:
       description: Validation error.
       content:
@@ -84,6 +78,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Problem'
+    Paged:
+      description: A page of results.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Page'
     OK:
       description: Success.
       content:
@@ -91,14 +91,6 @@ components:
           schema:
             $ref: '#/components/schemas/Resource'
   parameters:
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
     pageNumber:
       name: page[number]
       in: query
@@ -107,9 +99,15 @@ components:
         type: integer
         minimum: 1
       description: 1-based page number.
+    pageSize:
+      name: page[size]
+      in: query
+      required: false
+      schema:
+        type: integer
+        maximum: 500
+      description: Page size (max 500 for most collections).
   schemas:
-    Resource:
-      type: object
     Problem:
       type: object
       properties:
@@ -117,6 +115,8 @@ components:
           type: string
         message:
           type: string
+    Resource:
+      type: object
     Page:
       type: object
       properties:

@@ -38,6 +38,19 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Page'
+  schemas:
+    Page:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+        next_page:
+          type:
+          - string
+          - 'null'
+          description: URL of the next page of results, or null on the last page.
   parameters:
     pageSize:
       name: page[size]
@@ -55,19 +68,6 @@ components:
         type: integer
         minimum: 1
       description: 1-based page number.
-  schemas:
-    Page:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            type: object
-        next_page:
-          type:
-          - string
-          - 'null'
-          description: URL of the next page of results, or null on the last page.
   securitySchemes:
     bearerAuth:
       type: http

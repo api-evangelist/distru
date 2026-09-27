@@ -70,45 +70,6 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 components:
-  parameters:
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
-    pageNumber:
-      name: page[number]
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-      description: 1-based page number.
-  schemas:
-    Resource:
-      type: object
-    Problem:
-      type: object
-      properties:
-        error:
-          type: string
-        message:
-          type: string
-    Page:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            type: object
-        next_page:
-          type:
-          - string
-          - 'null'
-          description: URL of the next page of results, or null on the last page.
   responses:
     Unprocessable:
       description: Validation error.
@@ -122,18 +83,57 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Problem'
-    OK:
-      description: Success.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Resource'
     Unauthorized:
       description: Missing or invalid API key.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Problem'
+    OK:
+      description: Success.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Resource'
+  parameters:
+    pageNumber:
+      name: page[number]
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: 1-based page number.
+    pageSize:
+      name: page[size]
+      in: query
+      required: false
+      schema:
+        type: integer
+        maximum: 500
+      description: Page size (max 500 for most collections).
+  schemas:
+    Problem:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    Resource:
+      type: object
+    Page:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+        next_page:
+          type:
+          - string
+          - 'null'
+          description: URL of the next page of results, or null on the last page.
   securitySchemes:
     bearerAuth:
       type: http

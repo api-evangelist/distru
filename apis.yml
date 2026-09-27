@@ -369,8 +369,6 @@ apis:
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - FileAttachments
-  tags_raw:
   - File Attachments
   properties:
   - type: OpenAPI
