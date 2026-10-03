@@ -36,6 +36,16 @@ paths:
         '422':
           $ref: '#/components/responses/Unprocessable'
 components:
+  schemas:
+    Problem:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    Resource:
+      type: object
   responses:
     Unprocessable:
       description: Validation error.
@@ -49,16 +59,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Resource'
-  schemas:
-    Resource:
-      type: object
-    Problem:
-      type: object
-      properties:
-        error:
-          type: string
-        message:
-          type: string
   securitySchemes:
     bearerAuth:
       type: http

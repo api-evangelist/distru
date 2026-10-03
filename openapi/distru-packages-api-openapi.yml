@@ -31,13 +31,23 @@ paths:
         '200':
           $ref: '#/components/responses/Paged'
 components:
-  responses:
-    Paged:
-      description: A page of results.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Page'
+  parameters:
+    pageNumber:
+      name: page[number]
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: 1-based page number.
+    pageSize:
+      name: page[size]
+      in: query
+      required: false
+      schema:
+        type: integer
+        maximum: 500
+      description: Page size (max 500 for most collections).
   schemas:
     Page:
       type: object
@@ -51,23 +61,13 @@ components:
           - string
           - 'null'
           description: URL of the next page of results, or null on the last page.
-  parameters:
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
-    pageNumber:
-      name: page[number]
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-      description: 1-based page number.
+  responses:
+    Paged:
+      description: A page of results.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Page'
   securitySchemes:
     bearerAuth:
       type: http
