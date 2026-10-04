@@ -87,31 +87,6 @@ paths:
         '422':
           $ref: '#/components/responses/Unprocessable'
 components:
-  responses:
-    Unprocessable:
-      description: Validation error.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    OK:
-      description: Success.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Resource'
-    Paged:
-      description: A page of results.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Page'
-    NotFound:
-      description: Resource not found.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Problem'
   schemas:
     Page:
       type: object
@@ -125,6 +100,8 @@ components:
           - string
           - 'null'
           description: URL of the next page of results, or null on the last page.
+    Resource:
+      type: object
     Problem:
       type: object
       properties:
@@ -132,17 +109,32 @@ components:
           type: string
         message:
           type: string
-    Resource:
-      type: object
+  responses:
+    Unprocessable:
+      description: Validation error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Paged:
+      description: A page of results.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Page'
+    OK:
+      description: Success.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Resource'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
   parameters:
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
     pageNumber:
       name: page[number]
       in: query
@@ -151,6 +143,14 @@ components:
         type: integer
         minimum: 1
       description: 1-based page number.
+    pageSize:
+      name: page[size]
+      in: query
+      required: false
+      schema:
+        type: integer
+        maximum: 500
+      description: Page size (max 500 for most collections).
   securitySchemes:
     bearerAuth:
       type: http

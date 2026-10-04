@@ -71,6 +71,12 @@ paths:
           $ref: '#/components/responses/NotFound'
 components:
   responses:
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Unprocessable:
       description: Validation error.
       content:
@@ -83,12 +89,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Resource'
-    Unauthorized:
-      description: Missing or invalid API key.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Problem'
     NotFound:
       description: Resource not found.
       content:
@@ -96,6 +96,8 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    Resource:
+      type: object
     Page:
       type: object
       properties:
@@ -115,17 +117,7 @@ components:
           type: string
         message:
           type: string
-    Resource:
-      type: object
   parameters:
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
     pageNumber:
       name: page[number]
       in: query
@@ -134,6 +126,14 @@ components:
         type: integer
         minimum: 1
       description: 1-based page number.
+    pageSize:
+      name: page[size]
+      in: query
+      required: false
+      schema:
+        type: integer
+        maximum: 500
+      description: Page size (max 500 for most collections).
   securitySchemes:
     bearerAuth:
       type: http

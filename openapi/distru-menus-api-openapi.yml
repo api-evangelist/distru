@@ -61,6 +61,8 @@ components:
           - string
           - 'null'
           description: URL of the next page of results, or null on the last page.
+    Resource:
+      type: object
     Problem:
       type: object
       properties:
@@ -68,25 +70,6 @@ components:
           type: string
         message:
           type: string
-    Resource:
-      type: object
-  parameters:
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
-    pageNumber:
-      name: page[number]
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-      description: 1-based page number.
   responses:
     OK:
       description: Success.
@@ -106,6 +89,23 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Problem'
+  parameters:
+    pageNumber:
+      name: page[number]
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: 1-based page number.
+    pageSize:
+      name: page[size]
+      in: query
+      required: false
+      schema:
+        type: integer
+        maximum: 500
+      description: Page size (max 500 for most collections).
   securitySchemes:
     bearerAuth:
       type: http
