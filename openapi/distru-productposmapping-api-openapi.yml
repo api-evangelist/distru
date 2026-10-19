@@ -1,0 +1,442 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Product Pos Mapping API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: ProductPosMapping
+paths:
+  /public/v1/product-pos-mappings:
+    get:
+      description: 'List the links between your Distru products and their matching products in an external point-of-sale (POS) catalog — Blaze, Dutchie, or Treez. Each row is one product-to-POS-product link; a single Distru product can appear more than once when it is mapped in several POS systems or to several retailers.
+
+
+        Filtering:
+
+        • Pass no filter to return every POS mapping for your company, across all POS systems and retailers.
+
+        • `product_id` returns every mapping for one Distru product.
+
+        • `blaze_retailer_id`, `dutchie_retailer_id`, or `treez_retailer_id` returns every mapping for one connected retailer of that POS.
+
+
+        At most one of the id selectors (`product_id`, `blaze_retailer_id`, `dutchie_retailer_id`, `treez_retailer_id`) may be supplied per request — sending more than one returns 400. Each id selector is an exact match on the stored id, not a search. The `inserted_datetime` and `updated_datetime` ranges are separate and may be added on top of any (or no) id selector to narrow the result to a creation/last-updated window. The full matching set is returned in one response.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.ProductPosMappingController.index
+      parameters:
+      - description: Return only mappings for this Distru product, given as its ID. Exact match. Cannot be combined with any retailer filter.
+        in: query
+        name: product_id
+        required: false
+        example: ?product_id=123e4567-e89b-12d3-a456-426614174000
+        schema:
+          type: string
+      - description: Return only Blaze mappings for this connected Blaze retailer, given as its Distru ID (the `blaze_retailer_id` seen on a mapping). Exact match. Cannot be combined with another filter.
+        in: query
+        name: blaze_retailer_id
+        required: false
+        example: ?blaze_retailer_id=456e7890-e89b-12d3-a456-426614174000
+        schema:
+          type: string
+      - description: Return only Dutchie mappings for this connected Dutchie retailer, given as its Distru ID (the `dutchie_retailer_id` seen on a mapping). Exact match. Cannot be combined with another filter.
+        in: query
+        name: dutchie_retailer_id
+        required: false
+        example: ?dutchie_retailer_id=789e0123-e89b-12d3-a456-426614174000
+        schema:
+          type: string
+      - description: Return only Treez mappings for this connected Treez retailer, given as its Distru retailer id (an integer). Exact match. Cannot be combined with another filter.
+        in: query
+        name: treez_retailer_id
+        required: false
+        schema:
+          type: integer
+      - description: 'Filter to product POS mappings by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it. May be combined with an id selector.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to product POS mappings by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range. May be combined with an id selector.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductPosMappingsResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: List product POS mappings
+      tags:
+      - ProductPosMapping
+    post:
+      description: 'Create or update the link between one of your Distru products and its matching product in a single external POS catalog (Blaze, Dutchie, or Treez). This link is what lets Distru recognize the same product on both sides when it reconciles catalogs, menus, and inventory with that retailer, so mapping a product is a prerequisite for that retailer''s POS integration to act on it.
+
+
+        You do not send a POS type. It is derived from which POS fields you supply, and you must supply exactly one complete pair:
+
+        • Blaze: `blaze_product_id` + `blaze_retailer_id` (optionally `blaze_asset_id`).
+
+        • Dutchie: `dutchie_product_id` + `dutchie_retailer_id`.
+
+        • Treez: `treez_product_id` + `treez_retailer_id` (optionally `treez_photo_url`).
+
+
+        Supplying no complete pair, or fields belonging to more than one POS, returns 400 — a mapping targets one POS only.
+
+
+        Create vs. update is decided for you: the request matches an existing mapping by product plus the retailer of the supplied POS. A match is updated in place and returns 200; no match creates a new mapping and returns 201. Because the match key is stable, sending the same body twice is idempotent and never produces a duplicate.
+
+
+        Before the mapping is written, several things are checked and any failure returns 400 with a human-readable message:
+
+        • The `product_id` must be a product in your company.
+
+        • The supplied retailer must be a POS retailer connected to your company.
+
+        • The supplied POS product must already exist in Distru''s synced copy of that retailer''s catalog — you cannot map to a product Distru has not yet pulled from the POS.
+
+        • For Blaze only, the product''s category must already have a Blaze category mapping configured for that retailer.
+
+
+        Uniqueness is enforced on both sides: a given POS product can back only one Distru product per retailer, and a Distru product can have only one mapping per retailer. Violating either returns 400.
+
+
+        On update, only the fields you send are changed — the request is sparse. The `product_id` plus the complete POS pair must always be present (they form the match key and are re-validated), but the optional fields are treated per-field: omit `blaze_asset_id` or `treez_photo_url` to keep its current value, or send it as `null` to clear it. Repointing to a different POS product for the same retailer is a normal update: send the new `..._product_id` with the same `product_id` and retailer id.
+
+
+        This endpoint only maintains the link record — it does not itself move inventory or push the product to the POS; it makes the product eligible for that retailer''s sync.
+
+
+        Required permission: `products_permissions_edit`.'
+      operationId: DistruPublic.V1.ProductPosMappingController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertProductPosMapping'
+        description: POS mapping data
+        required: true
+      responses:
+        '200':
+          description: Updated existing mapping
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductPosMappingResponse'
+        '201':
+          description: Created new mapping
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductPosMappingResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create or update a product POS mapping
+      tags:
+      - ProductPosMapping
+  /public/v1/product-pos-mappings/{id}:
+    delete:
+      description: 'Permanently remove a single product POS mapping by its id. The row is hard-deleted, not soft-deleted, so it will no longer appear in list or get responses and the id cannot be reused.
+
+
+        This removes only the link between the Distru product and the external POS product. It does not change the product, the connected retailer, or anything in the external POS catalog; it just stops Distru from treating them as the same product going forward. To repoint a product at a different POS product, delete the mapping and upsert a new one (or upsert over the existing one).
+
+
+        Returns 204 on success, or 404 if no mapping with that id belongs to your company.
+
+
+        Required permission: `products_permissions_edit`.'
+      operationId: DistruPublic.V1.ProductPosMappingController.delete
+      parameters:
+      - description: ID of the product POS mapping to delete, as returned in the `id` field of a mapping. Must belong to a product in your company, or the request returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a product POS mapping
+      tags:
+      - ProductPosMapping
+    get:
+      description: 'Fetch a single product POS mapping by its id. The response includes the linked Distru product, the POS type, and only the POS-specific fields for that type (Blaze, Dutchie, or Treez).
+
+
+        Returns 404 if no mapping with that id belongs to a product in your company.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.ProductPosMappingController.show
+      parameters:
+      - description: ID of the product POS mapping, as returned in the `id` field of a mapping. Must belong to a product in your company, or the request returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single product POS mapping
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductPosMappingResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a product POS mapping
+      tags:
+      - ProductPosMapping
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ProductPosMapping:
+      description: A link between a Distru product and the matching product in an external point-of-sale (POS) system such as Blaze, Dutchie, or Treez. A mapping always targets exactly one POS, given by `pos_type`; only that POS's fields are present in the response, and the fields for the other two POS systems are omitted entirely.
+      properties:
+        blaze_asset_id:
+          description: Blaze asset (image) id for the product, or null if none was set. Present only when `pos_type` is `BLAZE`.
+          type:
+          - string
+          - 'null'
+        blaze_product_id:
+          description: Blaze's own id for the mapped product. Present and non-null only when `pos_type` is `BLAZE`; omitted entirely for other POS types.
+          type: string
+        blaze_retailer_id:
+          description: Distru ID of the connected Blaze retailer this mapping is scoped to. Present and non-null only when `pos_type` is `BLAZE`; omitted entirely for other POS types.
+          type: string
+        dutchie_product_id:
+          description: Dutchie's own numeric id for the mapped product (a Dutchie identifier, not a Distru id). Present and non-null only when `pos_type` is `DUTCHIE`; omitted entirely for other POS types.
+          type: integer
+        dutchie_retailer_id:
+          description: Distru ID of the connected Dutchie retailer this mapping is scoped to. Present and non-null only when `pos_type` is `DUTCHIE`; omitted entirely for other POS types.
+          type: string
+        id:
+          description: ID of this mapping. Use it to fetch or delete the mapping. Always present.
+          type: string
+        inserted_datetime:
+          description: When the mapping was created, in UTC. Always present.
+          format: datetime
+          type: string
+        pos_type:
+          description: Which external POS this mapping targets. One of `BLAZE`, `DUTCHIE`, or `TREEZ` (SCREAMING_CASE). Determines which POS-specific fields below are present. Always present.
+          enum:
+          - BLAZE
+          - DUTCHIE
+          - TREEZ
+          type: string
+        product_id:
+          description: ID of the linked Distru product. Always present.
+          type: string
+        treez_photo_url:
+          description: URL of the product photo in Treez, or null if none was set. Present only when `pos_type` is `TREEZ`.
+          type:
+          - string
+          - 'null'
+        treez_product_id:
+          description: Treez's own id for the mapped product (a Treez identifier, not a Distru id). Present and non-null only when `pos_type` is `TREEZ`; omitted entirely for other POS types.
+          type: string
+        treez_retailer_id:
+          description: ID of the connected Treez retailer this mapping is scoped to, as an integer. Present and non-null only when `pos_type` is `TREEZ`; omitted entirely for other POS types.
+          type: integer
+        updated_datetime:
+          description: When the mapping was last updated, in UTC. Equals `inserted_datetime` until the first update. Always present.
+          format: datetime
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - pos_type
+      - product_id
+      - id
+      title: Product POS Mapping
+      type: object
+    ProductPosMappingsResponse:
+      properties:
+        data:
+          description: The matching POS mappings. Empty when your company has no mappings (or none match the filter).
+          items:
+            $ref: '#/components/schemas/ProductPosMapping'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      required:
+      - data
+      title: Product POS Mappings Response
+      type: object
+    UpsertProductPosMapping:
+      description: Body for creating or updating a product POS mapping. Send `product_id` plus exactly one complete POS pair; the POS type is derived from which pair you supply — do not send it. Mixing fields from more than one POS is rejected. Which existing mapping (if any) gets updated is keyed on `product_id` and the retailer of the supplied POS.
+      example:
+        blaze_product_id: blaze_123
+        blaze_retailer_id: 456e7890-e89b-12d3-a456-426614174000
+        product_id: 123e4567-e89b-12d3-a456-426614174000
+      properties:
+        blaze_asset_id:
+          description: Optional Blaze asset (image) id, accepted only on a Blaze mapping. Omit on update to leave the current value untouched; send `null` to clear it. May be null even on a Blaze mapping.
+          type: string
+        blaze_product_id:
+          description: Blaze's own id for the product to link to. Provide together with `blaze_retailer_id` to make this a Blaze mapping. Must already exist in Distru's synced copy of that Blaze retailer's catalog.
+          type: string
+        blaze_retailer_id:
+          description: Distru ID of the connected Blaze retailer to scope the mapping to. Provide together with `blaze_product_id`.
+          type: string
+        dutchie_product_id:
+          description: Dutchie's own numeric id for the product to link to. Provide together with `dutchie_retailer_id` to make this a Dutchie mapping. Must already exist in Distru's synced copy of that Dutchie retailer's catalog.
+          type: integer
+        dutchie_retailer_id:
+          description: Distru ID of the connected Dutchie retailer to scope the mapping to. Provide together with `dutchie_product_id`.
+          type: string
+        product_id:
+          description: ID of the Distru product to map. Must be a product in your company. Required.
+          type: string
+        treez_photo_url:
+          description: Optional product photo URL, accepted only on a Treez mapping. Omit on update to leave the current value untouched; send `null` to clear it. May be null even on a Treez mapping.
+          type: string
+        treez_product_id:
+          description: Treez's own id for the product to link to. Provide together with `treez_retailer_id` to make this a Treez mapping. Must already exist in Distru's synced copy of that Treez retailer's catalog.
+          type: string
+        treez_retailer_id:
+          description: Distru id of the connected Treez retailer to scope the mapping to, as an integer. Provide together with `treez_product_id`.
+          type: integer
+      required:
+      - product_id
+      title: Upsert Product POS Mapping
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    ProductPosMappingResponse:
+      properties:
+        data:
+          $ref: '#/components/schemas/ProductPosMapping'
+      required:
+      - data
+      title: Product POS Mapping Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

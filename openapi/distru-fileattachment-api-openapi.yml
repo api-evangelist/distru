@@ -1,0 +1,275 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru File Attachment API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: FileAttachment
+paths:
+  /public/v1/file-attachments:
+    post:
+      description: 'Uploads a file and attaches it to exactly one existing record. On success the file is stored and
+
+        served back through the `url` on the response, so a single call both persists the document and
+
+        makes it downloadable.
+
+
+        Send the request as `multipart/form-data` with three parts:
+
+        • `file` — the binary to upload. Required, and must be non-empty (a zero-byte file is rejected).
+
+        • `name` — optional display name; defaults to the uploaded file''s original filename when omitted or blank.
+
+        • exactly one reference id (`product_id`, `order_id`, `purchase_id`, ...) naming the record to attach to. Supply the id — the same id that record''s own endpoint returns. Providing no reference id is rejected, and providing more than one is also rejected; exactly one is required.
+
+
+        This endpoint is create-only. There is no public endpoint to update or delete an attachment, and a
+
+        file cannot be replaced once uploaded — upload a new attachment instead. The response echoes the
+
+        attachment with all reference-id fields present but only the one you set populated; the rest are null.
+
+
+        The attachment is owned by the company tied to the API key you authenticate with, and the response''s
+
+        `uploader` is the user that key belongs to. On success you get a 201 with the created attachment
+
+        wrapped in a `data` envelope; its `url` is immediately downloadable.
+
+
+        System effects: the upload counts against your company''s storage quota. If it would exceed the
+
+        remaining quota the call fails with 400 and nothing is stored — free space under Settings (or remove
+
+        other attachments) and retry. This endpoint does not move inventory and does not push to Metrc or
+
+        BioTrack; it only associates a document with the referenced record.
+
+
+        Required permission: `products_permissions_edit`.'
+      operationId: DistruPublic.V1.FileAttachmentController.insert
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  description: The binary file to upload, sent as a multipart part. Required and must be non-empty — a zero-byte file is rejected. When `name` is omitted or blank, the uploaded file's original filename becomes the attachment name.
+                  type: string
+                  format: binary
+                name:
+                  description: Display name for the attachment. Defaults to the uploaded file's original filename when omitted or blank. Max 255 characters.
+                  type: string
+                product_id:
+                  description: ID of the product to attach this file to, as returned by the product endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                order_id:
+                  description: ID of the order to attach this file to, as returned by the order endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                purchase_id:
+                  description: ID of the purchase to attach this file to, as returned by the purchase endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                invoice_id:
+                  description: ID of the invoice to attach this file to, as returned by the invoice endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                batch_id:
+                  description: ID of the batch to attach this file to, as returned by the batch endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                contact_id:
+                  description: ID of the contact to attach this file to, as returned by the contact endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                company_relationship_id:
+                  description: ID of the company relationship to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                request_id:
+                  description: ID of the request to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                task_id:
+                  description: ID of the task to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                stock_transfer_id:
+                  description: ID of the stock transfer to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                assembly_id:
+                  description: ID of the assembly to attach this file to, as returned by the assembly endpoints. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                return_id:
+                  description: ID of the return to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                order_shipment_id:
+                  description: ID of the order shipment to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                license_id:
+                  description: ID of the license to attach this file to. Exactly one reference id must be provided across all `*_id` fields on this request — providing none, or more than one, is rejected.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+              required:
+              - file
+        required: true
+      responses:
+        '201':
+          description: File attachment inserted successfully
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/FileAttachmentResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Insert a file attachment
+      tags:
+      - FileAttachment
+components:
+  schemas:
+    FileAttachmentResponse:
+      description: A single file attachment wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/FileAttachment'
+      title: FileAttachment Response
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    FileAttachment:
+      description: A file attachment
+      properties:
+        assembly_id:
+          description: ID of the assembly this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        batch_id:
+          description: ID of the batch this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        company_relationship_id:
+          description: ID of the company relationship this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        contact_id:
+          description: ID of the contact this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        id:
+          description: ID of this file attachment. Always present.
+          type: string
+        invoice_id:
+          description: ID of the invoice this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        license_id:
+          description: ID of the license this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        mime_type:
+          description: MIME type detected at upload from the multipart part's content type (e.g. `application/pdf`). Populated whenever the file record exists; null only when the underlying file record is missing.
+          type: string
+        name:
+          description: Display name of the attachment — the name you sent, or the uploaded file's original filename when none was given. Always present.
+          type: string
+        order_id:
+          description: ID of the order this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        order_shipment_id:
+          description: ID of the order shipment this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        product_id:
+          description: ID of the product this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        purchase_id:
+          description: ID of the purchase this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        request_id:
+          description: ID of the request this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        return_id:
+          description: ID of the return this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        size_in_bytes:
+          description: Byte size of the stored file. For attachments created through this API it is always set (it is computed from the uploaded bytes). Null only when the underlying file record is missing, or when a file's size was never recorded.
+          type: integer
+        stock_transfer_id:
+          description: ID of the stock transfer this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        task_id:
+          description: ID of the task this file is attached to, or null. Exactly one of the reference-id fields is non-null on any attachment; the others are all null.
+          type: string
+        upload_datetime:
+          description: When the attachment was created, as a UTC ISO-8601 timestamp (e.g. `2026-08-20T14:30:00Z`). Always present.
+          type: string
+        uploader:
+          description: The user who uploaded the file, as `{ id, name }`. Null when that user is not visible to you. `name` may itself be null when the user has no profile name.
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+          type: object
+        url:
+          description: Download URL for the file, ready to fetch directly. Populated whenever the file record exists; null only when the underlying file record is missing.
+          type: string
+      required:
+      - upload_datetime
+      - name
+      - id
+      title: FileAttachment
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

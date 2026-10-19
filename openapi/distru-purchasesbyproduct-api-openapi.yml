@@ -1,0 +1,241 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Purchases By Product API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: PurchasesByProduct
+paths:
+  /public/v1/reports/purchases-by-product:
+    get:
+      description: 'Returns one row per purchased product, aggregating every non-draft purchase whose date falls in the reported range. Each row carries the product''s total quantity purchased and total purchased amount (each purchase item''s quantity times its price, summed and rounded to 2 decimal places), alongside the product''s current descriptive attributes (SKU, unit type, category, subcategory, group, vendor, owner, unit cost, sale price, and wholesale price). The attribute columns reflect the product as it stands now, not as it was at purchase time.
+
+
+        This is a read-only aggregate. It does not touch inventory, compliance (Metrc/BioTrack), or any purchase records — call it to analyze historical purchasing, not to reconcile a single purchase (use the purchases endpoints for that).
+
+
+        Date filtering, and the range echoed back under `meta`, are interpreted in the account''s configured time zone. When no date filter is provided, the report defaults to the last 30 days. Draft purchases are always excluded; only official purchases are counted.
+
+
+        Every value is returned as it appears in the report''s CSV export, with numeric cells returned as strings (currency and comma formatting stripped), matching the rest of the API. Any Product custom fields configured for the company are appended as extra columns (their keys vary per company). Report-level information (the resolved human-readable date range and the ordered column definitions) is returned under `meta`.
+
+
+        Each row also carries the IDs of the records it names — `product_id` and `vendor_id`, each right after its name column — so a row can be followed to the product or company endpoints without a name lookup. The CSV export leaves these ID columns out.
+
+
+        Required permission: `reports_permissions_purchases_by_product`.'
+      operationId: DistruPublic.V1.Report.PurchasesByProductController.index
+      parameters:
+      - description: 'Restrict the report to purchases dated within this range. Comma-separated pair of         ISO8601 timestamps, `after,before`, interpreted in the account''s time zone. Either         side may be left empty for an open-ended bound: `2026-01-01T00:00:00Z,` includes         everything on or after that instant, `,2026-02-01T00:00:00Z` everything up to it.         When omitted entirely, the report covers the last 30 days.'
+        in: query
+        name: order_datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Keep only products whose name or SKU matches this text. Omit to include all products.
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+      - description: Restrict to purchases whose owner (the purchase's assigned sales rep) is one of these         users. Repeat the key per id; values are Distru user ids. Multiple ids widen the match         (a purchase owned by any listed user is included). Omit to include every owner. This         filters the purchases that are aggregated and is unrelated to the product-level `owner`         column in each response row.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to purchases received into these locations. Repeat the key per id; values         are Distru location ids. Multiple ids widen the match. Omit to include every location         on the account, archived locations included, so historical purchases against         since-deleted locations still appear.
+        in: query
+        name: location_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: The Purchases By Product report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PurchasesByProductReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Purchases By Product report
+      tags:
+      - PurchasesByProduct
+components:
+  schemas:
+    PurchasesByProductReportRow:
+      description: 'A single row of the Purchases By Product report — one purchased product with its purchase totals over the reported range and its current descriptive attributes. Companies with Product custom fields configured will see additional keys, one per custom field, appended after `wholesale_price`.
+
+        '
+      properties:
+        category:
+          description: The product's current category name, or null when the product is uncategorized.
+          type: string
+        group:
+          description: The product's current group name, or null when the product has no group.
+          type: string
+        name:
+          description: The product name. Always present. When the product is inactive,             its name is returned with an inactive marker prepended so it reads as archived.
+          type: string
+        owner:
+          description: Full name of the user who owns the product, or null when the product has no               owner. This is the product's owner and is distinct from the `owner_ids` request               filter, which narrows by each purchase's assigned owner (sales rep).
+          type: string
+        product_id:
+          description: The product's ID — the `id` [GET /public/v1/products](#get-products) returns.
+          type: string
+        quantity_purchased:
+          description: Total quantity purchased across all non-draft purchases of this product in the               reported range, expressed in the product's `unit_type`. Always a number and never               null (the row only exists because at least one purchase item matched).
+          type: string
+        sale_price:
+          description: The product's current sale price as a string. Always present and never null.               Reflects the product now, not any historical purchase.
+          type: string
+        sku:
+          description: The product SKU. Always present, but an empty string (not null) when the product               has no SKU set.
+          type: string
+        subcategory:
+          description: The product's current subcategory name, or null when none is set.
+          type: string
+        total_purchased:
+          description: 'Total purchased amount over the range: each purchase item''s quantity times its               price, rounded per item to 2 decimals, then summed across the matching purchases.               A number in the account''s currency, always present and never null.'
+          type: string
+        unit_cost:
+          description: The product's current unit cost as a string, or null when no unit cost is set.               Reflects the product as it stands now, not the cost recorded on any individual               purchase in the range.
+          type: string
+        unit_type:
+          description: The product's unit type, returned verbatim as its configured display name (for               example `Grams`, `Each`, or a company-defined unit). This is NOT a normalized               SCREAMING_CASE enum — it is the label as it appears in the CSV export, so match on               it case-sensitively and expect company-specific values. Always present.
+          type: string
+        vendor:
+          description: The product's current vendor name, or null when no vendor is assigned. This is               the product's own vendor attribute, unrelated to which purchases were aggregated.
+          type: string
+        vendor_id:
+          description: The product's vendor's company ID — the `id` [GET /public/v1/companies](#get-companies) returns.
+          type: string
+        wholesale_price:
+          description: The product's current wholesale price as a string, or null when no wholesale               price is set. Reflects the product now, not any historical purchase.
+          type: string
+      required:
+      - sale_price
+      - vendor_id
+      - unit_type
+      - total_purchased
+      - quantity_purchased
+      - sku
+      - product_id
+      - name
+      title: PurchasesByProductReportRow
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    PurchasesByProductReport:
+      description: The Purchases By Product report
+      properties:
+        data:
+          description: One row per purchased product matching the filters. Empty array when no               non-draft purchases fall in the range.
+          items:
+            $ref: '#/components/schemas/PurchasesByProductReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/PurchasesByProductReportMeta'
+      required:
+      - meta
+      - data
+      title: PurchasesByProductReport
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    PurchasesByProductReportColumn:
+      description: 'Defines one column of the report. The `columns` array lists every column in order, including any per-company custom-field columns, so an integrator can render the report without hard-coding the key set.
+
+        '
+      properties:
+        key:
+          description: The key this column uses in each data row (e.g. `quantity_purchased`). Matches               the property names on a report row.
+          type: string
+        label:
+          description: The human-readable column header as shown in the CSV export (e.g. `Quantity               Purchased`).
+          type: string
+      required:
+      - label
+      - key
+      title: PurchasesByProductReportColumn
+      type: object
+    PurchasesByProductReportMeta:
+      description: Report-level metadata returned alongside the report rows.
+      properties:
+        columns:
+          description: Ordered definitions of every column in the report, including any per-company               custom-field columns.
+          items:
+            $ref: '#/components/schemas/PurchasesByProductReportColumn'
+          type: array
+        date_range:
+          description: Human-readable description of the date range the report resolved to, in the               account's time zone (e.g. `Last 30 Days`, or an explicit range when               `order_datetime` was supplied). Reflects the effective range, including the               30-day default when no filter was given.
+          type: string
+        report:
+          description: Stable identifier of this report, always `purchases_by_product`.
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: PurchasesByProductReportMeta
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

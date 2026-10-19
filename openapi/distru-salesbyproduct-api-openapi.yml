@@ -1,0 +1,305 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Sales By Product API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: SalesByProduct
+paths:
+  /public/v1/reports/sales-by-product:
+    get:
+      description: 'Returns one row per product with its quantity sold and total sales over the reported date range, alongside the product''s descriptive attributes (SKU, unit type, category, subcategory, group, vendor, owner, unit cost, sale price, wholesale price, shipped-from license, and UPC). Quantity sold and total sales are aggregated from sales order items over the date range and are net of returns, so a product with more returns than sales can report negative figures. This is a read-only aggregate report; it does not touch inventory, compliance (Metrc/BioTrack), or any order records.
+
+
+        Use this to pull period sales performance broken down by product (for example a monthly or quarterly sell-through summary). It is not the endpoint for line-item detail — it collapses every matching order item into a single per-product total, so you cannot see which orders contributed. Filters combine with AND (a row must satisfy all supplied filters); within a single multi-value filter the values combine with OR.
+
+
+        Date range: when `order_datetime` is omitted the report covers the last 30 days, resolved in the requesting user''s company timezone. Canceled orders are excluded unless the `status` filter explicitly lists `CANCELED`.
+
+
+        Response shape: each row is returned as it appears in the report''s CSV export. Cells that look numeric (money, quantities) are returned as strings (currency and percent formatting stripped) so they match the rest of the API; everything else is a string too. An optional product attribute the product doesn''t have comes back as `null` (the one exception is `sku`, which is always a string and is empty rather than null when unset). Because every numeric cell is a string, an all-digit identifier such as a numeric `sku` or `upc` comes back as a string, and one that carries a significant leading zero keeps its full display string so the zero isn''t lost. Any Product custom fields configured for the company are appended as extra columns keyed by the field''s slug, so rows for such companies carry additional keys beyond the documented ones. Report-level information (the resolved human-readable date range and the ordered column definitions) is returned under `meta`.
+
+
+        Each row also carries the IDs of the records it names — `product_id` and `vendor_id`, each right after its name column — so a row can be followed to the product or company endpoints without a name lookup. The CSV export leaves these ID columns out.
+
+
+        Requires the "view the sales by product report" permission.'
+      operationId: DistruPublic.V1.Report.SalesByProductController.index
+      parameters:
+      - description: 'Include only sales orders whose status is one of the supplied values. Values are SCREAMING_CASE and combine with OR. Allowed: PENDING, PROCESSING, READY_TO_SHIP, DELIVERING, DELIVERED, COMPLETED, CANCELED. When omitted, every status except CANCELED is included; CANCELED orders are counted only when you list CANCELED here.'
+        in: query
+        name: status
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - PENDING
+            - PROCESSING
+            - READY_TO_SHIP
+            - DELIVERING
+            - DELIVERED
+            - COMPLETED
+            - CANCELED
+            type: string
+      - description: 'Restrict to orders whose order date falls in this range. Format is two ISO8601 datetimes separated by a comma, `after,before` (inclusive bounds). Leave one side empty to make the range open-ended: `2026-01-01T00:00:00Z,` matches everything on or after that instant, and `,2026-02-01T00:00:00Z` everything up to it; supplying neither side (a lone comma) is rejected. When the whole parameter is omitted, the report covers the last 30 days resolved in the company''s timezone.'
+        in: query
+        name: order_datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Case-insensitive substring match against the product name or SKU; only products matching are included in the report.
+        in: query
+        name: search
+        required: false
+        example: ?search=blue+dream
+        schema:
+          type: string
+      - description: Include only sales to these customers, given as public customer (company relationship) IDs. Values combine with OR. Combine with `exclude_customer_ids` to include-then-exclude.
+        in: query
+        name: customer_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Exclude sales to these customers, given as public customer (company relationship) IDs. Applied after `customer_ids`, so a customer listed in both is excluded. Values combine with OR.
+        in: query
+        name: exclude_customer_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Include only orders owned by these sales reps, given as public user IDs. Values combine with OR. When omitted, orders from every sales rep in the company are included (no owner restriction).
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Include only order items whose shipped-from location is one of these, given as public location IDs. Values combine with OR. This filter and `user_ids` are evaluated as a single OR: an order item is kept when its shipped-from location matches `location_ids` OR its handling user matches `user_ids`. When both `location_ids` and `user_ids` are omitted the report spans every location and user in the company (no location/user restriction); supplying only one of the two turns off the other''s default, so passing just `location_ids` restricts the report purely by location.'
+        in: query
+        name: location_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Include only order items handled by these users, given as public user IDs. Values combine with OR. Evaluated together with `location_ids` as a single OR: an order item is kept when its handling user matches `user_ids` OR its shipped-from location matches `location_ids`. When both are omitted the report spans every user and location in the company; supplying just `user_ids` turns off the location default and restricts the report purely by user.'
+        in: query
+        name: user_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Include only order items shipped from these licenses, given as public license IDs. Values combine with OR.
+        in: query
+        name: shipped_from_license_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: The Sales By Product report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/SalesByProductReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Sales By Product report
+      tags:
+      - SalesByProduct
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    SalesByProductReportColumn:
+      properties:
+        key:
+          description: The key this column appears under in every data row (the label slugified to lower_snake_case, e.g. `quantity_sold`). Custom-field columns key off the field's slug.
+          type: string
+        label:
+          description: The human-readable column heading, e.g. `Quantity Sold`.
+          type: string
+      required:
+      - label
+      - key
+      title: SalesByProductReportColumn
+      type: object
+    SalesByProductReportRow:
+      description: 'A single row of the Sales By Product report. Companies with Product custom fields will see additional keys.
+
+        '
+      properties:
+        category:
+          description: The product's category name. Always present (every product is categorized).
+          type: string
+        group:
+          description: The product's group name, or null when the product has none.
+          type: string
+        name:
+          description: The product name. Inactive products are prefixed to mark them as such.
+          type: string
+        product_id:
+          description: The product's ID — the `id` [GET /public/v1/products](#get-products) returns.
+          type: string
+        product_owner:
+          description: The product owner's full name, or null when no owner is set.
+          type: string
+        quantity_sold:
+          description: Units sold over the date range, net of returns. Can be negative when returns exceed sales.
+          type: string
+        sale_price:
+          description: The product's sale price. Always present.
+          type: string
+        shipped_from_license:
+          description: The license number the sold items shipped from, or null when none applies.
+          type: string
+        sku:
+          description: The product SKU. Always present; an empty string when the product has no SKU. A purely numeric SKU is still returned as a string; one with a significant leading zero keeps its full display string so the zero isn't lost.
+          type: string
+        subcategory:
+          description: The product's subcategory name, or null when none is set.
+          type: string
+        total_sales:
+          description: Total sales value over the date range, net of returns. Can be negative when returns exceed sales.
+          type: string
+        unit_cost:
+          description: The product's unit cost, or null when no cost is recorded.
+          type: string
+        unit_type:
+          description: The product's unit type name. Always present.
+          type: string
+        upc:
+          description: The product's UPC, or null when the product has no UPC. A purely numeric UPC is still returned as a string; one with a significant leading zero keeps its full display string so the zero isn't lost.
+          type: string
+        vendor:
+          description: The product's vendor (supplier) company name. Always present.
+          type: string
+        vendor_id:
+          description: The vendor's company ID — the `id` [GET /public/v1/companies](#get-companies) returns.
+          type: string
+        wholesale_price:
+          description: The product's wholesale price, or null when no wholesale price is set.
+          type: string
+      required:
+      - sale_price
+      - vendor_id
+      - vendor
+      - category
+      - unit_type
+      - total_sales
+      - quantity_sold
+      - sku
+      - product_id
+      - name
+      title: SalesByProductReportRow
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    SalesByProductReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The report's column definitions in order, including any appended Product custom-field columns. Use these keys to read each data row.
+          items:
+            $ref: '#/components/schemas/SalesByProductReportColumn'
+          type: array
+        date_range:
+          description: The resolved date range the report covers, as a display string (reflects the last-30-days default when `order_datetime` was omitted).
+          type: string
+        report:
+          description: The report identifier, always `sales_by_product`.
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: SalesByProductReportMeta
+      type: object
+    SalesByProductReport:
+      description: The Sales By Product report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/SalesByProductReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/SalesByProductReportMeta'
+      required:
+      - meta
+      - data
+      title: SalesByProductReport
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

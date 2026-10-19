@@ -1,0 +1,284 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Harvest Outputs API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: HarvestOutputs
+paths:
+  /public/v1/reports/harvest-outputs:
+    get:
+      description: 'Returns one row per line item of every harvest assembly whose creation date falls in the reported date range. Each assembly expands into its inputs (the harvested material consumed), its outputs (the products produced, with their batch and package numbers), and its cost line items — the `cost_input_output` column identifies which. Every row carries the assembly''s date, number, and status, plus the harvest name, strain, location, product, product category, quantity, and unit type. Rows are grouped by assembly (ordered by assembly date, then number), and within each assembly the outputs come first, then inputs, then costs. When no `datetime` filter is provided, the report defaults to the last 7 days.
+
+
+        This is a read-only report; nothing is created, and no inventory or compliance state changes when you call it. The entire report is returned in one response — there is no pagination, so a wide date range can return a large payload.
+
+
+        The filters narrow which assemblies appear, not which line items. An assembly is included only if it has an input matching every input filter (`harvest_name`, `strain`, `location_id`) AND an output matching every output filter (`output_product_name`, `output_product_category_id`); once an assembly qualifies, all of its input, output, and cost rows are returned — including rows that don''t themselves match the filter (e.g. filtering by `output_product_name` still returns that assembly''s inputs and costs).
+
+
+        Every value is returned as it appears in the report''s CSV export, with numeric cells returned as strings (currency and comma formatting stripped) so they match the rest of the API; a value with a significant leading zero (an identifier such as a batch or package number) keeps its display string so the zero isn''t lost. The cost columns (`unit_cost_actual`, `unit_cost_default`, `total_cost_actual`, `total_cost_default`, `cost_type`, `cost_type_description`) are omitted entirely — the keys are absent, not null — for users without permission to view costs, which is a separate permission from the report permission below. Report-level information (the resolved date range and column definitions) is returned under `meta`.
+
+
+        Each row also carries the IDs of the records it names — `batch_id`, `package_id`, `location_id` and `product_id`, each right after its name column — so a row can be followed to the batch, package, location or product endpoints without a name lookup. The CSV export leaves these ID columns out.
+
+
+        Required permission: `reports_permissions_harvest_outputs`.'
+      operationId: DistruPublic.V1.Report.HarvestOutputsController.index
+      parameters:
+      - description: 'Keep only assemblies whose creation date falls in this range. Two ISO8601 timestamps separated by a comma: `after,before`. Interpreted in the requesting user''s timezone. Either side may be left empty to make the range open-ended (`,2026-02-01T00:00:00Z` = up to that date; `2026-01-01T00:00:00Z,` = from that date on). Defaults to the last 7 days when omitted.'
+        in: query
+        name: datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Keep only assemblies with this status. `PENDING` = not yet completed; `COMPLETED` = completed. Omit to return assemblies of any status. SCREAMING_CASE.
+        in: query
+        name: status
+        required: false
+        example: COMPLETED
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - COMPLETED
+      - description: Keep only assemblies that have an input whose harvest name contains this text (case-insensitive substring). Combined with the other input filters using AND.
+        in: query
+        name: harvest_name
+        required: false
+        schema:
+          type: string
+      - description: Keep only assemblies that have an input whose harvest strain contains this text (case-insensitive substring). Combined with the other input filters using AND.
+        in: query
+        name: strain
+        required: false
+        schema:
+          type: string
+      - description: Keep only assemblies that have an input at this location. A single Distru location ID; exact match against the input's location. Combined with the other input filters using AND.
+        in: query
+        name: location_id
+        required: false
+        schema:
+          type: string
+      - description: Keep only assemblies that have an output whose product name contains this text (case-insensitive substring). Combined with `output_product_category_id` using AND.
+        in: query
+        name: output_product_name
+        required: false
+        schema:
+          type: string
+      - description: Keep only assemblies that have an output whose product belongs to this category. A single Distru product-category ID; exact match. Combined with `output_product_name` using AND.
+        in: query
+        name: output_product_category_id
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The Harvest Outputs report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/HarvestOutputsReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Harvest Outputs report
+      tags:
+      - HarvestOutputs
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    HarvestOutputsReportRow:
+      description: 'A single row of the Harvest Outputs report (one input, output, or cost line item of a harvest assembly). The cost keys (`unit_cost_actual`, `unit_cost_default`, `total_cost_actual`, `total_cost_default`, `cost_type`, `cost_type_description`) are omitted for users without permission to view costs.
+
+        '
+      properties:
+        batch_id:
+          description: The output's batch ID — the `id` [GET /public/v1/batches](#get-batches) returns. Populated only on `Output` rows; null on `Input` and `Cost` rows, and on an output with no batch.
+          type: string
+        cost_input_output:
+          description: 'The line item type: `Input` (harvested material consumed), `Output` (product produced), or `Cost` (a cost line item on an output). Determines which of the type-specific fields below are populated. Always present.'
+          type: string
+        cost_type:
+          description: The cost type name. Populated only on `Cost` rows; null on `Input` and `Output` rows. Omitted entirely (key absent) for users without permission to view costs.
+          type: string
+        cost_type_description:
+          description: The cost line item's description. Populated only on `Cost` rows; null on `Input` and `Output` rows. Omitted entirely (key absent) for users without permission to view costs.
+          type: string
+        distru_product:
+          description: The Distru product name — the harvest name on `Input` rows, the output's product on `Output` rows. Null on `Cost` rows.
+          type: string
+        harvest_assembly_date:
+          description: The assembly's creation date, formatted `MM/DD/YYYY` in the requesting user's timezone (e.g. `01/15/2026`). Always present.
+          type: string
+        harvest_assembly_number:
+          description: The assembly's human-readable number. Always present.
+          type: string
+        harvest_name:
+          description: The harvest name. For an input row this is that input's harvest; for output and cost rows it is the assembly's first input's harvest. Null when the harvest has no name.
+          type: string
+        line_item_id:
+          description: Identifies the specific line item this row represents (the input, output, or cost line item, matching `cost_input_output`). Always present.
+          type: string
+        location:
+          description: The location name — the input's location on `Input` rows, the output's location on `Output` and `Cost` rows. Null when no location is set.
+          type: string
+        location_id:
+          description: The ID of the location named in `location` — the `id` [GET /public/v1/locations](#get-locations) returns.
+          type: string
+        output_batch_number:
+          description: The output's batch number. Populated only on `Output` rows; null on `Input` and `Cost` rows.
+          type: string
+        output_package_number:
+          description: The output package's compliance label (its package tag in the state traceability system — Metrc or BioTrack), falling back to the output's Metrc label. Populated only on `Output` rows; null on `Input` and `Cost` rows, and null on `Output` rows that carry neither a package compliance tag nor a Metrc label.
+          type: string
+        output_reference_id:
+          description: The ID of the output this cost line item belongs to. Populated only on `Cost` rows; null on `Input` and `Output` rows.
+          type: string
+        package_id:
+          description: The output's package ID — the `id` [GET /public/v1/packages](#get-packages) returns. Populated only on `Output` rows once the output has a package (a pending assembly's outputs have none yet); null on `Input` and `Cost` rows.
+          type: string
+        product_category:
+          description: The output product's category. Populated only on `Output` rows; null on `Input` and `Cost` rows.
+          type: string
+        product_id:
+          description: The output product's ID — the `id` [GET /public/v1/products](#get-products) returns. Populated only on `Output` rows; null on `Input` rows (an input is a harvest, not a product) and on `Cost` rows.
+          type: string
+        quantity:
+          description: 'The line item''s quantity in `unit_type`: the input quantity consumed, the output quantity produced, or the cost line item''s quantity. For package-tracked outputs this is the compliance (Metrc) quantity when available, otherwise the output''s own quantity. Always present.'
+          type: string
+        status:
+          description: 'The assembly status: `PENDING` (not yet completed) or `COMPLETED`. Same value on every row of the assembly. SCREAMING_CASE. Always present.'
+          enum:
+          - PENDING
+          - COMPLETED
+          type: string
+        strain:
+          description: The strain name (the harvest's Metrc strain). Sourced like `harvest_name`. Null when the harvest has no strain recorded.
+          type: string
+        total_cost_actual:
+          description: Actual total cost — `unit_cost_actual` multiplied by the row's quantity. Null when no cost is traced for the row. Omitted entirely (key absent) for users without permission to view costs.
+          type: string
+        total_cost_default:
+          description: Default (standard) total cost — `unit_cost_default` multiplied by the row's quantity. Null when no cost is traced for the row. Omitted entirely (key absent) for users without permission to view costs.
+          type: string
+        unit_cost_actual:
+          description: Actual cost per unit — the real cost Distru traces to the inputs and components that produced this inventory (purchase prices, assembly costs, stock-adjustment costs, and so on), per unit. Null when no cost is traced for the row. Omitted entirely (key absent) for users without permission to view costs.
+          type: string
+        unit_cost_default:
+          description: Default (standard) cost per unit — traced the same way as `unit_cost_actual`, but each input/component is valued at its product's configured unit cost instead of its real cost. Null when no cost is traced for the row. Omitted entirely (key absent) for users without permission to view costs.
+          type: string
+        unit_type:
+          description: The unit of measure for `quantity` (e.g. the harvest's unit on inputs, the product's unit on outputs, the cost type's unit on costs). Null when no unit applies.
+          type: string
+      required:
+      - line_item_id
+      - quantity
+      - cost_input_output
+      - location_id
+      - status
+      - harvest_assembly_number
+      - harvest_assembly_date
+      title: HarvestOutputsReportRow
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    HarvestOutputsReportColumn:
+      properties:
+        key:
+          description: The key used for this column in each data row
+          type: string
+        label:
+          description: The human-readable label of the column
+          type: string
+      required:
+      - label
+      - key
+      title: HarvestOutputsReportColumn
+      type: object
+    HarvestOutputsReport:
+      description: The Harvest Outputs report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/HarvestOutputsReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/HarvestOutputsReportMeta'
+      required:
+      - meta
+      - data
+      title: HarvestOutputsReport
+      type: object
+    HarvestOutputsReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The report's column definitions, in order, each mapping a `data` row key to its human-readable label. Reflects the columns actually present in `data` — the cost columns are absent for users without permission to view costs. Always present.
+          items:
+            $ref: '#/components/schemas/HarvestOutputsReportColumn'
+          type: array
+        date_range:
+          description: The resolved date range the report covers, as a human-readable label (reflects the `datetime` filter, or the default last-7-days range when it was omitted). Always present.
+          type: string
+        report:
+          description: The report identifier — always `harvest_outputs`.
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: HarvestOutputsReportMeta
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

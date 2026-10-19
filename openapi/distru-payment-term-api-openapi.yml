@@ -1,0 +1,177 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Payment Term API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Payment Term
+paths:
+  /public/v1/payment-terms:
+    get:
+      description: 'Get the payment terms configured for your company. A payment term is the agreed timeframe a
+
+        customer has to pay — for example "Net 30" means payment is due 30 days after the order date.
+
+
+        Use it to resolve the payment term applied to an order or invoice, or to pick a valid term id
+
+        for an integration that sets one. Each term carries:
+
+        • `name` — the term''s display label (e.g. "Net 30"), unique within your company.
+
+        • `days` — a non-negative whole number of days added to compute the due date. `0` means due the
+
+        same day (immediately). The due datetime is the order''s start date plus `days`, set to
+
+        `time_of_day`. The start date is normally the order date, but is the delivery date if your
+
+        company is configured to date its due dates from delivery.
+
+        • `time_of_day` — the local clock time the term becomes due on the due date, as `HH:MM:SS` on a
+
+        24-hour clock (e.g. `"17:00:00"` = 5 PM). It is interpreted in your company''s configured time
+
+        zone, not UTC.
+
+        • `locked` — `true` marks a built-in system term whose length (`days`) is fixed and which cannot
+
+        be deleted; only its `time_of_day` is changeable. `false` marks a fully editable, user-created
+
+        term. Independently of `locked`, any term (locked or not) currently chosen as the company''s
+
+        default order or default purchase payment term cannot be deleted while it holds that role — but
+
+        this endpoint does not expose which term is a default.
+
+
+        Returns every payment term for your company in a single response — this endpoint is not paginated,
+
+        so `next_page` is always null and there are no filter or page parameters. Order of the returned
+
+        terms is not guaranteed.
+
+
+        Note: This endpoint returns eventually consistent data — a term you just created, edited, or
+
+        deleted elsewhere may take up to 1 second to appear or disappear here.
+
+
+        Required permission: `settings_permissions_payment_terms`.'
+      operationId: DistruPublic.V1.PaymentTermController.index
+      responses:
+        '200':
+          description: A list of payment terms
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PaymentTerms'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get payment terms
+      tags:
+      - Payment Term
+components:
+  schemas:
+    PaymentTerm:
+      description: The agreed timeframe a customer has to pay — for example "Net 30" means payment is due 30 days after the invoice.
+      properties:
+        days:
+          description: Number of days after the invoice date until payment is due. 0 means due the same day.
+          type: integer
+        id:
+          description: ID for this payment term
+          type: string
+        inserted_datetime:
+          description: The datetime this payment term was created at
+          type: string
+        locked:
+          description: True when this is a built-in Distru default payment term. A locked term cannot be deleted and only its `time_of_day` can be edited; an unlocked one is fully editable.
+          type: boolean
+        name:
+          description: Name of the payment term. Unique per company (case-insensitive).
+          example: Net 30
+          type: string
+        time_of_day:
+          description: Time of day on the due date that payment is due, as "HH:MM:SS" (e.g. "17:00:00"). Defaults to "17:00:00".
+          example: '17:00:00'
+          type: string
+        updated_datetime:
+          description: The datetime this payment term was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - locked
+      - time_of_day
+      - days
+      - name
+      - id
+      title: PaymentTerm
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    PaymentTerms:
+      description: A collection of Payment Terms
+      properties:
+        data:
+          description: Payment Terms
+          items:
+            $ref: '#/components/schemas/PaymentTerm'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Payment Terms
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

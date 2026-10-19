@@ -1,0 +1,1467 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Batch API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Batch
+paths:
+  /public/v1/batches:
+    get:
+      description: 'List batches, sorted oldest-first by creation date and filtered by the query parameters below. Only batches of batch-tracked products are returned; batches belonging to products on any other inventory-tracking method are never listed here.
+
+
+        Results are paginated. The response wraps the batches in `data` and returns a `next_page` URL; follow it to page through results, and stop when `next_page` is null.
+
+
+        By default each batch is returned without cost data. Pass `include_costs=true` to enrich every batch that currently holds positive on-hand quantity with its cost and quantity totals (`total_cost_actual`, `total_cost_default`, `cost_per_unit_actual`, `cost_per_unit_default`); batches with no on-hand stock omit those fields even when the flag is set. The single-batch `GET /public/v1/batches/{id}` endpoint always includes these totals, so use it when you need cost for one batch.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `products_permissions_view`. Results are additionally scoped to only the batches the authenticated user can access under their team restrictions, so two API keys at the same company may see different subsets.'
+      operationId: DistruPublic.V1.BatchController.index
+      parameters:
+      - description: Restrict the result to specific batches by ID (the same ID returned as each batch's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches belonging to any of these products (matches each batch's `product_id`). Repeat the bracketed key once per id; multiple ids are OR-ed.
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Case-insensitive substring match on the batch's `batch_number`. `batch_number` is a user-set label and is not guaranteed unique, so this may return more than one batch.
+        in: query
+        name: batch_number
+        required: false
+        example: ?batch_number=LOT-124
+        schema:
+          type: string
+      - description: Return only batches whose `batch_number` exactly matches (case-sensitive) any value in the list — send batch numbers exactly as they appear in responses. Repeat the bracketed key once per value.
+        in: query
+        name: batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product is in any of these categories (matches the batch's `product.category.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product is in any of these subcategories (matches the batch's `product.subcategory.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product is in any of these groups (matches the batch's `product.product_group.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product has any of these brands (matches the batch's `product.brand.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product is supplied by any of these vendors (matches the batch's `product.vendor.id`; this is the company-relationship ID, not the raw company ID). Multiple ids are OR-ed.
+        in: query
+        name: product_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product has any of these strains (matches the batch's `product.strain.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product carries any of these tags (matches an id in the batch's `product.tags[].id`). Multiple ids are OR-ed.
+        in: query
+        name: product_tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only batches whose product SKU exactly matches (case-insensitive) any value in the list (matches the batch's `product.sku`). Multiple values are OR-ed.
+        in: query
+        name: product_skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only batches that currently hold active quantity (`true`) or none (`false`). Omit to match either.
+        in: query
+        name: has_quantity_active
+        required: false
+        schema:
+          type: boolean
+      - description: 'Filter by batch creation time as a comma-separated ISO 8601 range `start,end` (inclusive). Omit either side to leave that bound open: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Restrict to batches owned by any of these Distru users (each batch's `owner_id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Controls whether soft-deleted batches are included. `no` (the default) returns only non-deleted batches, `only` returns only soft-deleted batches, `include` returns both. SCREAMING_CASE is not used here — pass the lowercase value.
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: When `true`, each returned batch is enriched with its cost and on-hand quantity totals — `total_cost_actual`, `total_cost_default`, `cost_per_unit_actual`, and `cost_per_unit_default`. Defaults to `false` when omitted, in which case those four fields are left off the batch objects entirely (keeping the listing lighter). Even when `true`, the fields appear only for batches that currently hold positive on-hand quantity; a batch with no stock omits them. To always get cost for a single batch regardless of stock, use `GET /public/v1/batches/{id}`.
+        in: query
+        name: include_costs
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Filter by the batch's most-recent modification time as a comma-separated ISO 8601 range `start,end` (inclusive). Omit either side to leave that bound open, e.g. `,2022-07-10T00:00:00Z` matches batches last modified on or before that instant.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=batch` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      responses:
+        '200':
+          description: A list of batches
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Batches'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get batches
+      tags:
+      - Batch
+    post:
+      description: 'Create or update a single batch. Omit `id` to create a new batch; pass the `id` of an existing batch to update it. Either way the whole operation is atomic — if any field is rejected, nothing is written and the batch is left unchanged.
+
+
+        A batch is Distru''s lot for a batch-tracked product: it is the unit that inventory quantity, cost, test results, and (optionally) bins hang off of. You can only create a batch under a product whose inventory-tracking method is batch-tracked; pointing `product_id` at any other product is rejected. Products that track inventory as compliance packages are managed through their package endpoints, not here.
+
+
+        On create, the batch''s inventory records are initialized so quantity and cost can begin accumulating against it (a brand-new batch starts with no on-hand quantity — receive a purchase, run an assembly, or adjust stock to add inventory). The write is recorded to the batch''s activity history. This endpoint does not push to or pull from any state traceability system (Metrc / BioTrack); a 200 reflects the Distru batch record only.
+
+
+        Update is a targeted patch, not a full replace: only the fields you send are changed, and any field you omit keeps its current value. `product_id` is fixed after creation — a batch cannot be moved to a different product. See each field below for its create-time default and its null-vs-omit behavior (notably `bin_ids`).
+
+
+        Required permission: `products_permissions_create` to create, `products_permissions_edit` to update.'
+      operationId: DistruPublic.V1.BatchController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: The Distru batch ID to update. Omit to create a new batch. When present, it must reference a batch in your company or the request is rejected.
+                product_id:
+                  type: string
+                  description: The Distru product ID this batch belongs to. Required on create, and the product must be a batch-tracked product in your company (pointing at a product tracked any other way is rejected). Immutable once the batch exists — on update, omit it or resend the batch's current product; sending a different product id is rejected rather than silently ignored, and a batch can never be moved to another product.
+                batch_number:
+                  type: string
+                  description: The user-facing lot / batch number label (e.g. `LOT-1241291`). This is where your own batch identifier belongs. Free-form and not required to be unique. Nullable; leave omitted or null if the batch has no external lot number.
+                thc:
+                  type: string
+                  description: A free-form THC label for the batch, as displayed in Distru (e.g. "18.5%"). This is a static value stored on the batch record; it does not set or derive from any lab result — the batch's primary test result tracks potency separately.
+                cbd:
+                  type: string
+                  description: A free-form CBD label for the batch, as displayed in Distru (e.g. "0.3%"). This is a static value stored on the batch record; it does not set or derive from any lab result — the batch's primary test result tracks potency separately.
+                expiration_datetime:
+                  type: string
+                  description: When the batch expires, as an ISO 8601 datetime (e.g. `2026-01-31T00:00:00Z`). Nullable; omit or send null if the batch has no expiration.
+                harvest_datetime:
+                  type: string
+                  description: When the batch's material was harvested, as an ISO 8601 datetime (e.g. `2025-09-15T00:00:00Z`). Nullable and optional; surfaced in the response as `harvest_datetime`.
+                manufactured_datetime:
+                  type: string
+                  description: When the batch was manufactured, as an ISO 8601 datetime (e.g. `2025-09-20T00:00:00Z`). If omitted on create, defaults to the time the batch is created. Surfaced in the response as `manufactured_datetime`.
+                owner_id:
+                  type: string
+                  description: The Distru user ID of the batch's designated owner. Must be an active user in your company that the authenticated user is allowed to assign to, otherwise the request is rejected. Nullable; omit or send null for no owner.
+                description:
+                  type: string
+                  description: Free-form notes about the batch. Nullable and optional.
+                custom_data:
+                  type: object
+                  description: 'A map of custom field IDs to their values. Use GET /public/v1/custom-fields?parent_object=batch to retrieve available custom fields, their IDs, and their types. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options.'
+                bin_ids:
+                  items:
+                    type: string
+                  type: array
+                  description: 'The IDs of the bins this batch is stored in. Behaviour: omit `bin_ids` to leave the batch''s bins unchanged; pass `null` or an empty array to clear all bins; pass a non-empty array to replace the batch''s bins with exactly those. Ignored unless bin inventory tracking is enabled for your company.
+
+                    '
+      responses:
+        '200':
+          description: A single batch
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BatchFullResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create or update a batch
+      tags:
+      - Batch
+  /public/v1/batches/{id}:
+    delete:
+      description: 'Deletes a batch. This is a soft delete: the batch stops appearing in `GET /public/v1/batches` by default (pass the `deleted` filter as `include` or `only` to still see it) and this endpoint returns 404 for it, but the record is retained — `GET /public/v1/batches/{id}` keeps resolving it with a non-null `deleted_at`. The delete cannot be undone through the API; recreating the batch via upsert produces a new batch with a new `id`. Responds 204 with no body on success, or 404 if no non-deleted batch with that `id` exists in your company (including one that was already deleted or belongs to another company).
+
+
+        A batch can only be deleted while nothing depends on it. The delete is refused with a 400 when the batch: appears on any sales order or purchase line item, has any returns, appears on any inventory transfer, or is used as an input or output of any assembly. The batch only becomes deletable once no such record references it. Only batches of batch-tracked products can be deleted here — a batch of a product on any other inventory-tracking method is refused with a 400.
+
+
+        A batch may still hold on-hand quantity when it is deleted; that remaining quantity is not adjusted away, but it immediately stops counting as active inventory (it drops out of the batch''s and its product''s `quantity_active` and `quantity_active_by_location` fields, and of the inventory endpoint). No inventory is created, consumed, or released, and nothing is synced to Metrc or BioTrack. A successful delete records a `delete` entry in the batch''s activity log and notifies the relevant users.
+
+
+        Required permission: `products_permissions_delete`.'
+      operationId: DistruPublic.V1.BatchController.delete
+      parameters:
+      - description: ID of the batch to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your company (or was already deleted) returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a batch
+      tags:
+      - Batch
+    get:
+      description: 'Fetch one batch by its Distru batch ID, including its cost and on-hand quantity totals, custom field values, primary test result, and (when your company has bin tracking enabled) its bins. Returns 404 if no batch with that id exists in your company, or the authenticated user cannot access it under their team restrictions.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.BatchController.show
+      parameters:
+      - description: The Distru batch ID to fetch.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single batch
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BatchFullResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a batch
+      tags:
+      - Batch
+  /public/v1/batches/{id}/primary-test-result/pdf:
+    post:
+      description: 'Get the Certificate of Analysis (COA) PDF for a single batch and download it directly, get a signed link to it, or email it (see `format`). The PDF is the batch''s designated primary test result (the lab result flagged as primary among the batch''s test results). Returns 404 when the batch has no primary test result, or that result has no attached file, with the message `This batch has no lab results attached`, which tells it apart from an unknown ID (`Not Found`). A deleted batch returns `Not Found`. This serves a document already stored in Distru; it does not re-run or fetch anything from a lab or a state traceability system.
+
+
+        The same permissions that govern downloading this PDF in the Distru web app apply to this endpoint; when `format` is `email`, the web app''s permission for emailing it applies instead (documents the web app cannot email keep the download permission).
+
+
+        `format` selects how the generated PDF is delivered and has three modes: `binary` returns the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` returns a JSON envelope `{"data": {"url": ..., "expires_datetime": ...}}` with a temporary signed download URL; `email` sends the PDF to the addresses in `email_addresses` and returns a JSON envelope `{"data": {"emailed_to": [...]}}`. `format` is required, but for backward compatibility omitting it defaults to `binary`.
+
+
+        All PDF download endpoints share a single, combined rate limit for your account: 20 requests per minute and 1000 per day in total across every PDF endpoint (not per endpoint). Requests over the limit return 429 with a Retry-After header, and only successful downloads count toward it.'
+      operationId: DistruPublic.V1.BatchController.download_primary_test_result_pdf
+      parameters:
+      - description: The Distru batch ID whose COA to download.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/DistruPublic.V1.AssemblyController.download_pdfBody'
+      responses:
+        '200':
+          description: 'When `format` is `binary` (or omitted), the raw PDF file (`Content-Type: application/pdf`). When `format` is `url`, a JSON body with a temporary signed download URL; when `format` is `email`, a JSON body listing the addresses the PDF was emailed to (see the PdfResponse schema).'
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/PdfResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found, or the batch has no lab results attached (the message says which)
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's shared PDF download rate limit (20/minute, 1000/day across all PDF endpoints) was exceeded. Retry after the period in the Retry-After header.
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Generate a batch's Certificate of Analysis (COA) PDF
+      tags:
+      - Batch
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    BinCompact:
+      description: Minimal details about a bin, as nested on other records
+      properties:
+        id:
+          description: ID for this bin
+          type: string
+        name:
+          description: The name of the bin
+          type: string
+      required:
+      - name
+      - id
+      title: BinCompact
+      type: object
+    BillOfMaterialsProductInput:
+      description: A specific product consumed by a bill of materials
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: How much of the product this recipe consumes, in the product's unit, as a decimal string (e.g. "2.5").
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsProductInput
+      type: object
+    BillOfMaterialsCost:
+      description: An additional cost applied by a bill of materials
+      properties:
+        cost_type:
+          $ref: '#/components/schemas/BillOfMaterialsCostType'
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies, as a decimal string (e.g. "3"). Multiply by the cost type's `cost_per_unit` to get the line total.
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsCost
+      type: object
+    CompactMenu:
+      description: A lightweight reference to a DistruCommerce menu — the online catalog a buyer browses to place an order — carrying just its id and name. Where it appears on a sales order, it is the menu that order was placed through. Use the id to fetch the full menu from the menus endpoint.
+      properties:
+        id:
+          description: ID of the menu
+          type: string
+        name:
+          description: Display name of the menu
+          type: string
+      required:
+      - name
+      - id
+      title: CompactMenu
+      type: object
+    BatchFull:
+      description: A lot of a product with all its details — a group of inventory sharing a harvest/production run, expiration date, potency, lab results, and cost. Used for batch-tracked products.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        bins:
+          description: The bins this batch is stored in. Only present when bin inventory tracking is enabled for the company.
+          items:
+            $ref: '#/components/schemas/BinCompact'
+          type: array
+        cbd:
+          description: A free-form CBD value set directly on the batch record. This is a static label, independent of any lab result — the batch's `primary_test_result` may report different potency values (e.g. `cbd_percentage`). Null if unset.
+          type: string
+        cost_per_unit_actual:
+          description: Actual cost per unit — `total_cost_actual` divided by the batch quantity. Returned only when the request passes `include_costs=true` and the batch has on-hand quantity; the field is absent otherwise.
+          type: string
+        cost_per_unit_default:
+          description: Default (standard) cost per unit — `total_cost_default` divided by the batch quantity. Returned only when the request passes `include_costs=true` and the batch has on-hand quantity; the field is absent otherwise.
+          type: string
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this batch
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime this batch was soft-deleted at, or null when the batch has not been deleted
+          type: string
+        description:
+          description: Free-text description of this batch, or null when none was entered
+          type: string
+        expiration_datetime:
+          description: ISO 8601 datetime this batch expires, or null when none is set.
+          type: string
+        harvest_datetime:
+          description: ISO 8601 datetime this batch was harvested, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        inserted_datetime:
+          description: The datetime this batch was created (ISO 8601)
+          type: string
+        manufactured_datetime:
+          description: ISO 8601 datetime this batch was manufactured. Defaults to the batch's creation time when none is supplied, so it is always present.
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        owner_id:
+          description: The ID of the Distru user who owns this batch, or null when unassigned
+          type: string
+        primary_test_result:
+          $ref: '#/components/schemas/PrimaryTestResult'
+        product:
+          $ref: '#/components/schemas/Product'
+        product_id:
+          description: The ID of the [product](#model-product) this batch is a lot of
+          type: string
+        quantity_active:
+          description: Total active on-hand quantity of this batch across all locations, as a decimal string (e.g. "100"). Sums the batch's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the batch has no active stock. Reserved stock is still physically on-hand, so it is included here. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The batch's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the batch has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        tasks:
+          description: 'The tasks linked to this batch that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        thc:
+          description: A free-form THC value set directly on the batch record. This is a static label, independent of any lab result — the batch's `primary_test_result` may report different potency values (e.g. `thc_percentage`). Null if unset.
+          type: string
+        total_cost_actual:
+          description: Total actual cost of this batch. Distru traces the inputs and components that produced the batch and sums the real costs incurred along that chain — for example the price paid when a component was purchased, assembly costs, and costs added by stock adjustments, among others. Returned only when the request passes `include_costs=true` and the batch has on-hand quantity; the field is absent otherwise.
+          type: string
+        total_cost_default:
+          description: Total default (standard) cost of this batch. Traced the same way as `total_cost_actual`, but each input/component is valued at its product's configured unit cost (the product's `unit_cost`) instead of its real cost. Returned only when the request passes `include_costs=true` and the batch has on-hand quantity; the field is absent otherwise.
+          type: string
+        updated_datetime:
+          description: The datetime this batch was last modified (ISO 8601)
+          type: string
+      required:
+      - custom_data
+      - quantity_active_by_location
+      - quantity_active
+      - product
+      - product_id
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - manufactured_datetime
+      - name
+      - id
+      title: BatchFull
+      type: object
+    Batches:
+      description: A collection of Batches
+      properties:
+        data:
+          description: Batches
+          items:
+            $ref: '#/components/schemas/BatchFull'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Batches
+      type: object
+    Product:
+      description: A sellable or trackable item in your catalog — its name, pricing, category, unit of measure, and how its inventory is tracked (see `inventory_tracking_method`).
+      properties:
+        batches_with_active_quantity_by_location:
+          description: The product's batches that hold active quantity, grouped by location. Present only when the request passes `include_batches_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not batch-tracked or holds no active batches.
+          items:
+            $ref: '#/components/schemas/BatchesWithActiveQuantityByLocation'
+          type: array
+        bill_of_materials:
+          $ref: '#/components/schemas/BillOfMaterials'
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this product
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime the product was soft-deleted at, or null when the product has not been deleted
+          type: string
+        description:
+          description: Plain-text description of this product, or null when none was entered. Always null together with `description_markdown` and non-null together with it — one is never set without the other.
+          type: string
+        description_markdown:
+          description: The same description in Markdown. Null when `description` is null; populated whenever `description` is populated.
+          type: string
+        external_name:
+          description: Customer-facing name shown on DistruCommerce menus and the Order Tracker, or null when none is set (it does not fall back to `name`)
+          type: string
+        gross_weight:
+          description: The gross weight of one unit including packaging, as a decimal string, measured in `gross_weight_unit_type`. Null when not set; it is always set together with `gross_weight_unit_type` and null together with it.
+          type: string
+        gross_weight_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        id:
+          description: ID for this product
+          type: string
+        images:
+          description: 'The images associated with this product, in display order: by `rank`, lowest first (the first is the primary image), then by id. Images with no rank come last. Empty array when the product has no images.'
+          items:
+            $ref: '#/components/schemas/Image'
+          type: array
+        inserted_datetime:
+          description: The datetime this product was created at
+          type: string
+        inventory_tracking_method:
+          description: 'How this product''s inventory is tracked. One of: `BATCH` (grouped into batches sharing traits such as expiration dates and test results), `PACKAGE` (inventory is defined by packages), `PRODUCT` (ungrouped; inventory exists directly on the product).'
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+          type: string
+        is_active:
+          description: True when the product is active. False when it has been marked inactive (archived), which hides it from most product pickers.
+          type: boolean
+        is_featured:
+          description: True when the product is flagged as featured
+          type: boolean
+        leaflink_product_id:
+          description: The LeafLink product ID this product is synced to, or null if not synced
+          type: integer
+        menu_visibility:
+          description: 'Which menus this product is shown in. One of `DO_NOT_INCLUDE`, `INCLUDE_IN_ALL`, `INCLUDE_IN_SELECT` (same values accepted by the upsert endpoint); defaults to `DO_NOT_INCLUDE`. The `menus` field below lists the specific menus the product belongs to — this is how you see which menus when the value is `INCLUDE_IN_SELECT`. Setting `INCLUDE_IN_ALL` adds the product to every menu, and a menu created later gets it too, except a copy of a menu it isn''t on, or a new (not copied) menu made by a user who can''t see the product: read `menus` for where it really is.'
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+          type: string
+        menus:
+          description: 'Menus this product is on, ordered by menu creation time then id (includes inactive menus). Follows `menu_visibility`: the chosen menus for `INCLUDE_IN_SELECT`, every menu but the exceptions listed under `menu_visibility` for `INCLUDE_IN_ALL`, and usually none for `DO_NOT_INCLUDE`. A change made by a team-restricted user never removes the product from menus that user can''t see, so those stay listed.'
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        msrp:
+          description: Manufacturer's suggested retail price, as a decimal string (e.g. "19.99"), or null when not set
+          type: string
+        name:
+          description: Human readable name for this product
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packages_with_active_quantity_by_location:
+          description: The product's packages that hold active quantity, grouped by location. Present only when the request passes `include_packages_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not package-tracked or holds no active packages.
+          items:
+            $ref: '#/components/schemas/PackagesWithActiveQuantityByLocation'
+          type: array
+        product_group:
+          $ref: '#/components/schemas/ProductGroupCompact'
+        quantity_active:
+          description: Total active on-hand quantity of this product across all locations, as a decimal string (e.g. "100"). Sums the product's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the product has no active stock. Reserved stock is still physically on-hand, so it is included here; subtract `quantity_reserved` to get `quantity_available`. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The product's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the product has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        quantity_available:
+          description: Active on-hand quantity minus reserved quantity, as a decimal string (e.g. "100"). Equals `quantity_active` − `quantity_reserved` — what is on-hand and not already spoken for by unfulfilled sales orders or draft assemblies. Can be negative when more is reserved than is on-hand at a location. "0" when the product has no active stock and nothing reserved.
+          type: string
+        quantity_available_threshold_max:
+          description: 'Over-stock alert threshold: Distru flags the product when its available quantity rises above this value. Decimal string, or null when no over-stock alert is configured. When both thresholds are set, this is strictly greater than `quantity_available_threshold_min`.'
+          type: string
+        quantity_available_threshold_min:
+          description: 'Low-stock alert threshold: Distru flags the product when its available quantity drops below this value. Decimal string, or null when no low-stock alert is configured. When both thresholds are set, this is strictly less than `quantity_available_threshold_max`.'
+          type: string
+        quantity_reserved:
+          description: 'Total quantity of this product currently reserved across all locations, as a decimal string (e.g. "100"). Reserved quantity is a soft hold tracked separately from on-hand stock (`quantity_active`): it rises as unfulfilled sales order items and draft assembly inputs are created, and falls as they are deleted or fulfilled. "0" when nothing is reserved.'
+          type: string
+        sku:
+          description: The stock keeping unit (SKU) configured for this product
+          type: string
+        strain:
+          $ref: '#/components/schemas/Strain'
+        subcategory:
+          $ref: '#/components/schemas/ProductSubcategoryCompact'
+        tags:
+          description: The tags associated with this product. Empty array when the product has no tags.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        tasks:
+          description: 'The tasks linked to this product that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total_cannabinoid_unit:
+          description: The unit `total_thc` and `total_cbd` are measured in — one of MG (milligrams per unit) or PERCENT (percent by weight). Null when neither potency value is set.
+          type: string
+        total_cbd:
+          description: Total CBD potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        total_thc:
+          description: Total THC potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        treez_wholesale_price:
+          description: The Treez wholesale price of this product, as a decimal string, or null when not set
+          type: string
+        unit_cost:
+          description: The cost (purchase price) of one unit of this product, as a decimal string, or null when not set
+          type: string
+        unit_net_weight:
+          description: The net contents of one unit of this product (weight, volume, or count of the contents), as a decimal string, measured in `unit_net_weight_serving_size_unit_type`. Null when not set.
+          type: string
+        unit_net_weight_serving_size_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        unit_price:
+          description: The list (sale) price of one unit of this product, as a decimal string (e.g. "25.00")
+          type: string
+        unit_serving_size:
+          description: The serving size per unit, as a decimal string, measured in `unit_net_weight_serving_size_unit_type` (the same unit as `unit_net_weight`). Null when not set. When both are set, this is at most `unit_net_weight`.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        units_per_case:
+          description: The number of units of this product packed in one case, as a decimal string (e.g. "12"), or null when not set
+          type: string
+        upc:
+          description: The UPC barcode of this product, or null when not set
+          type: string
+        updated_datetime:
+          description: The datetime this product was last updated at
+          type: string
+        vendor:
+          $ref: '#/components/schemas/CompanyCompact'
+        wholesale_unit_price:
+          description: The wholesale unit price of this product, as a JSON number (e.g. 12.5) rather than a decimal string — unlike `unit_price`. Null when not set.
+          type: number
+      required:
+      - quantity_reserved
+      - quantity_available
+      - quantity_active_by_location
+      - quantity_active
+      - custom_data
+      - inventory_tracking_method
+      - unit_price
+      - is_featured
+      - is_active
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - sku
+      - name
+      - id
+      title: Product
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    BillOfMaterials:
+      description: A product's bill of materials (recipe of inputs and additional costs)
+      properties:
+        costs:
+          description: The additional (non-material) costs this recipe applies, ordered oldest first. Empty when none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsCost'
+          type: array
+        description:
+          description: Free-text description of this bill of materials, or null when none was entered
+          type: string
+        dynamic_inputs:
+          description: The inputs that select products by attribute (category, strain, tag, and so on) rather than naming a specific product. Empty when this recipe has none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsDynamicInput'
+          type: array
+        id:
+          description: ID for this bill of materials
+          type: string
+        name:
+          description: Human readable name for this bill of materials
+          type: string
+        product_inputs:
+          description: The inputs that name a specific product to consume. Empty when this recipe has none. See `dynamic_inputs` for inputs that select products by attribute instead.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsProductInput'
+          type: array
+      required:
+      - costs
+      - dynamic_inputs
+      - product_inputs
+      - name
+      - id
+      title: BillOfMaterials
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    BillOfMaterialsDynamicInput:
+      description: A dynamic input of a bill of materials. It selects products by attribute rather than naming a specific product. Each attribute list holds the entities matched by that criterion, or is empty when the criterion is not used.
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product_categories:
+          description: The product categories this input matches on, or empty when it does not match on category. A product must match every non-empty criterion.
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        product_groups:
+          description: The product groups this input matches on, or empty when it does not match on group.
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        product_subcategories:
+          description: The product subcategories this input matches on, or empty when it does not match on subcategory.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        quantity:
+          description: How much this recipe consumes of whatever product matches, as a decimal string (e.g. "2.5").
+          type: string
+        strains:
+          description: The strains this input matches on, or empty when it does not match on strain.
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        tags:
+          description: The tags this input matches on, or empty when it does not match on tag.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - tags
+      - strains
+      - product_groups
+      - product_subcategories
+      - product_categories
+      - quantity
+      - id
+      title: BillOfMaterialsDynamicInput
+      type: object
+    PdfResponse:
+      description: 'The JSON envelope a PDF endpoint returns for the non-binary formats: `format=url` returns `url` + `expires_datetime`, `format=email` returns `emailed_to`.'
+      properties:
+        data:
+          description: The response payload; which fields are present depends on the requested `format`.
+          properties:
+            emailed_to:
+              description: The recipient email addresses the PDF was emailed to, present only when `format=email`.
+              items:
+                type: string
+              type: array
+            expires_datetime:
+              description: ISO 8601 datetime when the signed `url` expires (e.g. "2026-08-20T00:00:00Z"), present only when `format=url`.
+              type: string
+            url:
+              description: Temporary signed URL to download the PDF, present only when `format=url`. Stops working once `expires_datetime` passes; request the endpoint again for a fresh URL.
+              type: string
+          type: object
+      title: PdfResponse
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ProductTagRef:
+      description: A tag associated with a product
+      properties:
+        id:
+          description: ID for this tag
+          type: string
+        name:
+          description: The name of this tag
+          type: string
+      required:
+      - name
+      - id
+      title: ProductTagRef
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    ProductGroupCompact:
+      description: A named grouping of products, defined per company (e.g. a brand line or product family).
+      properties:
+        id:
+          description: ID for this product group
+          type: string
+        name:
+          description: The name of this product group
+          type: string
+      required:
+      - name
+      - id
+      title: ProductGroupCompact
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    QuantityActiveByLocation:
+      description: Active on-hand quantity of an entity held at a single location.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        quantity:
+          description: Active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity
+      - location
+      title: QuantityActiveByLocation
+      type: object
+    Package:
+      description: A specific, compliance-tracked quantity of a product identified by a unique tag (e.g. a Metrc package). This is the physical unit of inventory for package-tracked products. This is the compact reference; see PackageFull for all fields.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+      required:
+      - distru_status
+      - quantity_active
+      - quantity
+      - location_id
+      - license_id
+      - id
+      title: Package
+      type: object
+    PrimaryTestResult:
+      description: A compact view of the primary [test result](#model-testresult) nested on a package or batch — just its headline potency figures. Fetch the full result from the test results endpoint for the complete analyte breakdown.
+      properties:
+        cbd_mg_per_unit:
+          description: CBD content in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        cbd_mg_per_unit_total:
+          description: Total CBD (including its acid precursor) in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        cbd_percentage:
+          description: CBD content as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        cbd_percentage_total:
+          description: Total CBD (including its acid precursor) as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        coa_url:
+          description: Public URL to view/download this test result's Certificate of Analysis (COA), or null when no file is attached
+          type: string
+        mg_per_unit_type:
+          description: The unit that the `*_mg_per_unit` figures are measured against, or null when not set
+          type: string
+        name:
+          description: The name of the test result
+          type: string
+        thc_mg_per_unit:
+          description: THC content in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        thc_mg_per_unit_total:
+          description: Total THC (including its acid precursor) in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        thc_percentage:
+          description: THC content as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        thc_percentage_total:
+          description: Total THC (including its acid precursor) as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+      required:
+      - name
+      title: PrimaryTestResult
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    BillOfMaterialsCostType:
+      description: The cost type applied by a bill-of-materials cost
+      properties:
+        cost_per_unit:
+          description: The cost per unit, as a decimal string (e.g. "5.00"). Present only when the caller has the `costs_permissions_view_cost_types_cost_per_unit` permission; the field is omitted otherwise.
+          type: string
+        id:
+          description: ID for this cost type
+          type: string
+        name:
+          description: Human readable name for this cost type
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - name
+      - id
+      title: BillOfMaterialsCostType
+      type: object
+    PackagesWithActiveQuantityByLocation:
+      description: A location and the product's packages that hold active quantity there.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        packages:
+          description: The product's packages held at this location that have active quantity, ordered by id.
+          items:
+            $ref: '#/components/schemas/Package'
+          type: array
+      required:
+      - packages
+      - location
+      title: PackagesWithActiveQuantityByLocation
+      type: object
+    BatchesWithActiveQuantityByLocation:
+      description: A location and the product's batches that hold active quantity there.
+      properties:
+        batches:
+          description: The product's batches with active quantity at this location, each carrying its active quantity there, ordered by id.
+          items:
+            $ref: '#/components/schemas/BatchCompactWithQuantityActive'
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+      required:
+      - batches
+      - location
+      title: BatchesWithActiveQuantityByLocation
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    BatchCompactWithQuantityActive:
+      description: A compact [batch](#model-batch) reference plus its active on-hand quantity at the location it is nested under.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        quantity_active:
+          description: The batch's active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity_active
+      - name
+      - id
+      title: BatchCompactWithQuantityActive
+      type: object
+    BatchFullResponse:
+      description: A single batch
+      properties:
+        data:
+          $ref: '#/components/schemas/BatchFull'
+      title: Batch Response
+      type: object
+  requestBodies:
+    DistruPublic.V1.AssemblyController.download_pdfBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              format:
+                enum:
+                - binary
+                - url
+                - email
+                type: string
+                description: 'How the generated PDF is delivered. One of `binary` — the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` — a JSON body with a short-lived signed download URL (see the [PdfResponse](#model-pdfresponse) response); or `email` — emails the PDF to the addresses in `email_addresses` and returns a JSON body listing who it was emailed to. Required, but omitting it defaults to `binary` for backward compatibility.'
+              email_addresses:
+                items:
+                  type: string
+                type: array
+                description: Recipient email addresses, used only when `format` is `email` (required in that case, ignored otherwise). An entry may hold several comma-separated addresses; spaces, blank entries and repeats are dropped, and `emailed_to` lists the addresses actually emailed. At least one address is required and every address must be valid, otherwise the request is rejected with a 400. At most 200 addresses may be given, counted after that cleanup.
+            required:
+            - format
+      required: true
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

@@ -1,0 +1,1508 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Test Result API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: TestResult
+paths:
+  /public/v1/test-results:
+    get:
+      description: 'List test results for the authenticated company, most recently created last (ordered by creation time, then id). Each result is returned in full, including its potency values, lab metadata, `additional_test_results`, `coa_url`, `is_primary` flag, and the `package_id`/`batch_id` it is attached to.
+
+
+        Results are paginated; follow the `next_page` URL in the envelope to walk the full set. Reads are eventually consistent — a test result you just created or updated may take up to 1 second to appear or reflect its latest values here.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.TestResultController.index
+      parameters:
+      - description: Restrict the result to specific test results by ID (the same ID returned as each test result's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Restrict the result to test results attached to these packages by ID (the package''s ID, as returned in each result''s `package_id`). A result is attached to exactly one package or one batch, so this matches only package-attached results. This filter looks at direct attachment only: if a package *inherits* a test result from its assembly inputs, that package is not considered here — only packages the result is directly attached to are matched. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs may be given.'
+        in: query
+        name: package_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Restrict the result to test results attached to these batches by ID (the batch''s ID, as returned in each result''s `batch_id`). A result is attached to exactly one package or one batch, so this matches only batch-attached results. This filter looks at direct attachment only: if a batch *inherits* a test result from its assembly inputs, that batch is not considered here — only batches the result is directly attached to are matched. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs may be given.'
+        in: query
+        name: batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Restrict the result to test results whose attached package or batch belongs to one of these products by ID. This filter looks at direct attachment only: it matches on the product of the package or batch the result is directly attached to, so if a package/batch *inherits* a test result from its assembly inputs, that product is not considered here. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs may be given.'
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the result to test results with these Metrc lab-result identifiers — Metrc's own integer IDs (the `metrc_id` in the response), not Distru IDs. Matches a result if its Metrc ID equals any listed value. Only results synced from Metrc carry one. Repeat the bracketed key once per ID. An empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: metrc_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: 'Filter to test results whose creation time falls in a range. Value is a comma-separated pair of ISO8601 UTC datetimes, `<start>,<end>`; either side may be left empty for an open-ended bound. Both bounds are inclusive. Example: `?inserted_datetime=,2022-07-10T00:00:00Z` returns everything created on or before that instant; `?inserted_datetime=2022-07-01T00:00:00Z,2022-07-10T00:00:00Z` bounds both ends.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      - description: 'Filter to test results whose last-modified time falls in a range. Value is a comma-separated pair of ISO8601 UTC datetimes, `<start>,<end>`; either side may be left empty for an open-ended bound. Both bounds are inclusive. Example: `?updated_datetime=,2022-07-10T00:00:00Z` returns everything modified on or before that instant; `?updated_datetime=2022-07-01T00:00:00Z,2022-07-10T00:00:00Z` bounds both ends.'
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of test results
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TestResults'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get test results
+      tags:
+      - TestResult
+    post:
+      description: 'Create or update a single test result (lab result / Certificate of Analysis) for one package or batch. Omit `id` to create; pass an existing test result''s `id` to update it. Same URL and request shape for both.
+
+
+        On create, attach the result to exactly one material by sending either `package_id` or `batch_id` (never both, and at least one is required). On update, send neither — the attachment is fixed once created, and passing `package_id` or `batch_id` on an update is rejected. Only non-compliance-tracked test results can be updated through this endpoint; results synced from Metrc or BioTrack are read-only here and any update attempt is rejected.
+
+
+        Updates are sparse: only the fields you send are changed, and any field you omit keeps its stored value. To clear an optional potency or lab field back to null, send it explicitly as `null`. Potency percentage fields accept at most 4 decimal places and must be between 0 and 100.
+
+
+        Results created or updated here are Distru-only records — this endpoint never pushes to Metrc or BioTrack. Compliance-tracked results only ever arrive by syncing from those systems, which is why they are read-only here.
+
+
+        Effects beyond the test result row:
+
+        • Creating a result attaches it to the given package or batch and propagates it down to that material''s child packages where applicable.
+
+        • `is_primary: true` makes this the primary result for its package/batch: it unsets whatever result was previously primary there, propagates to child packages, and repoints those materials'' inventory/stock records at this result (so it becomes the potency shown for that inventory). A material always keeps exactly one primary — the first result created for a material becomes primary automatically even if you send `is_primary: false`.
+
+        • You cannot flip an existing primary result from `is_primary: true` to `false` directly; instead mark a different result on the same package/batch as primary, which demotes this one automatically.
+
+
+        Required permission: `products_permissions_edit`.'
+      operationId: DistruPublic.V1.TestResultController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: The test result's ID. Omit to create a new result; include an existing result's ID to update it (an ID that doesn't exist for your company returns 404). Only non-compliance-tracked results can be updated — updating one that is synced from Metrc or BioTrack is rejected. When present, `package_id` and `batch_id` must be omitted.
+                package_id:
+                  type: string
+                  description: The ID of the package this result is attached to. Provide exactly one of `package_id` or `batch_id` on create; sending both, or neither, is rejected. Must be omitted on update (the attachment cannot be moved).
+                batch_id:
+                  type: string
+                  description: The ID of the batch this result is attached to. Provide exactly one of `package_id` or `batch_id` on create; sending both, or neither, is rejected. Must be omitted on update. Batch-attached results cannot be compliance-tracked.
+                additional_test_results:
+                  type: object
+                  description: Required on create; on update, omit to leave the stored object unchanged. A key/value object of extra lab fields beyond the built-in THC/CBD ones (e.g. terpenes, pesticides, moisture). Which keys are valid depends on the attached material's product-category test result settings; an unrecognized key is rejected, and keys valid overall but outside that material's configured set are dropped from responses. Each value must be a valid decimal within that field's configured decimal-place, digit, and range limits (percentage fields 0–100). Null values are ignored. When you do send it on update it replaces the entire object, not merged per-key — include every entry you want to keep; send `{}` to clear them all. See [here](#additionaltestresult) for the valid options.
+                mg_per_unit_type:
+                  enum:
+                  - mg/g
+                  - mg/mL
+                  type: string
+                  description: Required on create; on update, omit to leave unchanged. The unit the `*_mg_per_unit` fields are expressed in. One of `mg/g` or `mg/mL`.
+                is_primary:
+                  type: boolean
+                  description: 'Required on create; on update, omit to leave unchanged. Whether this is the primary result for its package/batch. Setting `true` makes it primary — it demotes any other primary on the same material, propagates to child packages, and repoints that material''s inventory/stock potency at this result. You cannot change an existing primary result from `true` to `false` directly; mark a different result on the same package/batch as primary instead, which demotes this one automatically. Note: the first result created for a material always becomes primary regardless of this flag.'
+                release_date:
+                  type: string
+                  description: The lab's release date for this result, as an ISO8601 date (`YYYY-MM-DD`). Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                lab_license_number:
+                  type: string
+                  description: The license number of the testing lab. Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                lab_name:
+                  type: string
+                  description: The name of the testing lab. Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                name:
+                  type: string
+                  description: Required on create; on update, omit to leave unchanged. A display name for this result (250 characters or fewer).
+                thc_percentage:
+                  type: number
+                  format: decimal
+                  description: THC as a percentage of the material (0–100, at most 4 decimal places). Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                total_thc_percentage:
+                  type: number
+                  format: decimal
+                  description: Total THC as a percentage of the material, accounting for THCA conversion (0–100, at most 4 decimal places). Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                thc_mg_per_unit:
+                  type: number
+                  format: decimal
+                  description: THC content per unit, expressed in the unit named by `mg_per_unit_type`. Must be 0 or greater; unlike the percentage fields it has no upper bound and no decimal-place limit. Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                total_thc_mg_per_unit:
+                  type: number
+                  format: decimal
+                  description: Total THC content per unit (accounting for THCA conversion), expressed in the unit named by `mg_per_unit_type`. Must be 0 or greater; no upper bound and no decimal-place limit. Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                cbd_percentage:
+                  type: number
+                  format: decimal
+                  description: CBD as a percentage of the material (0–100, at most 4 decimal places). Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                total_cbd_percentage:
+                  type: number
+                  format: decimal
+                  description: Total CBD as a percentage of the material, accounting for CBDA conversion (0–100, at most 4 decimal places). Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                cbd_mg_per_unit:
+                  type: number
+                  format: decimal
+                  description: CBD content per unit, expressed in the unit named by `mg_per_unit_type`. Must be 0 or greater; unlike the percentage fields it has no upper bound and no decimal-place limit. Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+                total_cbd_mg_per_unit:
+                  type: number
+                  format: decimal
+                  description: Total CBD content per unit (accounting for CBDA conversion), expressed in the unit named by `mg_per_unit_type`. Must be 0 or greater; no upper bound and no decimal-place limit. Optional; omitting it on update leaves it unchanged. Send `null` to clear it.
+      responses:
+        '200':
+          description: A single test result
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TestResultResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a test result
+      tags:
+      - TestResult
+  /public/v1/test-results/{id}:
+    delete:
+      description: 'Deletes a test result. This is a hard delete: the record is permanently removed — it disappears from `GET /public/v1/test-results`, `GET /public/v1/test-results/{id}` returns 404 for it, and it cannot be recovered through the API. Responds 204 with no body on success, or 404 if no test result with that `id` exists in your company (including one that belongs to another company or was already deleted).
+
+
+        Only Distru-only results can be deleted: a result synced from Metrc or BioTrack (compliance-tracked) is refused with a 400. Nothing else blocks the delete — a result can be deleted even while it is the primary result of its package or batch.
+
+
+        Effects beyond the test result itself: the result is detached from the package or batch it was attached to (and from any child packages it propagated to), and its attached Certificate of Analysis (COA) file is permanently deleted with it. Where the result was the primary one, the affected packages/batches and their inventory are left with no test result — potency stops showing for that inventory until another result is created or marked primary via the upsert endpoint; no result is auto-promoted. No inventory quantity is created, consumed, or released, and nothing is synced to Metrc or BioTrack.
+
+
+        Required permission: `products_permissions_edit`.'
+      operationId: DistruPublic.V1.TestResultController.delete
+      parameters:
+      - description: ID of the test result to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a test result
+      tags:
+      - TestResult
+    get:
+      description: 'Get a single test result by its ID, in full: potency values, lab metadata, `additional_test_results`, `coa_url`, the `is_primary` flag, and the `package_id`/`batch_id` it is attached to. Returns 404 if no test result with that ID exists for the authenticated company.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.TestResultController.show
+      parameters:
+      - description: The ID of the test result to fetch, as returned by the list and upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single test result
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TestResultResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a test result
+      tags:
+      - TestResult
+  /public/v1/test-results/{id}/pdf:
+    post:
+      description: 'Generate the Certificate of Analysis (COA) PDF for a single test result — its attached lab result file — and download it directly, get a signed link to it, or email it (see `format`). Returns 404 when the test result has no attached lab result file, with the message `This test result has no lab results attached`, which tells it apart from an unknown ID (`Not Found`).
+
+
+        The same permissions that govern downloading this PDF in the Distru web app apply to this endpoint; when `format` is `email`, the web app''s permission for emailing it applies instead (documents the web app cannot email keep the download permission).
+
+
+        `format` selects how the generated PDF is delivered and has three modes: `binary` returns the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` returns a JSON envelope `{"data": {"url": ..., "expires_datetime": ...}}` with a temporary signed download URL; `email` sends the PDF to the addresses in `email_addresses` and returns a JSON envelope `{"data": {"emailed_to": [...]}}`. `format` is required, but for backward compatibility omitting it defaults to `binary`.
+
+
+        All PDF download endpoints share a single, combined rate limit for your account: 20 requests per minute and 1000 per day in total across every PDF endpoint (not per endpoint). Requests over the limit return 429 with a Retry-After header, and only successful downloads count toward it.'
+      operationId: DistruPublic.V1.TestResultController.download_pdf
+      parameters:
+      - description: The ID of the test result whose Certificate of Analysis (COA) PDF you want. This is the same `id` returned by the list and get endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/DistruPublic.V1.AssemblyController.download_pdfBody'
+      responses:
+        '200':
+          description: 'When `format` is `binary` (or omitted), the raw PDF file (`Content-Type: application/pdf`). When `format` is `url`, a JSON body with a temporary signed download URL; when `format` is `email`, a JSON body listing the addresses the PDF was emailed to (see the PdfResponse schema).'
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/PdfResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found, or the test result has no lab result file attached (the message says which)
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's shared PDF download rate limit (20/minute, 1000/day across all PDF endpoints) was exceeded. Retry after the period in the Retry-After header.
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Generate a test result's Certificate of Analysis (COA) PDF
+      tags:
+      - TestResult
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    PdfResponse:
+      description: 'The JSON envelope a PDF endpoint returns for the non-binary formats: `format=url` returns `url` + `expires_datetime`, `format=email` returns `emailed_to`.'
+      properties:
+        data:
+          description: The response payload; which fields are present depends on the requested `format`.
+          properties:
+            emailed_to:
+              description: The recipient email addresses the PDF was emailed to, present only when `format=email`.
+              items:
+                type: string
+              type: array
+            expires_datetime:
+              description: ISO 8601 datetime when the signed `url` expires (e.g. "2026-08-20T00:00:00Z"), present only when `format=url`.
+              type: string
+            url:
+              description: Temporary signed URL to download the PDF, present only when `format=url`. Stops working once `expires_datetime` passes; request the endpoint again for a fresh URL.
+              type: string
+          type: object
+      title: PdfResponse
+      type: object
+    AdditionalTestResult:
+      description: 'The full breakdown of individual analytes measured on a lab test, grouped by category (cannabinoids, terpenes, pesticides, heavy metals, microbials, mycotoxins, residual solvents, and more). Each value is a string. The unit is encoded in the field-name suffix: `_percentage` is percent by weight, `_mg_per_unit` is milligrams per unit, `_ug_per_g` is micrograms per gram, `_ug_per_kg` is micrograms per kilogram, and `_cfu_per_g` is colony-forming units per gram. A null or empty value means the analyte was not measured.'
+      properties:
+        acephate_ug_per_g:
+          description: Pesticide
+          type: string
+        acequinocyl_ug_per_g:
+          description: Pesticide
+          type: string
+        acetamiprid_ug_per_g:
+          description: Pesticide
+          type: string
+        acetic_acid_percentage:
+          description: Other
+          type: string
+        acetic_acid_ug_per_g:
+          description: Other
+          type: string
+        acetone_ug_per_g:
+          description: Solvent
+          type: string
+        acetonitrile_ug_per_g:
+          description: Solvent
+          type: string
+        aflatoxin_b1_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        aflatoxin_b2_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        aflatoxin_g1_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        aflatoxin_g2_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        aflatoxins_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        aldicarb_ug_per_g:
+          description: Pesticide
+          type: string
+        alpha_bisabolol_mg_per_unit:
+          description: Terpene
+          type: string
+        alpha_bisabolol_percentage:
+          description: Terpene
+          type: string
+        alpha_cyfluthrin_ug_per_g:
+          description: Pesticide
+          type: string
+        alpha_cypermethrin_ug_per_g:
+          description: Pesticide
+          type: string
+        alpha_humulene_mg_per_unit:
+          description: Terpene
+          type: string
+        alpha_humulene_percentage:
+          description: Terpene
+          type: string
+        alpha_myrcene_mg_per_unit:
+          description: Terpene
+          type: string
+        alpha_myrcene_percentage:
+          description: Terpene
+          type: string
+        alpha_phellandrene_mg_per_unit:
+          description: Terpene
+          type: string
+        alpha_phellandrene_percentage:
+          description: Terpene
+          type: string
+        alpha_pinene_mg_per_unit:
+          description: Terpene
+          type: string
+        alpha_pinene_percentage:
+          description: Terpene
+          type: string
+        alpha_terpinene_mg_per_unit:
+          description: Terpene
+          type: string
+        alpha_terpinene_percentage:
+          description: Terpene
+          type: string
+        ancymidol_ug_per_g:
+          description: Pesticide
+          type: string
+        antimony_ug_per_g:
+          description: Heavy Metal
+          type: string
+        arsenic_ug_per_g:
+          description: Heavy Metal
+          type: string
+        aspergillus_cfu_per_g:
+          description: Microbial
+          type: string
+        aspergillus_flavus_cfu_per_g:
+          description: Microbial
+          type: string
+        aspergillus_fumigatus_cfu_per_g:
+          description: Microbial
+          type: string
+        aspergillus_niger_cfu_per_g:
+          description: Microbial
+          type: string
+        aspergillus_terreus_cfu_per_g:
+          description: Microbial
+          type: string
+        azoxystrobin_ug_per_g:
+          description: Pesticide
+          type: string
+        benzene_ug_per_g:
+          description: Solvent
+          type: string
+        beta_caryophyllene_mg_per_unit:
+          description: Terpene
+          type: string
+        beta_caryophyllene_percentage:
+          description: Terpene
+          type: string
+        beta_cyfluthrin_ug_per_g:
+          description: Pesticide
+          type: string
+        beta_cypermethrin_ug_per_g:
+          description: Pesticide
+          type: string
+        beta_humulene_mg_per_unit:
+          description: Terpene
+          type: string
+        beta_humulene_percentage:
+          description: Terpene
+          type: string
+        beta_myrcene_mg_per_unit:
+          description: Terpene
+          type: string
+        beta_myrcene_percentage:
+          description: Terpene
+          type: string
+        beta_pinene_mg_per_unit:
+          description: Terpene
+          type: string
+        beta_pinene_percentage:
+          description: Terpene
+          type: string
+        bifenazate_ug_per_g:
+          description: Pesticide
+          type: string
+        bifenthrin_ug_per_g:
+          description: Pesticide
+          type: string
+        borneol_mg_per_unit:
+          description: Terpene
+          type: string
+        borneol_percentage:
+          description: Terpene
+          type: string
+        boscalid_ug_per_g:
+          description: Pesticide
+          type: string
+        butane_ug_per_g:
+          description: Solvent
+          type: string
+        butanol_ug_per_g:
+          description: Solvent
+          type: string
+        butyl_acetate_ug_per_g:
+          description: Solvent
+          type: string
+        cadmium_ug_per_g:
+          description: Heavy Metal
+          type: string
+        camphene_mg_per_unit:
+          description: Terpene
+          type: string
+        camphene_percentage:
+          description: Terpene
+          type: string
+        camphor_mg_per_unit:
+          description: Terpene
+          type: string
+        camphor_percentage:
+          description: Terpene
+          type: string
+        candida_albicans_cfu_per_g:
+          description: Microbial
+          type: string
+        cannabinoids_mg_per_unit_total:
+          description: Cannabinoid
+          type: string
+        cannabinoids_percentage_total:
+          description: Cannabinoid
+          type: string
+        captan_ug_per_g:
+          description: Pesticide
+          type: string
+        carbaryl_ug_per_g:
+          description: Pesticide
+          type: string
+        carbofuran_ug_per_g:
+          description: Pesticide
+          type: string
+        caryophyllene_oxide_mg_per_unit:
+          description: Terpene
+          type: string
+        caryophyllene_oxide_percentage:
+          description: Terpene
+          type: string
+        cbc_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbc_percentage:
+          description: Cannabinoid
+          type: string
+        cbca_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbca_percentage:
+          description: Cannabinoid
+          type: string
+        cbda_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbda_percentage:
+          description: Cannabinoid
+          type: string
+        cbdv_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbdv_percentage:
+          description: Cannabinoid
+          type: string
+        cbg_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbg_percentage:
+          description: Cannabinoid
+          type: string
+        cbga_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbga_percentage:
+          description: Cannabinoid
+          type: string
+        cbl_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbl_percentage:
+          description: Cannabinoid
+          type: string
+        cbn_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbn_percentage:
+          description: Cannabinoid
+          type: string
+        cbt_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        cbt_percentage:
+          description: Cannabinoid
+          type: string
+        chlorantraniliprole_ug_per_g:
+          description: Pesticide
+          type: string
+        chlordane_cis_ug_per_g:
+          description: Pesticide
+          type: string
+        chlordane_trans_ug_per_g:
+          description: Pesticide
+          type: string
+        chlordane_ug_per_g:
+          description: Pesticide
+          type: string
+        chlorfenapyr_ug_per_g:
+          description: Pesticide
+          type: string
+        chlormequat_chloride_percentage:
+          description: Other
+          type: string
+        chlormequat_chloride_ug_per_g:
+          description: Other
+          type: string
+        chlorobenzene_ug_per_g:
+          description: Solvent
+          type: string
+        chloroform_ug_per_g:
+          description: Solvent
+          type: string
+        chlorpyrifos_ug_per_g:
+          description: Pesticide
+          type: string
+        chromium_ug_per_g:
+          description: Heavy Metal
+          type: string
+        clofentezine_ug_per_g:
+          description: Pesticide
+          type: string
+        clothianidin_ug_per_g:
+          description: Pesticide
+          type: string
+        copper_ug_per_g:
+          description: Heavy Metal
+          type: string
+        coumaphos_ug_per_g:
+          description: Pesticide
+          type: string
+        cumene_ug_per_g:
+          description: Solvent
+          type: string
+        cyclohexane_ug_per_g:
+          description: Solvent
+          type: string
+        cyfluthrin_ug_per_g:
+          description: Pesticide
+          type: string
+        cymene_mg_per_unit:
+          description: Terpene
+          type: string
+        cymene_percentage:
+          description: Terpene
+          type: string
+        cypermethrin_ug_per_g:
+          description: Pesticide
+          type: string
+        daminozide_ug_per_g:
+          description: Pesticide
+          type: string
+        delta_3_carene_mg_per_unit:
+          description: Terpene
+          type: string
+        delta_3_carene_percentage:
+          description: Terpene
+          type: string
+        delta_8_thc_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        delta_8_thc_percentage:
+          description: Cannabinoid
+          type: string
+        diazinon_ug_per_g:
+          description: Pesticide
+          type: string
+        dichloroethane_ug_per_g:
+          description: Solvent
+          type: string
+        dichloromethane_ug_per_g:
+          description: Solvent
+          type: string
+        dichlorvos_ug_per_g:
+          description: Pesticide
+          type: string
+        dimethoate_ug_per_g:
+          description: Pesticide
+          type: string
+        dimethomorph_e_ug_per_g:
+          description: Pesticide
+          type: string
+        dimethomorph_ug_per_g:
+          description: Pesticide
+          type: string
+        dimethomorph_z_ug_per_g:
+          description: Pesticide
+          type: string
+        dimethoxyethane_ug_per_g:
+          description: Solvent
+          type: string
+        dimethyl_sulfoxide_ug_per_g:
+          description: Solvent
+          type: string
+        dimethylacetamide_ug_per_g:
+          description: Solvent
+          type: string
+        dimethylformamide_ug_per_g:
+          description: Solvent
+          type: string
+        dinotefuran_ug_per_g:
+          description: Pesticide
+          type: string
+        dioxane_ug_per_g:
+          description: Solvent
+          type: string
+        diuron_ug_per_g:
+          description: Pesticide
+          type: string
+        e_coli_cfu_per_g:
+          description: Microbial
+          type: string
+        enterobacteriacaea_cfu_per_g:
+          description: Microbial
+          type: string
+        ethanol_ug_per_g:
+          description: Solvent
+          type: string
+        ethephon_ug_per_g:
+          description: Pesticide
+          type: string
+        ethoprophos_ug_per_g:
+          description: Pesticide
+          type: string
+        ethoxyethanol_ug_per_g:
+          description: Solvent
+          type: string
+        ethyl_acetate_ug_per_g:
+          description: Solvent
+          type: string
+        ethyl_ether_ug_per_g:
+          description: Solvent
+          type: string
+        ethyl_formate_percentage:
+          description: Other
+          type: string
+        ethyl_formate_ug_per_g:
+          description: Other
+          type: string
+        ethylene_glycol_percentage:
+          description: Other
+          type: string
+        ethylene_glycol_ug_per_g:
+          description: Other
+          type: string
+        ethylene_oxide_ug_per_g:
+          description: Solvent
+          type: string
+        etofenprox_ug_per_g:
+          description: Pesticide
+          type: string
+        etoxazole_ug_per_g:
+          description: Pesticide
+          type: string
+        eucalyptol_mg_per_unit:
+          description: Terpene
+          type: string
+        eucalyptol_percentage:
+          description: Terpene
+          type: string
+        farnesene_mg_per_unit:
+          description: Terpene
+          type: string
+        farnesene_percentage:
+          description: Terpene
+          type: string
+        fenchol_mg_per_unit:
+          description: Terpene
+          type: string
+        fenchol_percentage:
+          description: Terpene
+          type: string
+        fenhexamid_ug_per_g:
+          description: Pesticide
+          type: string
+        fenoxycarb_ug_per_g:
+          description: Pesticide
+          type: string
+        fenpyroximate_ug_per_g:
+          description: Pesticide
+          type: string
+        filth_and_foreign_material_percentage:
+          description: Other
+          type: string
+        fipronil_ug_per_g:
+          description: Pesticide
+          type: string
+        flonicamid_ug_per_g:
+          description: Pesticide
+          type: string
+        fludioxonil_ug_per_g:
+          description: Pesticide
+          type: string
+        flurprimidol_ug_per_g:
+          description: Pesticide
+          type: string
+        formamide_ug_per_g:
+          description: Pesticide
+          type: string
+        formic_acid_percentage:
+          description: Other
+          type: string
+        formic_acid_ug_per_g:
+          description: Other
+          type: string
+        gamma_terpinene_mg_per_unit:
+          description: Terpene
+          type: string
+        gamma_terpinene_percentage:
+          description: Terpene
+          type: string
+        geraniol_mg_per_unit:
+          description: Terpene
+          type: string
+        geraniol_percentage:
+          description: Terpene
+          type: string
+        guaiol_mg_per_unit:
+          description: Terpene
+          type: string
+        guaiol_percentage:
+          description: Terpene
+          type: string
+        heptane_ug_per_g:
+          description: Solvent
+          type: string
+        hexane_ug_per_g:
+          description: Solvent
+          type: string
+        hexythiazox_ug_per_g:
+          description: Pesticide
+          type: string
+        imazalil_ug_per_g:
+          description: Pesticide
+          type: string
+        imidacloprid_ug_per_g:
+          description: Pesticide
+          type: string
+        isobutyl_acetate_ug_per_g:
+          description: Solvent
+          type: string
+        isopropanol_ug_per_g:
+          description: Solvent
+          type: string
+        isopropyl_acetate_ug_per_g:
+          description: Solvent
+          type: string
+        isopulegol_mg_per_unit:
+          description: Terpene
+          type: string
+        isopulegol_percentage:
+          description: Terpene
+          type: string
+        kresoxim_methyl_ug_per_g:
+          description: Pesticide
+          type: string
+        l_monocytogenes_cfu_per_g:
+          description: Microbial
+          type: string
+        lambda_cyhalothrin_ug_per_g:
+          description: Pesticide
+          type: string
+        lead_ug_per_g:
+          description: Heavy Metal
+          type: string
+        limonene_mg_per_unit:
+          description: Terpene
+          type: string
+        limonene_percentage:
+          description: Terpene
+          type: string
+        linalool_mg_per_unit:
+          description: Terpene
+          type: string
+        linalool_percentage:
+          description: Terpene
+          type: string
+        m_and_p_xylene_ug_per_g:
+          description: Solvent
+          type: string
+        malathion_ug_per_g:
+          description: Pesticide
+          type: string
+        mercury_ug_per_g:
+          description: Heavy Metal
+          type: string
+        metalaxyl_ug_per_g:
+          description: Pesticide
+          type: string
+        methanol_ug_per_g:
+          description: Solvent
+          type: string
+        methiocarb_ug_per_g:
+          description: Pesticide
+          type: string
+        methomyl_ug_per_g:
+          description: Pesticide
+          type: string
+        methoxybenzene_ug_per_g:
+          description: Solvent
+          type: string
+        methoxyethanol_ug_per_g:
+          description: Solvent
+          type: string
+        methyl_acetate_ug_per_g:
+          description: Solvent
+          type: string
+        methyl_butanol_ug_per_g:
+          description: Solvent
+          type: string
+        methyl_butyl_ketone_ug_per_g:
+          description: Solvent
+          type: string
+        methyl_ethyl_ketone_ug_per_g:
+          description: Solvent
+          type: string
+        methyl_parathion_ug_per_g:
+          description: Pesticide
+          type: string
+        methyl_propanol_ug_per_g:
+          description: Solvent
+          type: string
+        methylcyclohexane_ug_per_g:
+          description: Solvent
+          type: string
+        methylisobutyl_ketone_ug_per_g:
+          description: Solvent
+          type: string
+        mevinphos_i_ug_per_g:
+          description: Pesticide
+          type: string
+        mevinphos_ii_ug_per_g:
+          description: Pesticide
+          type: string
+        mevinphos_ug_per_g:
+          description: Pesticide
+          type: string
+        mgk_264_ug_per_g:
+          description: Pesticide
+          type: string
+        moisture_percentage:
+          description: Moisture
+          type: string
+        mold_cfu_per_g:
+          description: Microbial
+          type: string
+        myclobutanil_ug_per_g:
+          description: Pesticide
+          type: string
+        n_methylpyrrolidone_ug_per_g:
+          description: Solvent
+          type: string
+        naled_ug_per_g:
+          description: Pesticide
+          type: string
+        nerolidol_mg_per_unit:
+          description: Terpene
+          type: string
+        nerolidol_percentage:
+          description: Terpene
+          type: string
+        nickel_ug_per_g:
+          description: Heavy Metal
+          type: string
+        nitromethane_ug_per_g:
+          description: Solvent
+          type: string
+        ochratoxin_a_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        ocimene_mg_per_unit:
+          description: Terpene
+          type: string
+        ocimene_percentage:
+          description: Terpene
+          type: string
+        other_heavy_metals_ug_per_g:
+          description: Heavy Metal
+          type: string
+        other_microbials_cfu_per_g:
+          description: Microbial
+          type: string
+        other_mycotoxins_ug_per_kg:
+          description: Mycotoxin
+          type: string
+        other_pesticides_ug_per_g:
+          description: Pesticide
+          type: string
+        other_solvents_ug_per_g:
+          description: Solvent
+          type: string
+        other_terpenes_mg_per_unit:
+          description: Terpene
+          type: string
+        other_terpenes_percentage:
+          description: Terpene
+          type: string
+        oxamyl_ug_per_g:
+          description: Pesticide
+          type: string
+        paclobutrazol_ug_per_g:
+          description: Pesticide
+          type: string
+        pentachloronitrobenzene_ug_per_g:
+          description: Pesticide
+          type: string
+        pentane_ug_per_g:
+          description: Solvent
+          type: string
+        pentanol_ug_per_g:
+          description: Solvent
+          type: string
+        permethrin_cis_ug_per_g:
+          description: Pesticide
+          type: string
+        permethrin_trans_ug_per_g:
+          description: Pesticide
+          type: string
+        permethrin_ug_per_g:
+          description: Pesticide
+          type: string
+        phosmet_ug_per_g:
+          description: Pesticide
+          type: string
+        phytol_mg_per_unit:
+          description: Terpene
+          type: string
+        phytol_percentage:
+          description: Terpene
+          type: string
+        piperonylbutoxide_ug_per_g:
+          description: Pesticide
+          type: string
+        prallethrin_cis_ug_per_g:
+          description: Pesticide
+          type: string
+        prallethrin_trans_ug_per_g:
+          description: Pesticide
+          type: string
+        prallethrin_ug_per_g:
+          description: Pesticide
+          type: string
+        propane_ug_per_g:
+          description: Solvent
+          type: string
+        propanol_ug_per_g:
+          description: Solvent
+          type: string
+        propiconazole_cis_ug_per_g:
+          description: Pesticide
+          type: string
+        propiconazole_trans_ug_per_g:
+          description: Pesticide
+          type: string
+        propiconazole_ug_per_g:
+          description: Pesticide
+          type: string
+        propoxur_ug_per_g:
+          description: Pesticide
+          type: string
+        propyl_acetate_ug_per_g:
+          description: Solvent
+          type: string
+        pulegone_mg_per_unit:
+          description: Terpene
+          type: string
+        pulegone_percentage:
+          description: Terpene
+          type: string
+        pyrethrins_cinerin_i_ug_per_g:
+          description: Pesticide
+          type: string
+        pyrethrins_cinerin_ii_ug_per_g:
+          description: Pesticide
+          type: string
+        pyrethrins_jasmolin_i_ug_per_g:
+          description: Pesticide
+          type: string
+        pyrethrins_jasmolin_ii_ug_per_g:
+          description: Pesticide
+          type: string
+        pyrethrins_pyrethrin_i_ug_per_g:
+          description: Pesticide
+          type: string
+        pyrethrins_pyrethrin_ii_ug_per_g:
+          description: Pesticide
+          type: string
+        pyrethrins_ug_per_g:
+          description: Pesticide
+          type: string
+        pyridaben_ug_per_g:
+          description: Pesticide
+          type: string
+        pyridine_ug_per_g:
+          description: Solvent
+          type: string
+        pyriproxyfen_ug_per_g:
+          description: Pesticide
+          type: string
+        sabinene_mg_per_unit:
+          description: Terpene
+          type: string
+        sabinene_percentage:
+          description: Terpene
+          type: string
+        salmonella_cfu_per_g:
+          description: Microbial
+          type: string
+        sand_and_soil_and_cinders_and_dirt_percentage:
+          description: Other
+          type: string
+        spinetoram_j_ug_per_g:
+          description: Pesticide
+          type: string
+        spinetoram_l_ug_per_g:
+          description: Pesticide
+          type: string
+        spinetoram_ug_per_g:
+          description: Pesticide
+          type: string
+        spinosad_a_ug_per_g:
+          description: Pesticide
+          type: string
+        spinosad_d_ug_per_g:
+          description: Pesticide
+          type: string
+        spinosad_ug_per_g:
+          description: Pesticide
+          type: string
+        spiromesifen_ug_per_g:
+          description: Pesticide
+          type: string
+        spirotetramat_ug_per_g:
+          description: Pesticide
+          type: string
+        spiroxamine_a_ug_per_g:
+          description: Pesticide
+          type: string
+        spiroxamine_b_ug_per_g:
+          description: Pesticide
+          type: string
+        spiroxamine_ug_per_g:
+          description: Pesticide
+          type: string
+        sulfolane_ug_per_g:
+          description: Solvent
+          type: string
+        tebuconazole_ug_per_g:
+          description: Pesticide
+          type: string
+        terpenes_mg_per_unit_total:
+          description: Terpene
+          type: string
+        terpenes_percentage_total:
+          description: Terpene
+          type: string
+        terpineol_mg_per_unit:
+          description: Terpene
+          type: string
+        terpineol_percentage:
+          description: Terpene
+          type: string
+        terpinolene_mg_per_unit:
+          description: Terpene
+          type: string
+        terpinolene_percentage:
+          description: Terpene
+          type: string
+        tert_butyl_methyl_ether_ug_per_g:
+          description: Solvent
+          type: string
+        tetrahydrofuran_ug_per_g:
+          description: Solvent
+          type: string
+        tetralin_ug_per_g:
+          description: Solvent
+          type: string
+        thca_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        thca_percentage:
+          description: Cannabinoid
+          type: string
+        thcv_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        thcv_percentage:
+          description: Cannabinoid
+          type: string
+        thcva_mg_per_unit:
+          description: Cannabinoid
+          type: string
+        thcva_percentage:
+          description: Cannabinoid
+          type: string
+        thiabendazole_ug_per_g:
+          description: Pesticide
+          type: string
+        thiacloprid_ug_per_g:
+          description: Pesticide
+          type: string
+        thiamethoxam_ug_per_g:
+          description: Pesticide
+          type: string
+        toluene_ug_per_g:
+          description: Solvent
+          type: string
+        trichloroethylene_ug_per_g:
+          description: Solvent
+          type: string
+        trifloxystrobin_ug_per_g:
+          description: Pesticide
+          type: string
+        valencene_mg_per_unit:
+          description: Terpene
+          type: string
+        valencene_percentage:
+          description: Terpene
+          type: string
+        vitamin_e_acetate_percentage:
+          description: Other
+          type: string
+        vitamin_e_acetate_ug_per_g:
+          description: Other
+          type: string
+        water_activity_aw:
+          description: Water Activity
+          type: string
+        xylene_ug_per_g_total:
+          description: Solvent
+          type: string
+        yeast_cfu_per_g:
+          description: Microbial
+          type: string
+        zinc_ug_per_g:
+          description: Heavy Metal
+          type: string
+      title: AdditionalTestResult
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    TestResult:
+      description: Lab results for a batch or package — the Certificate of Analysis (COA). Headline potency figures (THC/CBD) sit on this object; the full analyte breakdown (terpenes, pesticides, heavy metals, and more) is nested under `additional_test_results`.
+      properties:
+        additional_test_results:
+          $ref: '#/components/schemas/AdditionalTestResult'
+        batch_id:
+          description: The ID of the batch this test result belongs to, or null when it is attached to a package instead (see `package_id`)
+          type: string
+        biotrack_id:
+          description: The test result's ID in BioTrack. A BioTrack identifier, not a Distru ID. Null when the result did not come from BioTrack.
+          type: string
+        cbd_mg_per_unit:
+          description: CBD content in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        cbd_percentage:
+          description: CBD content as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        coa_url:
+          description: Public URL to view/download this test result's Certificate of Analysis (COA), or null when no file is attached
+          type: string
+        id:
+          description: ID for this test result
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this test result was created at
+          type: string
+        is_primary:
+          description: True when this is the primary test result for its batch or package (the one whose potency figures represent the product)
+          type: boolean
+        lab_license_number:
+          description: The license number of the lab that performed this test, or null when not set
+          type: string
+        lab_name:
+          description: The name of the lab that performed this test, or null when not set
+          type: string
+        metrc_id:
+          description: The test result's ID in Metrc. A Metrc identifier, not a Distru ID. Null when the result did not come from Metrc.
+          type: integer
+        mg_per_unit_type:
+          description: The unit that the `*_mg_per_unit` figures are measured against (e.g. the per-unit size), or null when not set
+          type: string
+        name:
+          description: The name of the test result
+          type: string
+        package_id:
+          description: The ID of the package this test result belongs to, or null when it is attached to a batch instead (see `batch_id`)
+          type: string
+        release_date:
+          description: The date this test result was released (e.g. "2026-08-20"), or null when not set
+          type: string
+        thc_mg_per_unit:
+          description: THC content in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        thc_percentage:
+          description: THC content as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        total_cbd_mg_per_unit:
+          description: Total CBD (including its acid precursor) in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        total_cbd_percentage:
+          description: Total CBD (including its acid precursor) as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        total_thc_mg_per_unit:
+          description: Total THC (including its acid precursor) in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        total_thc_percentage:
+          description: Total THC (including its acid precursor) as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        updated_datetime:
+          description: ISO 8601 datetime this test result was last updated at
+          type: string
+      required:
+      - inserted_datetime
+      - updated_datetime
+      - is_primary
+      - name
+      - additional_test_results
+      - id
+      title: TestResult
+      type: object
+    TestResultResponse:
+      description: A single test result envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/TestResult'
+      title: Test Result Response
+      type: object
+    TestResults:
+      description: A collection of Test Results
+      properties:
+        data:
+          description: Test Results
+          items:
+            $ref: '#/components/schemas/TestResult'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Test Results
+      type: object
+  requestBodies:
+    DistruPublic.V1.AssemblyController.download_pdfBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              format:
+                enum:
+                - binary
+                - url
+                - email
+                type: string
+                description: 'How the generated PDF is delivered. One of `binary` — the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` — a JSON body with a short-lived signed download URL (see the [PdfResponse](#model-pdfresponse) response); or `email` — emails the PDF to the addresses in `email_addresses` and returns a JSON body listing who it was emailed to. Required, but omitting it defaults to `binary` for backward compatibility.'
+              email_addresses:
+                items:
+                  type: string
+                type: array
+                description: Recipient email addresses, used only when `format` is `email` (required in that case, ignored otherwise). An entry may hold several comma-separated addresses; spaces, blank entries and repeats are dropped, and `emailed_to` lists the addresses actually emailed. At least one address is required and every address must be valid, otherwise the request is rejected with a 400. At most 200 addresses may be given, counted after that cleanup.
+            required:
+            - format
+      required: true
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

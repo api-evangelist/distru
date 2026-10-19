@@ -1,0 +1,363 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Company Group API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: CompanyGroup
+paths:
+  /public/v1/company-groups:
+    get:
+      description: 'Lists the company groups owned by the authenticated company. Company groups are the labels you
+
+        use to organize your business relationships (your customers and vendors) — for example
+
+        "Wholesale", "Retail", or a region — and price tiers can target or exclude companies by group.
+
+
+        Results are scoped to your company only; groups belonging to other companies are never returned.
+
+        They come back sorted by creation time, oldest first, and are paginated: read `next_page` from the
+
+        envelope and request that URL to fetch the following page (it is null on the last page).
+
+
+        Required permission: `settings_permissions_company_relationship_groups`.'
+      operationId: DistruPublic.V1.CompanyGroupController.index
+      parameters:
+      - description: Restrict the result to specific company groups by ID (the same ID returned as each company group's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to company relationship groups by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to company relationship groups by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of company groups
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyGroups'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get company groups
+      tags:
+      - CompanyGroup
+    post:
+      description: 'Creates or renames a single company group in one endpoint. Pass `id` to rename the matching
+
+        existing group; omit `id` to create a new one. A create responds 201, an update responds 200.
+
+        Company groups are the labels you use to organize your business relationships (customers and
+
+        vendors); price tiers can target or exclude companies by group.
+
+
+        `name` is required and must be unique within your company — reusing a name already taken by
+
+        another of your groups is rejected with a 400. On update, `name` fully replaces the stored name;
+
+        there are no other editable fields, so this endpoint only ever sets the group''s name.
+
+
+        Renaming a group does not change its ID, so any price tier that already targets or excludes this
+
+        group keeps doing so under the new name. Creating a group does not attach it to any company
+
+        relationship — membership is managed separately.
+
+
+        Required permission: `settings_permissions_company_relationship_groups`.'
+      operationId: DistruPublic.V1.CompanyGroupController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the group to update. Present → the matching group owned by your company is renamed (404 if no such group exists for you). Absent → a new group is created.
+                name:
+                  type: string
+                  description: Display name of the company group. Required on both create and update. Leading/trailing whitespace is trimmed, and the result must be non-empty, at most 255 characters, and unique among your company's groups (a duplicate returns 400). Allowed characters are letters, digits, spaces, underscores, and `~#-$/|%&'().`; it may not contain two colons in sequence (`::`). Any other character is rejected with a 400. On update this replaces the existing name.
+              required:
+              - name
+        required: true
+      responses:
+        '200':
+          description: The updated company group
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyGroupFullResponse'
+        '201':
+          description: The created company group
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyGroupFullResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a company group
+      tags:
+      - CompanyGroup
+  /public/v1/company-groups/{id}:
+    delete:
+      description: 'Permanently deletes a company group. This is a hard delete: the group is removed and cannot be
+
+        recovered — there is no soft-delete or undo. Returns 404 if no group with that ID belongs to the
+
+        authenticated company.
+
+
+        Deleting a group also strips it from any price tier that targeted or excluded companies by this
+
+        group: those price tiers keep working but lose this group from their include/exclude filters. The
+
+        group is only a label, so deleting it does not delete any customer or vendor relationship that was
+
+        tagged with it — those companies simply lose the tag.
+
+
+        Required permission: `settings_permissions_company_relationship_groups`.'
+      operationId: DistruPublic.V1.CompanyGroupController.delete
+      parameters:
+      - description: ID of the company group to delete, as returned by the list and upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a company group
+      tags:
+      - CompanyGroup
+    get:
+      description: 'Fetches a single company group by its ID. Returns 404 if no group with that ID belongs to the
+
+        authenticated company — a group owned by a different company is indistinguishable from one that
+
+        does not exist.
+
+
+        Required permission: `settings_permissions_company_relationship_groups`.'
+      operationId: DistruPublic.V1.CompanyGroupController.show
+      parameters:
+      - description: ID of the company group to fetch, as returned by the list and upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single company group
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyGroupFullResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a company group
+      tags:
+      - CompanyGroup
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CompanyGroupFullResponse:
+      description: A single company group
+      properties:
+        data:
+          $ref: '#/components/schemas/CompanyGroupFull'
+      title: Company Group Response
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    CompanyGroups:
+      description: A collection of company groups
+      properties:
+        data:
+          description: Company Groups
+          items:
+            $ref: '#/components/schemas/CompanyGroupFull'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Company Groups
+      type: object
+    CompanyGroupFull:
+      description: A company group
+      properties:
+        id:
+          description: ID of this company group. Stable across renames; use it as the `id` for the upsert, fetch, and delete endpoints, and as the filter value in price tiers that target or exclude companies by group.
+          type: string
+        inserted_datetime:
+          description: When the company group was created, as a UTC ISO-8601 timestamp (e.g. `"2026-08-20T14:30:00Z"`). Always present.
+          type: string
+        name:
+          description: Display name of the company group. Always present, unique within your company.
+          type: string
+        updated_datetime:
+          description: When the company group was last modified, as a UTC ISO-8601 timestamp (e.g. `"2026-08-20T14:30:00Z"`). Equal to `inserted_datetime` until the group is first renamed. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: CompanyGroup
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

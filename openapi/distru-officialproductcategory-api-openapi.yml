@@ -1,0 +1,133 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Official Product Category API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: OfficialProductCategory
+paths:
+  /public/v1/official-product-categories:
+    get:
+      description: 'List Distru''s official product categories — the global, system-defined reference
+
+        taxonomy (e.g. `FLOWER`, `PRE_ROLL`, `EDIBLE`) that is identical for every company and
+
+        is not scoped to your API key. These records are singletons maintained by Distru; they
+
+        cannot be created, edited, or deleted through the API.
+
+
+        Use this to resolve the `official_product_category_id` on your own
+
+        product categories: each of your product categories maps to
+
+        exactly one of these, and that mapping is what lets Distru report across accounts, drive
+
+        consistent menu/marketplace filtering, and let buyers configure POS integrations without
+
+        knowing your custom category names. Fetch this list to discover the valid category `id`
+
+        values before you set that mapping; you do not need it for anything else.
+
+
+        The full set is returned in a single call ordered by `id` ascending — there is no
+
+        filtering, no pagination, and no `next_page`. The list is small and stable, so it is
+
+        safe to cache; new entries are added only when Distru extends the taxonomy.'
+      operationId: DistruPublic.V1.OfficialProductCategoryController.index
+      responses:
+        '200':
+          description: A list of official product categories
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/OfficialProductCategories'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get official product categories
+      tags:
+      - OfficialProductCategory
+components:
+  schemas:
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    OfficialProductCategories:
+      description: A collection of official product categories
+      properties:
+        data:
+          description: OfficialProductCategories
+          items:
+            $ref: '#/components/schemas/OfficialProductCategory'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: OfficialProductCategories
+      type: object
+    OfficialProductCategory:
+      description: A Distru standard, system-defined product category that your own product categories can map to
+      properties:
+        id:
+          description: Stable code identifying this official product category (e.g. `FLOWER`, `PRE_ROLL`). This is a human-readable natural key that is the same in every Distru account — set it as the `official_product_category_id` on your own product categories. Always present.
+          type: string
+        name:
+          description: Human-readable display label for the category (e.g. `Flower`, `Pre-Roll`). Suitable for showing in a UI; use `id`, not `name`, when storing the mapping. Always present.
+          type: string
+      required:
+      - name
+      - id
+      title: OfficialProductCategory
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

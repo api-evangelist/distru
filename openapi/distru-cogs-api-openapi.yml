@@ -1,0 +1,271 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Cogs API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Cogs
+paths:
+  /public/v1/reports/cogs:
+    get:
+      description: 'Read-only report. Returns one row per sold sales order line item over the reported date range, each carrying the product''s descriptive attributes (name, SKU, brand, category), its package, batch, and Metrc production batch, plus the item''s quantity, unit type, unit and total price, and both actual and default cost figures (unit cost, total cost, total profit, profit per unit, and margin). A row is included only when its order has reached COMPLETED status and the line item has not been fully returned; the reported `quantity` is the ordered quantity net of any returns. Rows are grouped by order and line item. Sample line items are omitted when your company is configured to exclude samples from cost reporting, so a completed order''s sample lines may not appear here even though the order does.
+
+
+        Every row returned by this endpoint is a sold-item row — `final_input` is always `Final` and `cost_origin` is always null. The per-component cost breakdown that can otherwise appear (input rows) is not exposed here.
+
+
+        Filtering:
+
+        • `order_datetime` and `delivery_datetime` each narrow the set by a date range and are combined with AND when both are supplied.
+
+        • When neither filter is provided, the report defaults to orders whose order date falls in the last 30 days (up to now) to avoid scanning your entire order history. There is no all-time default — send an explicit range to widen it.
+
+
+        Cost figures (`unit_cost_*`, `total_cost_*`, `total_profits_*`, `profit_unit_*`, `margin_*`) can be null on a row when Distru cannot trace a cost back to the inputs and components that produced the sold inventory; the `*_actual` and `*_default` variants value those inputs at their real cost versus each product''s configured unit cost. Margin is also null when the row''s total price is 0.
+
+
+        Every cell is returned as it appears in the report''s CSV export, with numeric cells returned as strings (currency, thousands, and percent formatting stripped, e.g. `"1234.56"`) so they match the rest of the API; identifiers with a significant leading zero (e.g. an order number like "0042") keep their display string. Companies on the BioTrack compliance integration do not receive the `metrc_production_batch_number` key at all — the column is dropped for them. Report-level information (the generated-at date and the column definitions) is returned under `meta`.
+
+
+        Each row also carries the IDs of the records it names — `sales_order_id`, `product_id`, `brand_id`, `package_id` and `batch_id`, each right after its name column — so a row can be followed to the order, product, company, package or batch endpoints without a name lookup. The CSV export leaves these ID columns out.
+
+
+        Required permission: `reports_permissions_cogs`.'
+      operationId: DistruPublic.V1.Report.CogsController.index
+      parameters:
+      - description: 'Restrict the report to orders whose order date falls in this range. Format is two         comma-separated ISO8601 UTC datetimes, `<after>,<before>`, both bounds inclusive.         Either side may be left empty for an open-ended range: `2026-01-01T00:00:00Z,` keeps         only orders on or after Jan 1, and `,2026-02-01T00:00:00Z` keeps only orders on or         before Feb 1. Both sides empty is rejected. Combined with `delivery_datetime` (AND)         when both are given. When neither this nor `delivery_datetime` is supplied, the         report defaults to the last 30 days by order date.'
+        in: query
+        name: order_datetime
+        required: false
+        example: ?order_datetime=2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: 'Restrict the report to orders whose delivery date falls in this range. Same format         as `order_datetime`: two comma-separated ISO8601 UTC datetimes, `<after>,<before>`,         both bounds inclusive, with either side omittable for an open-ended range and both         empty rejected. Combined with `order_datetime` (AND) when both are given. Supplying         this filter (with or without `order_datetime`) suppresses the default 30-day order-date         window.'
+        in: query
+        name: delivery_datetime
+        required: false
+        example: ?delivery_datetime=2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The Cost of Goods Sold report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CogsReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Cost of Goods Sold report
+      tags:
+      - Cogs
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CogsReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The report's column definitions, in row order. Reflects the columns actually               returned, so the `metrc_production_batch_number` column is absent for companies               on the BioTrack compliance integration.
+          items:
+            $ref: '#/components/schemas/CogsReportColumn'
+          type: array
+        date_range:
+          description: Human-readable date the report was generated, formatted in the requesting               user's timezone. Despite the name this is the generation timestamp, not the               filtered date range.
+          type: string
+        report:
+          description: The report identifier (always `cogs`).
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: CogsReportMeta
+      type: object
+    CogsReport:
+      description: The Cost of Goods Sold report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/CogsReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/CogsReportMeta'
+      required:
+      - meta
+      - data
+      title: CogsReport
+      type: object
+    CogsReportColumn:
+      properties:
+        key:
+          description: The key used for this column in each data row
+          type: string
+        label:
+          description: The human-readable label of the column
+          type: string
+      required:
+      - label
+      - key
+      title: CogsReportColumn
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    CogsReportRow:
+      description: 'A single row of the Cost of Goods Sold report (one sales order line item). Companies on the BioTrack compliance integration do not get the `metrc_production_batch_number` key.
+
+        '
+      properties:
+        batch:
+          description: The Distru batch. For a package-tracked item this is the package's batch               number; for a batch-tracked item it is the batch name, with the batch number               appended in parentheses when set (e.g. "OG Kush (B-0001)"). `null` when               the item has neither a package nor a batch.
+          type: string
+        batch_id:
+          description: 'The batch''s ID — the `id` [GET /public/v1/batches](#get-batches) returns: the line item''s own batch when it is batch-tracked, its package''s batch when it is package-tracked. `null` when the item has neither a package nor a batch.'
+          type: string
+        brand_id:
+          description: The brand's company ID — the `id` [GET /public/v1/companies](#get-companies) returns — or `null` when the product has no brand assigned.
+          type: string
+        cost_origin:
+          description: Where a component's cost came from. Always null on this endpoint, since only               the sold-item rows are returned.
+          type: string
+        final_input:
+          description: Always `Final` on this endpoint, marking the row as the sold line item. The               per-component `Input` breakdown that can otherwise carry this value is not               exposed here.
+          type: string
+        margin_actual:
+          description: Actual profit as a fraction of total price (`total_profits_actual` / `total_price`). Null when the actual cost cannot be traced or the total price is 0.
+          type: string
+        margin_default:
+          description: Default profit as a fraction of total price (`total_profits_default` / `total_price`). Null when the default cost cannot be traced or the total price is 0.
+          type: string
+        metrc_production_batch_number:
+          description: The package's Metrc production batch number, or `null` when there is               no package or none has been synced. Not present at all for companies on the               BioTrack compliance integration — the key is omitted for them.
+          type: string
+        order_number:
+          description: The sales order number. Always returned as a string; one that carries a               significant leading zero (e.g. "0042") keeps its full display string so the               zero isn't lost.
+          type: string
+        package:
+          description: The package's compliance label, or `null` when the line item is not               package-tracked or the package has no label.
+          type: string
+        package_id:
+          description: The line item's package ID — the `id` [GET /public/v1/packages](#get-packages) returns — or `null` when the line item is not package-tracked.
+          type: string
+        product_brand:
+          description: The product's brand name, or `null` when the product has no brand assigned.
+          type: string
+        product_category:
+          description: The product's category name. Always present — every product has a category.
+          type: string
+        product_id:
+          description: The product's ID — the `id` [GET /public/v1/products](#get-products) returns.
+          type: string
+        product_name:
+          description: The product name.
+          type: string
+        profit_unit_actual:
+          description: '`unit_price` minus `unit_cost_actual`. Null when the actual cost cannot be traced.'
+          type: string
+        profit_unit_default:
+          description: '`unit_price` minus `unit_cost_default`. Null when the default cost cannot be traced.'
+          type: string
+        quantity:
+          description: The quantity sold, net of any returned quantity on the line item.
+          type: string
+        sales_order_id:
+          description: The order's ID — the `id` [GET /public/v1/orders](#get-orders) returns.
+          type: string
+        sku:
+          description: The product SKU.
+          type: string
+        total_cost_actual:
+          description: Actual total cost — `unit_cost_actual` multiplied by the row's quantity. Null when `unit_cost_actual` is null.
+          type: string
+        total_cost_default:
+          description: Default (standard) total cost — `unit_cost_default` multiplied by the row's quantity. Null when `unit_cost_default` is null.
+          type: string
+        total_price:
+          description: The total price (unit price times quantity).
+          type: string
+        total_profits_actual:
+          description: Total price minus `total_cost_actual`. Null when the actual cost cannot be traced.
+          type: string
+        total_profits_default:
+          description: Total price minus `total_cost_default`. Null when the default cost cannot be traced.
+          type: string
+        unit_cost_actual:
+          description: Actual cost per unit — the real cost Distru traces to the inputs and components that produced this inventory (purchase prices, assembly costs, stock-adjustment costs, and so on), per unit. Null when Distru cannot trace a cost for the row.
+          type: string
+        unit_cost_default:
+          description: Default (standard) cost per unit — traced the same way as `unit_cost_actual`, but each input/component is valued at its product's configured unit cost instead of its real cost. Null when no cost can be traced.
+          type: string
+        unit_price:
+          description: The price per unit.
+          type: string
+        unit_type:
+          description: The item's unit type name.
+          type: string
+      required:
+      - total_price
+      - unit_price
+      - unit_type
+      - quantity
+      - product_category
+      - sku
+      - product_id
+      - product_name
+      - final_input
+      - sales_order_id
+      - order_number
+      title: CogsReportRow
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

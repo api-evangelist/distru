@@ -1,0 +1,296 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Inventory Transaction History API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: InventoryTransactionHistory
+paths:
+  /public/v1/reports/inventory-transaction-history:
+    get:
+      description: 'Returns the Inventory Transaction History report as JSON: one row per inventory transaction (a single recorded movement of stock) falling within the reported date range, ordered newest-first by transaction date. Each row carries the transaction''s date, product, package/batch identifiers, Metrc production batch number, transaction type, the related entity that caused the movement (order, purchase, return, assembly, teardown, breakdown, stock transfer, or stock adjustment) with that entity''s status and customer/vendor, the signed amount and unit type, the package''s potency figures (THC/CBD), and the transaction''s total cost. The `total_cost` column is omitted entirely — the key is absent, not null — for users without permission to view costs, which is a separate permission from the report permission below.
+
+
+        This is a read-only report and changes nothing. It reflects inventory movements already recorded by orders, purchases, assemblies, teardowns, breakdowns, returns, stock transfers, stock adjustments, and Metrc/BioTrack compliance syncs — so a row appears here only after the operation that moved the stock. Use it to reconcile or audit stock movement over a period; it is not the way to look up a single package''s current balance. The entire matching result set is returned in one response — there is no pagination — so scope every request with the date range and the entity filters below to keep the payload manageable (a broad range can span hundreds of thousands of rows).
+
+
+        When no `datetime` filter is provided, the report defaults to the last 30 days: from the start of the day 30 days ago through the end of today, in the company''s timezone. At most one entity filter takes effect per request — when several are sent, the report applies `package_id` first, then `batch_ids`, then `product_ids`, and ignores the rest.
+
+
+        Every value mirrors the report''s CSV export: numeric cells are returned as strings (currency and comma formatting stripped, matching the rest of the API), everything else stays a string, and identifier-like values whose number carries a significant leading zero keep their display string. Companies on the BioTrack compliance integration do not receive the `metrc_unit_name` or `metrc_production_batch_number` columns at all. The resolved date range and the column definitions are returned under `meta`.
+
+
+        Each row also carries the IDs of the records it names — `package_id` after `package_label`, and after `related_entity` one ID per kind of related entity (`sales_order_id`, `purchase_order_id`, `assembly_id`, `return_id`), each null unless the related entity is of that kind — so a row can be followed to the package, order, purchase, assembly or return endpoints without a lookup. Stock transfers, teardowns and breakdowns get no ID. The CSV export leaves these ID columns out.
+
+
+        Required permission: `reports_permissions_inventory_transaction_history`.'
+      operationId: DistruPublic.V1.Report.InventoryTransactionHistoryController.index
+      parameters:
+      - description: Include only transactions whose date falls in this range, as two comma-separated         ISO8601 timestamps `after,before` (both bounds inclusive). Either side may be left         empty to make the range open-ended (`2026-01-01T00:00:00Z,` for everything from that         instant on). When omitted entirely the report defaults to the last 30 days — from         the start of the day 30 days ago through the end of today, in the company's timezone.
+        in: query
+        name: datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Include only transactions for these products, given as Distru product IDs. Takes         effect only when neither `package_id` nor `batch_ids` is supplied (`package_id` wins,         then `batch_ids`, then `product_ids`). Omit to include every product in range.
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Include only transactions for these batches, given as Distru batch IDs. Applies only         when `package_id` is absent, and takes precedence over `product_ids` when both are         sent. Omit to include every batch in range.
+        in: query
+        name: batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Include only transactions for this single package, given as a Distru package ID.         This is the highest-priority entity filter: when present, `batch_ids` and         `product_ids` are ignored. Omit to leave package filtering off.'
+        in: query
+        name: package_id
+        required: false
+        example: ?package_id=3fa85f64-5717-4562-b3fc-2c963f66afa6
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The Inventory Transaction History report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/InventoryTransactionHistoryReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Inventory Transaction History report
+      tags:
+      - InventoryTransactionHistory
+components:
+  schemas:
+    InventoryTransactionHistoryReportColumn:
+      properties:
+        key:
+          description: The key used for this column in each data row
+          type: string
+        label:
+          description: The human-readable label of the column
+          type: string
+      required:
+      - label
+      - key
+      title: InventoryTransactionHistoryReportColumn
+      type: object
+    InventoryTransactionHistoryReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The report's column definitions, in order, each mapping a row key to its               human-readable label. For BioTrack companies this list omits the               `metrc_unit_name` and `metrc_production_batch_number` columns, matching the row               shape.
+          items:
+            $ref: '#/components/schemas/InventoryTransactionHistoryReportColumn'
+          type: array
+        date_range:
+          description: The human-readable date range the report covers, reflecting the resolved               `datetime` filter (or the default last-30-days window when it was omitted).
+          type: string
+        report:
+          description: The report identifier, always `inventory_transaction_history`.
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: InventoryTransactionHistoryReportMeta
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    InventoryTransactionHistoryReport:
+      description: The Inventory Transaction History report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/InventoryTransactionHistoryReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/InventoryTransactionHistoryReportMeta'
+      required:
+      - meta
+      - data
+      title: InventoryTransactionHistoryReport
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    InventoryTransactionHistoryReportRow:
+      description: 'A single row of the Inventory Transaction History report (one inventory transaction). Companies on the BioTrack compliance integration do not get the `metrc_unit_name` and `metrc_production_batch_number` keys. Potency keys are only populated for package-based transactions.
+
+        '
+      properties:
+        amount:
+          description: 'The signed transaction quantity, measured in `unit_type`: negative when stock               left inventory, positive when it entered.'
+          type: string
+        assembly_id:
+          description: The related assembly's ID — the `id`               [GET /public/v1/assemblies](#get-assemblies) returns. Null unless the related               entity is an assembly.
+          type: string
+        batch_id:
+          description: The Distru batch ID of the transaction's batch. Null unless               the product is batch-tracked. Accepts the same value the `batch_ids` filter               takes.
+          type: string
+        batch_number:
+          description: The Distru batch number of the transaction's batch. Null unless the product is               batch-tracked.
+          type: string
+        cbd:
+          description: The package's CBD potency, as a percentage. Same population rule as `thc`.
+          type: string
+        cbd_mg_g:
+          description: The package's CBD in mg per gram. Populated only when the primary test result               reports potency in mg/g; null otherwise — mutually exclusive with `cbd_mg_ml`.
+          type: string
+        cbd_mg_ml:
+          description: The package's CBD in mg per millilitre. Populated only when the primary test               result reports potency in mg/mL; null otherwise. Mutually exclusive with               `cbd_mg_g`.
+          type: string
+        company_relationship_id:
+          description: The Distru ID of the related customer or vendor (the company relationship).               Null when the transaction has no related entity, or that entity               has no associated company (e.g. assemblies, stock transfers, teardowns,               breakdowns).
+          type: string
+        date:
+          description: The transaction's date and time, formatted `YYYY-MM-DD HH:MM` in the company's               timezone (e.g. `2026-01-15 14:30`).
+          type: string
+        description:
+          description: The transaction's description.
+          type: string
+        metrc_production_batch_number:
+          description: The package's Metrc production batch number. Null when there is no package or               the package has none. This key is absent entirely for companies on the BioTrack               integration.
+          type: string
+        metrc_unit_name:
+          description: The Metrc unit-of-measure name for the package. Null for non-package               transactions. This key is absent entirely for companies on the BioTrack               integration.
+          type: string
+        package_batch_number_or_batch_name:
+          description: For package transactions, the package's batch number; for batch-tracked               products, the batch's name. Null when the product is tracked at the product               level (no package and no batch).
+          type: string
+        package_id:
+          description: The transaction's package ID — the `id` [GET /public/v1/packages](#get-packages)               returns and the value the `package_id` filter takes. Null when the transaction is               not tied to a package.
+          type: string
+        package_label:
+          description: The package's compliance label. Null when the transaction is not tied to a               package.
+          type: string
+        product:
+          description: The product's name. When the product has been deactivated the name is prefixed               to mark it inactive.
+          type: string
+        product_id:
+          description: The Distru product ID of the transaction's product. Accepts               the same value the `product_ids` filter takes.
+          type: string
+        purchase_order_id:
+          description: The related purchase's ID — the `id` [GET /public/v1/purchases](#get-purchases)               returns. Null unless the related entity is a purchase.
+          type: string
+        related_entity:
+          description: 'A human-readable label for the entity that caused the movement: an order or               purchase number, return number, assembly number, stock transfer number, a               teardown name, or a breakdown number. For system movements with no such entity               it is a synthesized label (e.g. `Stock Adjustment`, `Package Repair`, `Package               Changed Product`, `Update from Metrc`), or an empty string when neither applies.'
+          type: string
+        related_entity_customer_vendor:
+          description: The customer or vendor company name on the related entity. Null when the               transaction has no related entity, or that entity has no associated company               (e.g. assemblies, stock transfers, teardowns).
+          type: string
+        related_entity_status:
+          description: The related entity's status as shown in Distru — populated for order,               purchase, return, assembly, and stock transfer movements. Null when the               transaction has no related entity, and for teardown and breakdown movements,               which carry no status. Returned as Distru's human-readable status text (e.g.               `Completed`, `Partially Received`), not the SCREAMING_CASE enum used elsewhere               in the API.
+          type: string
+        return_id:
+          description: The related return's ID — the `id` [GET /public/v1/returns](#get-returns)               returns. Null unless the related entity is a return.
+          type: string
+        sales_order_id:
+          description: The related order's ID — the `id` [GET /public/v1/orders](#get-orders) returns.               Null unless the related entity is a sales order.
+          type: string
+        thc:
+          description: The package's THC potency, as a percentage. Populated only for package               transactions whose package has a primary test result recorded; null otherwise               (including all non-package transactions).
+          type: string
+        thc_mg_g:
+          description: The package's THC in mg per gram. Populated only when the package's primary               test result reports potency in mg/g; null otherwise — including when it reports               in mg/mL, in which case see `thc_mg_ml`.
+          type: string
+        thc_mg_ml:
+          description: The package's THC in mg per millilitre. Populated only when the package's               primary test result reports potency in mg/mL; null otherwise. Mutually               exclusive with `thc_mg_g`.
+          type: string
+        total_cbd:
+          description: The package's total CBD (post-decarboxylation), as a percentage. Same               population rule as `thc`.
+          type: string
+        total_cbd_mg_g:
+          description: The package's total CBD in mg per gram. Populated only when the primary test               result reports potency in mg/g; null otherwise.
+          type: string
+        total_cbd_mg_ml:
+          description: The package's total CBD in mg per millilitre. Populated only when the primary               test result reports potency in mg/mL; null otherwise.
+          type: string
+        total_cost:
+          description: The transaction's total inventory cost over its quantity, in the company's               currency. Null when no unit cost is recorded for the stock consumed. Omitted               entirely (key absent) for users without permission to view costs.
+          type: string
+        total_thc:
+          description: The package's total THC (post-decarboxylation), as a percentage. Same               population rule as `thc`.
+          type: string
+        total_thc_mg_g:
+          description: The package's total THC in mg per gram. Populated only when the primary test               result reports potency in mg/g; null otherwise.
+          type: string
+        total_thc_mg_ml:
+          description: The package's total THC in mg per millilitre. Populated only when the primary               test result reports potency in mg/mL; null otherwise.
+          type: string
+        type:
+          description: The kind of movement that produced this row, as a lowercase/mixed-case token               (e.g. `adjustment`, `package_repair`). Null when the transaction has no recorded               type. Unlike enums elsewhere in the API, this value is not normalized to               SCREAMING_CASE, so match it case-sensitively as returned.
+          type: string
+        unit_type:
+          description: The name of the unit `amount` is measured in — the package's unit for package               transactions, otherwise the product's unit.
+          type: string
+      required:
+      - description
+      - unit_type
+      - amount
+      - product
+      - date
+      title: InventoryTransactionHistoryReportRow
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

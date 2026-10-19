@@ -1,0 +1,1530 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Price Tier API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: PriceTier
+paths:
+  /public/v1/price-tiers:
+    get:
+      description: 'List the company''s price tiers, newest first (by creation time). A price tier lowers the price
+
+        of a matching sales order item — it applies to an order item only when every one of the tier''s
+
+        populated conditions is met. Soft-deleted tiers are excluded, and so are tiers your team
+
+        restrictions hide. Tiers outside their active window are still listed; the window only governs
+
+        whether a tier applies to orders, not whether it appears here.
+
+
+        Filter with `company_relationship_id` (a customer condition), `product_ids` (a product
+
+        condition), or `search` (substring on the internal name). When several filters are supplied a
+
+        tier must satisfy all of them (AND).
+
+
+        Results are paginated. Walk pages by following the response''s `next_page` URL; it is null on
+
+        the last page.
+
+
+        Required permission: `settings_permissions_price_tiers`.'
+      operationId: DistruPublic.V1.PriceTierController.index
+      parameters:
+      - description: Restrict the result to specific price tiers by ID (the same ID returned as each price tier's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only tiers that include this customer in a customer condition. The ID of a company relationship (customer). Matches a tier whose "one of these customers" condition lists this id exactly; tiers with no customer condition, or that only exclude this customer, are not returned.
+        in: query
+        name: company_relationship_id
+        required: false
+        schema:
+          type: string
+      - description: Return only tiers that explicitly list any of these products in their product condition (the same products returned under a tier's `conditions.one_of_products`). Repeat the bracketed key once per product ID; matches ANY. Tiers with no product condition — all-products tiers, or those scoped by category/brand/group — are not returned, nor are tiers that only exclude these products. A malformed ID is rejected with a 400; an unknown-but-well-formed ID matches nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Case-insensitive substring match on the tier's internal name. Does not search external_name.
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+      - description: 'Filter to price tiers by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to price tiers by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Restrict to price tiers owned by any of these Distru users (each tier's `owner.id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of price tiers
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PriceTiers'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get price tiers
+      tags:
+      - PriceTier
+    post:
+      description: 'Create a price tier when `id` is absent, update it in place when present. Every write records a
+
+        new immutable version and points the tier''s `current_version_id` at it, so order items priced
+
+        by an earlier version keep their frozen pricing (see `price_tier_version` on the
+
+        sales order item).
+
+
+        Updates are sparse: only the fields you send change, and anything you omit is left as-is. This
+
+        applies to `conditions` too — send only the conditions you want to change, and send an empty
+
+        array (or null) for a `one_of_*`/`not_one_of_*` list to clear that one. Omitting `menu_ids` leaves the
+
+        tier''s current menus untouched; send the full list to replace them. When you send the
+
+        `min_quantity` or `total_thc_percentage_range` object, include every sub-field — a present
+
+        sub-field may be null, but a missing one is rejected. Send the object as null to clear it.
+
+
+        `conditions` decides whether the tier can apply to a sales order item — every populated
+
+        condition must be met together (AND), or the tier is not applicable. Within a single "one of"
+
+        list any listed match qualifies; a "not one of" list disqualifies any listed match;
+
+        `min_quantity` is compared against the combined quantity of the order''s matching items; and
+
+        `total_thc_percentage_range` applies only where selling by potency is enabled. A create must
+
+        resolve to at least one condition, otherwise it is rejected with a 400. Creating a tier also
+
+        requires your company to be set up for price tiers; if it is not, the create fails with a 400
+
+        and a message to contact Distru support.
+
+
+        Saving a tier also refreshes buyer-facing and statewide marketplace price discovery, which
+
+        happens asynchronously — a 200/201 reflects the saved tier itself, not yet its propagation to
+
+        every menu or marketplace surface that shows it. When a promo-enabled tier newly becomes
+
+        eligible for a menu, that menu gets a fresh promo entry.
+
+
+        Promo card fields default sensibly on create: omit `menu_promo_card_type` and it becomes `TEXT`,
+
+        and a `TEXT` card fills `menu_promo_card_background_hex` and `menu_promo_card_text_hex` with
+
+        default colors when you omit them. Send `menu_promo_card_type: "IMAGE"` for an image card, where
+
+        the hex colors are optional. `menu_promo_enabled` (default false) controls whether the card shows
+
+        on menus.
+
+
+        Required permission: `settings_permissions_price_tiers`, and price tier visibility other than
+
+        "Restrict access" on your teams (admins are always allowed).'
+      operationId: DistruPublic.V1.PriceTierController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: Price tier ID to update. Omit to create a new tier; when present, that tier is updated in place and a new immutable version is recorded. An unknown or soft-deleted tier returns 404, and one your team restrictions hide returns 403.
+                name:
+                  type: string
+                  description: Internal name of the tier, up to 255 characters. Required.
+                external_name:
+                  type: string
+                  description: Buyer-facing name shown on menus and marketplace surfaces, up to 255 characters. When omitted or null, buyer-facing surfaces fall back to `name`.
+                price_or_percent:
+                  enum:
+                  - PRICE
+                  - PERCENT
+                  type: string
+                  description: Whether the discount is a fixed amount (`PRICE`, uses `price`) or a percentage (`PERCENT`, uses `percent`). SCREAMING_CASE. A tier carries exactly one — setting one clears the other. Required.
+                price:
+                  type: string
+                  description: 'Discount amount, as a decimal string with up to 5 decimals (e.g. "10.00"). Its effect depends on `is_flat`: when `is_flat` is false it is subtracted from the order item''s base price; when `is_flat` is true it replaces the base price outright. Must be zero or greater. Required when `price_or_percent` is `PRICE`; leave unset for `PERCENT`, which clears it automatically.'
+                percent:
+                  type: string
+                  description: Discount percentage off the base price, as a decimal string with up to 3 decimals (e.g. "12.5", 0-100). Required when `price_or_percent` is `PERCENT`; switching to `PRICE` clears it automatically.
+                is_flat:
+                  type: boolean
+                  description: Whether `price` is a flat replacement price (true) rather than an amount subtracted from the base price (false). Defaults to false. Can only be true with `price_or_percent` `PRICE` — true with `PERCENT` is rejected.
+                valid_from_datetime:
+                  type: string
+                  description: ISO8601 UTC start of the active window (e.g. "2026-01-01T00:00:00Z"). Null or omitted means no start bound. Outside the active window the tier is still listed but never applies to orders.
+                valid_until_datetime:
+                  type: string
+                  description: ISO8601 UTC end of the active window (e.g. "2026-12-31T23:59:59Z"). Null or omitted means no end bound (never expires). Must be after `valid_from_datetime` when both are set.
+                menu_mode:
+                  enum:
+                  - ALL
+                  - NONE
+                  - SPECIFIC
+                  type: string
+                  description: 'Which menus the tier appears on: `ALL` every menu, `NONE` no menus, `SPECIFIC` only the menus in `menu_ids`. Required, SCREAMING_CASE. Setting `ALL` or `NONE` clears any specific menu selection.'
+                menu_ids:
+                  items:
+                    type: string
+                  type: array
+                  description: IDs of the menus the tier appears on, used only when `menu_mode` is `SPECIFIC` (ignored for `ALL`/`NONE`, whose selection is cleared). Omit to leave the tier's current menus unchanged; send the full list to replace them — a sent list is the complete set, so menus not in it are removed.
+                menu_promo_enabled:
+                  type: boolean
+                  description: Whether a promo card for this tier shows on menus. Defaults to false. When true, `menu_promo_card_type` is required, and a `TEXT` card additionally requires both hex colors.
+                menu_promo_card_type:
+                  enum:
+                  - TEXT
+                  - IMAGE
+                  type: string
+                  description: Promo card style, SCREAMING_CASE. Defaults to `TEXT` when omitted on create. A `TEXT` card requires both hex colors (filled with defaults if omitted on create); an `IMAGE` card does not use the hex colors. `TEXT` is the standard style.
+                menu_promo_card_background_hex:
+                  type: string
+                  description: Promo card background color as a hex string (e.g. "#9F60FF"). Required for a `TEXT` card — defaults to a standard color when omitted on create; ignored for `IMAGE`.
+                menu_promo_card_text_hex:
+                  type: string
+                  description: Promo card text color as a hex string (e.g. "#0D1D23"). Required for a `TEXT` card — defaults to a standard color when omitted on create; ignored for `IMAGE`.
+                menu_promo_card_emoji:
+                  type: string
+                  description: Emoji shown on the promo card. Optional; null for none.
+                owner_id:
+                  type: string
+                  description: ID of the user that owns this tier. Must be a user you are allowed to assign (within your team-visibility scope); an unassignable id is rejected. Send null to clear ownership; omit to leave it unchanged.
+                conditions:
+                  $ref: '#/components/schemas/PriceTierConditionsInput'
+              required:
+              - name
+              - price_or_percent
+              - menu_mode
+        required: true
+      responses:
+        '200':
+          description: The updated price tier
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PriceTierResponse'
+        '201':
+          description: The created price tier
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PriceTierResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a price tier
+      tags:
+      - PriceTier
+  /public/v1/price-tiers/{id}:
+    delete:
+      description: 'Soft-deletes the tier. It stops applying to new orders immediately; order items already priced
+
+        by it keep the frozen version they reference, so their prices don''t change. Its removal from
+
+        statewide marketplace price discovery propagates asynchronously, so a 204 confirms the tier was
+
+        deleted, not that every buyer-facing surface has dropped it yet. Deleting an unknown or
+
+        already-deleted tier returns 404, and one your team restrictions hide returns 403.
+
+
+        Required permission: `settings_permissions_price_tiers`, and price tier visibility other than
+
+        "Restrict access" on your teams (admins are always allowed).'
+      operationId: DistruPublic.V1.PriceTierController.delete
+      parameters:
+      - description: Price tier ID, as returned by the list and upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a price tier
+      tags:
+      - PriceTier
+    get:
+      description: 'Get a single price tier by id, with its conditions resolved into the referenced products,
+
+        categories, customers, and menus. Returns 404 for an unknown or soft-deleted tier, and 403 for
+
+        one your team restrictions hide.
+
+
+        Required permission: `settings_permissions_price_tiers`.'
+      operationId: DistruPublic.V1.PriceTierController.show
+      parameters:
+      - description: Price tier ID, as returned by the list and upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single price tier
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PriceTierResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a price tier
+      tags:
+      - PriceTier
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    BillOfMaterialsProductInput:
+      description: A specific product consumed by a bill of materials
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: How much of the product this recipe consumes, in the product's unit, as a decimal string (e.g. "2.5").
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsProductInput
+      type: object
+    BillOfMaterialsCost:
+      description: An additional cost applied by a bill of materials
+      properties:
+        cost_type:
+          $ref: '#/components/schemas/BillOfMaterialsCostType'
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies, as a decimal string (e.g. "3"). Multiply by the cost type's `cost_per_unit` to get the line total.
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsCost
+      type: object
+    PriceTiers:
+      description: A collection of price tiers
+      properties:
+        data:
+          description: Price Tiers
+          items:
+            $ref: '#/components/schemas/PriceTier'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Price Tiers
+      type: object
+    PriceTier:
+      description: A price tier lowers the price of a single sales order item when the item meets the tier's conditions. It is applied per order item, not at the order level.
+      properties:
+        conditions:
+          $ref: '#/components/schemas/PriceTierConditions'
+        creator:
+          $ref: '#/components/schemas/User'
+        current_version_id:
+          description: ID of the tier's current version — the immutable snapshot taken at the tier's latest edit. Every edit of a tier produces a new version; a [sales order item](#model-salesorderitem) records the version that priced it in its `price_tier_version`, so its pricing stays frozen at that snapshot even after the tier changes. An order item reflects this tier's latest state exactly when its `price_tier_version.id` equals this value (its `price_tier_version.is_live` is true).
+          type: string
+        external_name:
+          description: Buyer-facing name shown on menus, or null (falls back to name)
+          type: string
+        id:
+          description: ID for this price tier
+          type: string
+        inserted_datetime:
+          description: When the tier was created (UTC ISO-8601)
+          type: string
+        is_flat:
+          description: When true the `price` replaces the list price outright instead of discounting off it. Only meaningful when `price_or_percent` is PRICE — never true with PERCENT.
+          type: boolean
+        menu_mode:
+          description: Which menus the tier appears on
+          enum:
+          - ALL
+          - NONE
+          - SPECIFIC
+          type: string
+        menu_promo_card_background_hex:
+          description: Background color of a TEXT promo card, as a hex string (e.g. "#FF0000"); null for an IMAGE card
+          type: string
+        menu_promo_card_emoji:
+          description: Emoji shown on a TEXT promo card, or null when none is set
+          type: string
+        menu_promo_card_text_hex:
+          description: Text color of a TEXT promo card, as a hex string (e.g. "#FFFFFF"); null for an IMAGE card
+          type: string
+        menu_promo_card_type:
+          description: 'The promo card style (SCREAMING_CASE): TEXT renders a colored card using the hex/emoji fields, IMAGE renders an uploaded image instead.'
+          enum:
+          - TEXT
+          - IMAGE
+          type: string
+        menu_promo_enabled:
+          description: Whether the tier renders a promo card on menus. The `menu_promo_card_*` fields below are only shown to buyers when this is true.
+          type: boolean
+        menus:
+          description: Menus the tier applies to. Populated only when menu_mode is SPECIFIC
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        name:
+          description: Internal name of the tier
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        percent:
+          description: The discount percentage used when `price_or_percent` is PERCENT, as a decimal string with up to 3 decimals (e.g. "12.5", 0-100); null when `price_or_percent` is PRICE
+          type: string
+        price:
+          description: The money amount used when `price_or_percent` is PRICE, as a decimal string with up to 5 decimals (e.g. "5.00"); null when `price_or_percent` is PERCENT. Interpreted as a per-unit discount off the list price, or — when `is_flat` is true — as the replacement per-unit price itself.
+          type: string
+        price_or_percent:
+          description: Whether the discount is a fixed amount or a percentage
+          enum:
+          - PRICE
+          - PERCENT
+          type: string
+        updated_datetime:
+          description: When the tier was last updated (UTC ISO-8601)
+          type: string
+        valid_from_datetime:
+          description: ISO 8601 datetime the tier starts being applicable, or null for no start bound (applicable from any time up to `valid_until_datetime`)
+          type: string
+        valid_until_datetime:
+          description: ISO 8601 datetime the tier stops being applicable, or null for no end bound (applicable indefinitely from `valid_from_datetime`)
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - conditions
+      - menu_promo_card_type
+      - menus
+      - menu_mode
+      - is_flat
+      - price_or_percent
+      - current_version_id
+      - name
+      - id
+      title: PriceTier
+      type: object
+    CompactMenu:
+      description: A lightweight reference to a DistruCommerce menu — the online catalog a buyer browses to place an order — carrying just its id and name. Where it appears on a sales order, it is the menu that order was placed through. Use the id to fetch the full menu from the menus endpoint.
+      properties:
+        id:
+          description: ID of the menu
+          type: string
+        name:
+          description: Display name of the menu
+          type: string
+      required:
+      - name
+      - id
+      title: CompactMenu
+      type: object
+    Product:
+      description: A sellable or trackable item in your catalog — its name, pricing, category, unit of measure, and how its inventory is tracked (see `inventory_tracking_method`).
+      properties:
+        batches_with_active_quantity_by_location:
+          description: The product's batches that hold active quantity, grouped by location. Present only when the request passes `include_batches_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not batch-tracked or holds no active batches.
+          items:
+            $ref: '#/components/schemas/BatchesWithActiveQuantityByLocation'
+          type: array
+        bill_of_materials:
+          $ref: '#/components/schemas/BillOfMaterials'
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this product
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime the product was soft-deleted at, or null when the product has not been deleted
+          type: string
+        description:
+          description: Plain-text description of this product, or null when none was entered. Always null together with `description_markdown` and non-null together with it — one is never set without the other.
+          type: string
+        description_markdown:
+          description: The same description in Markdown. Null when `description` is null; populated whenever `description` is populated.
+          type: string
+        external_name:
+          description: Customer-facing name shown on DistruCommerce menus and the Order Tracker, or null when none is set (it does not fall back to `name`)
+          type: string
+        gross_weight:
+          description: The gross weight of one unit including packaging, as a decimal string, measured in `gross_weight_unit_type`. Null when not set; it is always set together with `gross_weight_unit_type` and null together with it.
+          type: string
+        gross_weight_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        id:
+          description: ID for this product
+          type: string
+        images:
+          description: 'The images associated with this product, in display order: by `rank`, lowest first (the first is the primary image), then by id. Images with no rank come last. Empty array when the product has no images.'
+          items:
+            $ref: '#/components/schemas/Image'
+          type: array
+        inserted_datetime:
+          description: The datetime this product was created at
+          type: string
+        inventory_tracking_method:
+          description: 'How this product''s inventory is tracked. One of: `BATCH` (grouped into batches sharing traits such as expiration dates and test results), `PACKAGE` (inventory is defined by packages), `PRODUCT` (ungrouped; inventory exists directly on the product).'
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+          type: string
+        is_active:
+          description: True when the product is active. False when it has been marked inactive (archived), which hides it from most product pickers.
+          type: boolean
+        is_featured:
+          description: True when the product is flagged as featured
+          type: boolean
+        leaflink_product_id:
+          description: The LeafLink product ID this product is synced to, or null if not synced
+          type: integer
+        menu_visibility:
+          description: 'Which menus this product is shown in. One of `DO_NOT_INCLUDE`, `INCLUDE_IN_ALL`, `INCLUDE_IN_SELECT` (same values accepted by the upsert endpoint); defaults to `DO_NOT_INCLUDE`. The `menus` field below lists the specific menus the product belongs to — this is how you see which menus when the value is `INCLUDE_IN_SELECT`. Setting `INCLUDE_IN_ALL` adds the product to every menu, and a menu created later gets it too, except a copy of a menu it isn''t on, or a new (not copied) menu made by a user who can''t see the product: read `menus` for where it really is.'
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+          type: string
+        menus:
+          description: 'Menus this product is on, ordered by menu creation time then id (includes inactive menus). Follows `menu_visibility`: the chosen menus for `INCLUDE_IN_SELECT`, every menu but the exceptions listed under `menu_visibility` for `INCLUDE_IN_ALL`, and usually none for `DO_NOT_INCLUDE`. A change made by a team-restricted user never removes the product from menus that user can''t see, so those stay listed.'
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        msrp:
+          description: Manufacturer's suggested retail price, as a decimal string (e.g. "19.99"), or null when not set
+          type: string
+        name:
+          description: Human readable name for this product
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packages_with_active_quantity_by_location:
+          description: The product's packages that hold active quantity, grouped by location. Present only when the request passes `include_packages_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not package-tracked or holds no active packages.
+          items:
+            $ref: '#/components/schemas/PackagesWithActiveQuantityByLocation'
+          type: array
+        product_group:
+          $ref: '#/components/schemas/ProductGroupCompact'
+        quantity_active:
+          description: Total active on-hand quantity of this product across all locations, as a decimal string (e.g. "100"). Sums the product's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the product has no active stock. Reserved stock is still physically on-hand, so it is included here; subtract `quantity_reserved` to get `quantity_available`. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The product's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the product has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        quantity_available:
+          description: Active on-hand quantity minus reserved quantity, as a decimal string (e.g. "100"). Equals `quantity_active` − `quantity_reserved` — what is on-hand and not already spoken for by unfulfilled sales orders or draft assemblies. Can be negative when more is reserved than is on-hand at a location. "0" when the product has no active stock and nothing reserved.
+          type: string
+        quantity_available_threshold_max:
+          description: 'Over-stock alert threshold: Distru flags the product when its available quantity rises above this value. Decimal string, or null when no over-stock alert is configured. When both thresholds are set, this is strictly greater than `quantity_available_threshold_min`.'
+          type: string
+        quantity_available_threshold_min:
+          description: 'Low-stock alert threshold: Distru flags the product when its available quantity drops below this value. Decimal string, or null when no low-stock alert is configured. When both thresholds are set, this is strictly less than `quantity_available_threshold_max`.'
+          type: string
+        quantity_reserved:
+          description: 'Total quantity of this product currently reserved across all locations, as a decimal string (e.g. "100"). Reserved quantity is a soft hold tracked separately from on-hand stock (`quantity_active`): it rises as unfulfilled sales order items and draft assembly inputs are created, and falls as they are deleted or fulfilled. "0" when nothing is reserved.'
+          type: string
+        sku:
+          description: The stock keeping unit (SKU) configured for this product
+          type: string
+        strain:
+          $ref: '#/components/schemas/Strain'
+        subcategory:
+          $ref: '#/components/schemas/ProductSubcategoryCompact'
+        tags:
+          description: The tags associated with this product. Empty array when the product has no tags.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        tasks:
+          description: 'The tasks linked to this product that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total_cannabinoid_unit:
+          description: The unit `total_thc` and `total_cbd` are measured in — one of MG (milligrams per unit) or PERCENT (percent by weight). Null when neither potency value is set.
+          type: string
+        total_cbd:
+          description: Total CBD potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        total_thc:
+          description: Total THC potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        treez_wholesale_price:
+          description: The Treez wholesale price of this product, as a decimal string, or null when not set
+          type: string
+        unit_cost:
+          description: The cost (purchase price) of one unit of this product, as a decimal string, or null when not set
+          type: string
+        unit_net_weight:
+          description: The net contents of one unit of this product (weight, volume, or count of the contents), as a decimal string, measured in `unit_net_weight_serving_size_unit_type`. Null when not set.
+          type: string
+        unit_net_weight_serving_size_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        unit_price:
+          description: The list (sale) price of one unit of this product, as a decimal string (e.g. "25.00")
+          type: string
+        unit_serving_size:
+          description: The serving size per unit, as a decimal string, measured in `unit_net_weight_serving_size_unit_type` (the same unit as `unit_net_weight`). Null when not set. When both are set, this is at most `unit_net_weight`.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        units_per_case:
+          description: The number of units of this product packed in one case, as a decimal string (e.g. "12"), or null when not set
+          type: string
+        upc:
+          description: The UPC barcode of this product, or null when not set
+          type: string
+        updated_datetime:
+          description: The datetime this product was last updated at
+          type: string
+        vendor:
+          $ref: '#/components/schemas/CompanyCompact'
+        wholesale_unit_price:
+          description: The wholesale unit price of this product, as a JSON number (e.g. 12.5) rather than a decimal string — unlike `unit_price`. Null when not set.
+          type: number
+      required:
+      - quantity_reserved
+      - quantity_available
+      - quantity_active_by_location
+      - quantity_active
+      - custom_data
+      - inventory_tracking_method
+      - unit_price
+      - is_featured
+      - is_active
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - sku
+      - name
+      - id
+      title: Product
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    PriceTierResponse:
+      description: A single price tier
+      properties:
+        data:
+          $ref: '#/components/schemas/PriceTier'
+      title: Price Tier Response
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    BillOfMaterials:
+      description: A product's bill of materials (recipe of inputs and additional costs)
+      properties:
+        costs:
+          description: The additional (non-material) costs this recipe applies, ordered oldest first. Empty when none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsCost'
+          type: array
+        description:
+          description: Free-text description of this bill of materials, or null when none was entered
+          type: string
+        dynamic_inputs:
+          description: The inputs that select products by attribute (category, strain, tag, and so on) rather than naming a specific product. Empty when this recipe has none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsDynamicInput'
+          type: array
+        id:
+          description: ID for this bill of materials
+          type: string
+        name:
+          description: Human readable name for this bill of materials
+          type: string
+        product_inputs:
+          description: The inputs that name a specific product to consume. Empty when this recipe has none. See `dynamic_inputs` for inputs that select products by attribute instead.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsProductInput'
+          type: array
+      required:
+      - costs
+      - dynamic_inputs
+      - product_inputs
+      - name
+      - id
+      title: BillOfMaterials
+      type: object
+    BillOfMaterialsDynamicInput:
+      description: A dynamic input of a bill of materials. It selects products by attribute rather than naming a specific product. Each attribute list holds the entities matched by that criterion, or is empty when the criterion is not used.
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product_categories:
+          description: The product categories this input matches on, or empty when it does not match on category. A product must match every non-empty criterion.
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        product_groups:
+          description: The product groups this input matches on, or empty when it does not match on group.
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        product_subcategories:
+          description: The product subcategories this input matches on, or empty when it does not match on subcategory.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        quantity:
+          description: How much this recipe consumes of whatever product matches, as a decimal string (e.g. "2.5").
+          type: string
+        strains:
+          description: The strains this input matches on, or empty when it does not match on strain.
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        tags:
+          description: The tags this input matches on, or empty when it does not match on tag.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - tags
+      - strains
+      - product_groups
+      - product_subcategories
+      - product_categories
+      - quantity
+      - id
+      title: BillOfMaterialsDynamicInput
+      type: object
+    CompanyGroup:
+      description: A label used to group companies together (for example by territory or account tier) for organizing and reporting.
+      properties:
+        id:
+          description: ID for this company group
+          type: string
+        name:
+          description: Name of the company group
+          type: string
+      required:
+      - name
+      - id
+      title: CompanyGroup
+      type: object
+    PriceTierConditions:
+      description: What decides whether a tier can apply to a sales order item. Every populated condition must be met by the item, or the tier is not applicable. An item satisfies a one_of_* condition when it matches at least one entity in the list, and a not_one_of_* condition when it matches none. Unused lists are empty.
+      properties:
+        min_quantity:
+          description: order_item.quantity must be at least this much, or null
+          properties:
+            quantity:
+              description: Minimum quantity, e.g. "10"
+              type: string
+            unit_type:
+              $ref: '#/components/schemas/UnitType'
+          type: object
+        not_one_of_companies:
+          description: order_item.order.company must not be one of these
+          items:
+            $ref: '#/components/schemas/CompanyCompact'
+          type: array
+        not_one_of_company_relationship_groups:
+          description: order_item.order.company.group must not be one of these
+          items:
+            $ref: '#/components/schemas/CompanyGroup'
+          type: array
+        not_one_of_product_brands:
+          description: order_item.product.brand must not be one of these
+          items:
+            $ref: '#/components/schemas/CompanyCompact'
+          type: array
+        not_one_of_product_categories:
+          description: order_item.product.category must not be one of these
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        not_one_of_product_groups:
+          description: order_item.product.group must not be one of these
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        not_one_of_product_subcategories:
+          description: order_item.product.subcategory must not be one of these
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        not_one_of_product_tags:
+          description: order_item.product must carry none of these tags. A product with no tags always matches.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        not_one_of_products:
+          description: order_item.product must not be one of these
+          items:
+            $ref: '#/components/schemas/Product'
+          type: array
+        one_of_companies:
+          description: order_item.order.company must be one of these
+          items:
+            $ref: '#/components/schemas/CompanyCompact'
+          type: array
+        one_of_company_relationship_groups:
+          description: order_item.order.company.group must be one of these
+          items:
+            $ref: '#/components/schemas/CompanyGroup'
+          type: array
+        one_of_product_brands:
+          description: order_item.product.brand must be one of these
+          items:
+            $ref: '#/components/schemas/CompanyCompact'
+          type: array
+        one_of_product_categories:
+          description: order_item.product.category must be one of these
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        one_of_product_groups:
+          description: order_item.product.group must be one of these
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        one_of_product_subcategories:
+          description: order_item.product.subcategory must be one of these
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        one_of_product_tags:
+          description: order_item.product must carry at least one of these tags. A product with no tags never matches.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        one_of_products:
+          description: order_item.product must be one of these
+          items:
+            $ref: '#/components/schemas/Product'
+          type: array
+        total_thc_percentage_range:
+          description: order_item.product's total THC % must fall in this window, or null
+          properties:
+            max:
+              description: Maximum total THC %, or null
+              type: string
+            min:
+              description: Minimum total THC %, or null
+              type: string
+          type: object
+      required:
+      - not_one_of_company_relationship_groups
+      - not_one_of_companies
+      - not_one_of_product_tags
+      - not_one_of_product_groups
+      - not_one_of_product_subcategories
+      - not_one_of_product_categories
+      - not_one_of_product_brands
+      - not_one_of_products
+      - one_of_company_relationship_groups
+      - one_of_companies
+      - one_of_product_tags
+      - one_of_product_groups
+      - one_of_product_subcategories
+      - one_of_product_categories
+      - one_of_product_brands
+      - one_of_products
+      title: PriceTierConditions
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ProductTagRef:
+      description: A tag associated with a product
+      properties:
+        id:
+          description: ID for this tag
+          type: string
+        name:
+          description: The name of this tag
+          type: string
+      required:
+      - name
+      - id
+      title: ProductTagRef
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    ProductGroupCompact:
+      description: A named grouping of products, defined per company (e.g. a brand line or product family).
+      properties:
+        id:
+          description: ID for this product group
+          type: string
+        name:
+          description: The name of this product group
+          type: string
+      required:
+      - name
+      - id
+      title: ProductGroupCompact
+      type: object
+    PriceTierConditionsInput:
+      description: 'The conditions to set on a price tier. Send id arrays for each criterion the tier should apply to (one_of_*) or be excluded from (not_one_of_*). On update this is sparse: only the conditions you include change, and sending an empty array or null clears that one. A create must resolve to at least one condition.'
+      properties:
+        min_quantity:
+          description: order_item.quantity must be at least this much. When sent, include both quantity and unit_type_id (unit_type_id may be null for unit-agnostic). Send the object as null to clear the condition.
+          properties:
+            quantity:
+              description: Minimum quantity (at least 1)
+              type: integer
+            unit_type_id:
+              description: Unit type the minimum is measured in; omit for unit-agnostic
+              type: string
+          type: object
+        not_one_of_company_ids:
+          description: order_item.order.company must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_company_relationship_group_ids:
+          description: order_item.order.company.group must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_product_brand_ids:
+          description: order_item.product.brand must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_product_category_ids:
+          description: order_item.product.category must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_product_group_ids:
+          description: order_item.product.group must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_product_ids:
+          description: order_item.product must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_product_subcategory_ids:
+          description: order_item.product.subcategory must not be one of these
+          items:
+            type: string
+          type: array
+        not_one_of_product_tag_ids:
+          description: order_item.product must carry none of these tags. A product with no tags always matches. Call [GET /public/v1/tags](#get-tags) to list the available tag IDs.
+          items:
+            type: string
+          type: array
+        one_of_company_ids:
+          description: order_item.order.company must be one of these
+          items:
+            type: string
+          type: array
+        one_of_company_relationship_group_ids:
+          description: order_item.order.company.group must be one of these
+          items:
+            type: string
+          type: array
+        one_of_product_brand_ids:
+          description: order_item.product.brand must be one of these
+          items:
+            type: string
+          type: array
+        one_of_product_category_ids:
+          description: order_item.product.category must be one of these
+          items:
+            type: string
+          type: array
+        one_of_product_group_ids:
+          description: order_item.product.group must be one of these
+          items:
+            type: string
+          type: array
+        one_of_product_ids:
+          description: order_item.product must be one of these
+          items:
+            type: string
+          type: array
+        one_of_product_subcategory_ids:
+          description: order_item.product.subcategory must be one of these
+          items:
+            type: string
+          type: array
+        one_of_product_tag_ids:
+          description: order_item.product must carry at least one of these tags. A product with no tags never matches. Call [GET /public/v1/tags](#get-tags) to list the available tag IDs.
+          items:
+            type: string
+          type: array
+        total_thc_percentage_range:
+          description: order_item.product's total THC % must fall in this window. When sent, include both min and max (either may be null for an open-ended range, but not both). Send the object as null to clear the condition.
+          properties:
+            max:
+              description: Maximum total THC %
+              type: number
+            min:
+              description: Minimum total THC %
+              type: number
+          type: object
+      title: PriceTierConditionsInput
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    QuantityActiveByLocation:
+      description: Active on-hand quantity of an entity held at a single location.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        quantity:
+          description: Active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity
+      - location
+      title: QuantityActiveByLocation
+      type: object
+    Package:
+      description: A specific, compliance-tracked quantity of a product identified by a unique tag (e.g. a Metrc package). This is the physical unit of inventory for package-tracked products. This is the compact reference; see PackageFull for all fields.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+      required:
+      - distru_status
+      - quantity_active
+      - quantity
+      - location_id
+      - license_id
+      - id
+      title: Package
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    BillOfMaterialsCostType:
+      description: The cost type applied by a bill-of-materials cost
+      properties:
+        cost_per_unit:
+          description: The cost per unit, as a decimal string (e.g. "5.00"). Present only when the caller has the `costs_permissions_view_cost_types_cost_per_unit` permission; the field is omitted otherwise.
+          type: string
+        id:
+          description: ID for this cost type
+          type: string
+        name:
+          description: Human readable name for this cost type
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - name
+      - id
+      title: BillOfMaterialsCostType
+      type: object
+    PackagesWithActiveQuantityByLocation:
+      description: A location and the product's packages that hold active quantity there.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        packages:
+          description: The product's packages held at this location that have active quantity, ordered by id.
+          items:
+            $ref: '#/components/schemas/Package'
+          type: array
+      required:
+      - packages
+      - location
+      title: PackagesWithActiveQuantityByLocation
+      type: object
+    BatchesWithActiveQuantityByLocation:
+      description: A location and the product's batches that hold active quantity there.
+      properties:
+        batches:
+          description: The product's batches with active quantity at this location, each carrying its active quantity there, ordered by id.
+          items:
+            $ref: '#/components/schemas/BatchCompactWithQuantityActive'
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+      required:
+      - batches
+      - location
+      title: BatchesWithActiveQuantityByLocation
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    BatchCompactWithQuantityActive:
+      description: A compact [batch](#model-batch) reference plus its active on-hand quantity at the location it is nested under.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        quantity_active:
+          description: The batch's active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity_active
+      - name
+      - id
+      title: BatchCompactWithQuantityActive
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

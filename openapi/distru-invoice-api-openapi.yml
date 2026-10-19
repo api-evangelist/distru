@@ -1,0 +1,2279 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Invoice API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Invoice
+paths:
+  /public/v1/invoices:
+    get:
+      description: 'List the company''s invoices, newest first (sorted by invoice date, descending), with the given filters applied. All filters combine with AND; each returned invoice matches every filter you pass. This is a read-only operation with no side effects.
+
+
+        Results are paginated. The response carries a `next_page` URL only while more pages remain; follow it to walk the full result set. Page size is fixed by the server and is not client-controllable.
+
+
+        This endpoint returns eventually consistent data: a just-created or just-updated invoice may take up to about 1 second to appear or reflect its latest values here.
+
+
+        Required permission: `invoices_permissions_view`. Results are further narrowed to only the invoices the authenticated user is allowed to see under their team restrictions, so two API keys on the same company can see different subsets.'
+      operationId: DistruPublic.V1.InvoiceController.index
+      parameters:
+      - description: Restrict the result to specific invoices by ID (the same ID returned as each invoice's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by the invoice's due datetime. A comma-separated `min,max` range of ISO8601 UTC datetimes; both bounds are inclusive and either may be omitted. `2022-07-10T00:00:00Z,` keeps invoices due on or after that instant, `,2022-07-10T00:00:00Z` keeps those due on or before it, and passing both bounds keeps invoices due within the range.
+        in: query
+        name: due_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Filter by the datetime the invoice was created in Distru. A comma-separated `min,max` range of ISO8601 UTC datetimes; both bounds are inclusive and either may be omitted (see `due_datetime` for the range semantics).
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,2022-07-11T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by the invoice datetime (the date the invoice is dated for, which is also the sort key). A comma-separated `min,max` range of ISO8601 UTC datetimes; both bounds are inclusive and either may be omitted (see `due_datetime` for the range semantics).
+        in: query
+        name: invoice_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Filter to invoices whose invoice number contains this value. This is a case-insensitive substring match, not an exact match — `001` matches `INV-0012` and `10015`.
+        in: query
+        name: invoice_number
+        required: false
+        example: '001'
+        schema:
+          type: string
+      - description: 'Filter by payment status. Repeat the bracketed key to pass several statuses; an invoice matches when its status equals any value you supply (OR across values). Values are SCREAMING_CASE:
+
+          • `NOT_PAID` — no payments recorded yet
+
+          • `PARTIALLY_PAID` — some, but not all, of the total has been paid
+
+          • `FULLY_PAID` — paid in full
+
+          • `OVER_PAID` — recorded payments exceed the total. Rare and effectively legacy: new overpayments are converted into a customer credit instead of moving an invoice into this status.'
+        in: query
+        name: statuses
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - NOT_PAID
+            - PARTIALLY_PAID
+            - FULLY_PAID
+            - OVER_PAID
+            type: string
+      - description: Filter to invoices billing any of these sales orders. Repeat the bracketed key to pass several IDs; an invoice matches when its order's `id` equals any value you supply (OR across values). Empty list is no filter. At most 200 IDs.
+        in: query
+        name: order_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices whose sales order has any of these human-readable order numbers (the SO number shown in the UI, not the order's `id`). Case-insensitive exact match per value. Repeat the bracketed key per value; empty list is no filter. At most 200 values.
+        in: query
+        name: order_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to invoices whose sales order has any of these statuses (OR across values). SCREAMING_CASE: `PENDING`, `PROCESSING`, `READY_TO_SHIP`, `DELIVERING`, `DELIVERED`, `COMPLETED`, `CANCELED`. Empty list is no filter. At most 200 values. This is the order''s status, distinct from the invoice''s payment `statuses`.'
+        in: query
+        name: order_statuses
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - PENDING
+            - PROCESSING
+            - READY_TO_SHIP
+            - DELIVERING
+            - DELIVERED
+            - COMPLETED
+            - CANCELED
+            type: string
+      - description: Filter to invoices whose order bills any of these customers (the order's customer, returned as each invoice's `company.id`). Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs.
+        in: query
+        name: company_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices whose customer belongs to any of these company relationship groups. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs.
+        in: query
+        name: company_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices owned by any of these Distru users (matching each invoice's `owner.id`). Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices whose invoice number is any of these values. Case-sensitive exact match per value (send numbers exactly as they appear in responses) — unlike `invoice_number`, which is a case-insensitive substring match. Repeat the bracketed key per value; empty list is no filter. At most 200 values.
+        in: query
+        name: invoice_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by whether the invoice is voided. `true` keeps only voided invoices, `false` keeps only non-voided ones; omit for both. An invoice is voided automatically when its sales order is canceled. See also `voided_datetime`.
+        in: query
+        name: is_voided
+        required: false
+        schema:
+          type: boolean
+      - description: Filter by the invoice `total` (the value returned as each invoice's `total`, including line items, charges, discounts, and taxes). Inclusive range written as `min,max`; either side may be omitted. `100,` keeps invoices totaling 100 or more, `,500` keeps those totaling 500 or less, and `100,500` keeps those in between.
+        in: query
+        name: total
+        required: false
+        example: 100,500
+        schema:
+          type: string
+      - description: Filter by the invoice's outstanding balance (`remaining_amount` — the `total` minus recorded payments; negative when over-paid). Inclusive range written as `min,max`; either side may be omitted (see `total` for the range semantics). `0,0` keeps fully-paid invoices; `0.01,` keeps invoices with a positive balance still owed.
+        in: query
+        name: remaining_amount
+        required: false
+        example: 0.01,
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Filter by the datetime the invoice was last modified in Distru. A comma-separated `min,max` range of ISO8601 UTC datetimes; both bounds are inclusive and either may be omitted (see `due_datetime` for the range semantics).
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Filter by the datetime the invoice was voided. A comma-separated `min,max` range of ISO8601 UTC datetimes; both bounds are inclusive and either may be omitted (see `due_datetime` for the range semantics). Non-voided invoices (null `voided_datetime`) never match a bound. See also `is_voided`.
+        in: query
+        name: voided_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Filter to invoices that bill a line item drawn from any of these batches (matching the billed order item's batch). Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item drawn from any of these packages (matching the billed order item's package). Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: package_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose package carries any of these compliance labels (the package's Metrc/BioTrack label). Case-sensitive exact match. Repeat the bracketed key per value; empty list is no filter. At most 200 values. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: package_compliance_labels
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose package has any of these batch numbers (the batch number stored on the package). Case-sensitive exact match. Repeat the bracketed key per value; empty list is no filter. At most 200 values. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: package_batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose batch has any of these batch numbers (matching the billed order item's batch). Case-sensitive exact match. Repeat the bracketed key per value; empty list is no filter. At most 200 values. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: batch_batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item of any of these products (matching the billed order item's product). Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product belongs to any of these product categories. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product belongs to any of these product subcategories. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product belongs to any of these product groups. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product has any of these brands. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product has any of these vendors (the product's supplier company relationship). Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product has any of these strains. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product carries any of these tags. Repeat the bracketed key per ID; unknown IDs match nothing; empty list is no filter. At most 200 IDs. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices that bill a line item whose product has any of these SKUs. Case-insensitive exact match. Repeat the bracketed key per value; empty list is no filter. At most 200 values. When combined with the other item and product filters, a single line item must satisfy all of them together (e.g. the same line is both in the given batch and of the given product).
+        in: query
+        name: product_skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=invoice` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      responses:
+        '200':
+          description: A list of invoices
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Invoices'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get invoices
+      tags:
+      - Invoice
+    post:
+      description: 'Create or update a single invoice. This is one endpoint for both: omit `id` to create a new invoice (Distru assigns the ID and the human-readable invoice number), or pass an existing invoice''s `id` to update it. Same URL, same request shape.
+
+
+        Every invoice bills an existing sales order, so `order_id` is required and each line item must reference an order item that belongs to that order. This endpoint bills existing order lines — it does **not** create, reserve, consume, or otherwise move inventory. Inventory is governed by the sales order and its fulfillment, not by invoicing. On save, Distru recalculates the invoice''s charge amounts and `total` and recomputes its payment status from recorded payments; for an update that lowers the total below what has already been paid, the excess is reconciled into a customer credit automatically.
+
+
+        Updates are sparse: any top-level field you omit is left unchanged, and sending an explicit null clears that field. The `items` and `charges` collections are optional on update — omit either to leave the existing line items or charges untouched. When you DO send `items` or `charges`, that array is the complete set for that collection: any existing entry whose `id` you leave out is deleted, and passing `[]` clears them all. A line item or charge sent WITH an `id` is patched — merged onto the stored row, so you can change one field and omit the rest; one WITHOUT an `id` is a new entry. If any part of the request is rejected (a bad order item, a validation failure), the whole upsert fails and nothing is changed.
+
+
+        A voided invoice is frozen and cannot be edited through this endpoint — the request is rejected. An invoice is voided automatically when its sales order is canceled (and un-voided if that order later leaves the canceled status), so voiding is driven by the order, not set here.
+
+
+        Side effects reach other systems asynchronously. A successful 200 means the invoice was saved, not that downstream syncs finished: if the company is connected to QuickBooks Online the invoice is queued for sync there, and if the invoice''s customer maps to a connected point-of-sale (Treez, Dutchie, or Blaze) it is queued for sync to that POS. Poll the relevant system to observe the synced result. Distru may also email the invoice PDF to the customer when the order is configured to do so.
+
+
+        Required permission: `invoices_permissions_create` to create a new invoice, or `invoices_permissions_edit` (plus access to the invoice under team restrictions) to update an existing one.'
+      operationId: DistruPublic.V1.InvoiceController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID for this invoice. Omit it to create a new invoice — Distru assigns the ID. Provide an existing invoice's ID to update that invoice; an ID that doesn't exist (or belongs to another company) returns a not-found error.
+                order_id:
+                  type: string
+                  description: The `id` of the sales order this invoice bills. Required. Determines the invoice's customer and the order items its line items may reference. The order must have a customer and a billing location, and must not be merged. Only set on create in practice — an invoice stays tied to the order it was created for.
+                due_datetime:
+                  type: string
+                  description: The datetime by which the customer should pay the invoice, as an ISO8601 datetime (e.g. `2026-08-30T00:00:00Z`). Required on create; on update, omit to leave it unchanged.
+                invoice_datetime:
+                  type: string
+                  description: The datetime the invoice is dated for, as an ISO8601 datetime (e.g. `2026-08-20T00:00:00Z`). Required on create; on update, omit to leave it unchanged. This is the date shown on the invoice and the key the list endpoint sorts and filters by.
+                items:
+                  items:
+                    $ref: '#/components/schemas/InvoiceItemRequest'
+                  type: array
+                  description: 'The line items being billed, one entry per line, each following the [InvoiceItemRequest](#model-invoiceitemrequest) shape. Required on create (at least one line). Optional on update: omit the whole field to leave the existing line items unchanged. When sent, this array is the complete set of line items, so any existing item whose `id` you do not include is deleted. A line sent with an existing `id` is patched — merged onto the stored line, so you can change one field and omit the rest; a line WITHOUT an `id` is new.'
+                charges:
+                  items:
+                    $ref: '#/components/schemas/InvoiceChargeRequest'
+                  type: array
+                  description: Extra lines added on top of the items — fees, discounts, or taxes — each following the [InvoiceChargeRequest](#model-invoicechargerequest) shape. Optional; omit the whole field to leave the existing charges unchanged. When sent, this array is the complete set of charges, so any existing charge whose `id` you do not include is deleted, and an empty array clears all charges. A charge sent with an existing `id` is patched — merged onto the stored charge, so you can change one field and omit the rest.
+                billing_location_id:
+                  type: string
+                  description: The `id` of the location to bill. Optional. Must be a location belonging to the order's customer; an ID that doesn't resolve to such a location is ignored.
+                owner_id:
+                  type: string
+                  description: The `id` of the Distru user who owns this invoice. Optional. Must be a user the caller is allowed to assign under their team restrictions.
+                external_notes:
+                  type: string
+                  description: Notes on this invoice that are visible to the customer. Optional.
+                internal_notes:
+                  type: string
+                  description: Notes on this invoice that are only visible internally. Optional.
+                custom_data:
+                  type: object
+                  description: 'A map of custom field IDs to their values. Use GET /public/v1/custom-fields?parent_object=invoice to retrieve available custom fields, their IDs, and their types. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options.'
+              required:
+              - order_id
+              - due_datetime
+              - invoice_datetime
+        required: true
+      responses:
+        '200':
+          description: A single invoice
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert an invoice
+      tags:
+      - Invoice
+  /public/v1/invoices/{id}:
+    delete:
+      description: 'Deletes an invoice. This is a hard delete: the invoice is permanently removed together with its line items, charges, and payments — it disappears from `GET /public/v1/invoices`, `GET /public/v1/invoices/{id}` returns 404 for it, and it cannot be recovered through the API. Responds 204 with no body on success, or 404 if no invoice with that `id` exists in your company (including one that belongs to another company or was already deleted). A VOIDED invoice can be deleted too. Any custom validation rule your company has configured for invoice deletion can refuse the delete with a 400, in which case nothing is changed.
+
+
+        Effects on payments and credits, all in one atomic call: every payment recorded on the invoice (voided ones included) is deleted with it. Credit balance that was applied to the invoice through those payments is released back onto the credits, and credits that were generated by overpaying this invoice are canceled.
+
+
+        The order the invoice bills is untouched: it keeps its status and line items, and its invoiced and paid totals simply no longer include this invoice, so the order can be invoiced again. If your company is integrated with QuickBooks Online, the linked QuickBooks Online invoice and its payments are scheduled for deletion there too (that sync is eventual — observe it in QuickBooks Online, not in the 204). Files attached to the invoice are detached but kept. Nothing is synced to Metrc or BioTrack.
+
+
+        Required permission: `invoices_permissions_delete` (plus access to the invoice under team restrictions).'
+      operationId: DistruPublic.V1.InvoiceController.delete
+      parameters:
+      - description: ID of the invoice to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete an invoice
+      tags:
+      - Invoice
+    get:
+      description: 'Fetch a single invoice by its ID, including its line items, charges, non-voided payments, and custom field values. Read-only, with no side effects. Returns 404 when no invoice with that ID exists in the caller''s company. Required permission: `invoices_permissions_view`. The authenticated user must also have access to the requested invoice under their team restrictions, otherwise the request is rejected even though the invoice exists.'
+      operationId: DistruPublic.V1.InvoiceController.show
+      parameters:
+      - description: The invoice's ID — the `id` returned by the list and show invoice endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: An invoice
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get an invoice
+      tags:
+      - Invoice
+  /public/v1/invoices/{id}/payments:
+    post:
+      description: 'Record a payment against an invoice. On success the invoice''s `paid_amount`, `remaining_amount`, and payment `status` are recomputed to reflect the new payment.
+
+
+        The recorded amount is capped at the invoice''s outstanding balance (its `remaining_amount`): only the portion up to that balance is applied to the invoice, and any excess becomes a customer credit for the account. In the response, the payment''s `amount` holds the applied (capped) portion and the generated credit appears in `overpayment_credits` with the excess as its `amount`. On the invoice, `paid_amount` grows by the applied portion only, so it ends equal to `total`, `remaining_amount` drops to `0`, and `status` becomes FULLY_PAID — an overpayment never produces OVER_PAID. For example, sending an `amount` of 150 against an invoice with a `remaining_amount` of "100.00" returns a payment with `amount` "100" and one entry in `overpayment_credits` with `amount` "50"; the invoice then reads `paid_amount` equal to `total`, `remaining_amount` "0.00", and `status` FULLY_PAID. A payment cannot be filed against an invoice that is already fully paid, or against a voided invoice — both are rejected. Returns 404 when the invoice does not exist in the caller''s company or the API key''s user cannot see it under their team restrictions.
+
+
+        If the company is connected to QuickBooks Online there are two extra behaviors. First, Distru synchronously pulls the latest payment and credit data from QuickBooks Online before recording, which can briefly fail with a "try again in a few seconds" error while that refresh runs — retry the request in that case. Second, the payment (or its invoice) is only queued for sync to QuickBooks Online once its dependencies are already synced there; otherwise the sync is deferred. A 200 is therefore not confirmation the payment reached QuickBooks Online — the response''s `quickbooks_sync_enqueued` flag tells you whether a sync was queued, and you should poll QuickBooks Online to observe the final result. The payment may also be pushed to LeafLink when that integration is configured for the customer.
+
+
+        Required permission: `invoices_permissions_receive_payment`. The authenticated user must also be allowed to view invoices under their team restrictions.'
+      operationId: DistruPublic.V1.InvoiceController.insert_payment
+      parameters:
+      - description: The `id` of the invoice to record the payment against — the `id` returned by the list and show invoice endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_method_id:
+                  type: string
+                  description: The `id` of the payment method to record this payment under. Required. Retrieve valid IDs from GET /public/v1/payment-methods.
+                amount:
+                  type: number
+                  format: decimal
+                  description: 'The payment amount. Required. Rounded to 2 decimal places. Capped at the invoice''s `remaining_amount`: only the portion up to the outstanding balance is applied — that portion is returned as the payment''s `amount` and added to the invoice''s `paid_amount` — while any excess becomes a customer credit, returned in the payment''s `overpayment_credits`. E.g. sending 150 when "100.00" remains records a payment of "100" and a credit of "50".'
+                payment_datetime:
+                  type: string
+                  description: The datetime the payment was made, as an ISO8601 datetime (e.g. `2026-08-20T00:00:00Z`). Required.
+                description:
+                  type: string
+                  description: A free-text description of the payment. Required.
+                quickbooks_deposit_account_id:
+                  type: string
+                  description: QuickBooks Online deposit account ID. Optional. Mutually exclusive with `quickbooks_deposit_account_name` — sending both is rejected. When your company is connected to QuickBooks Online and you send neither, the payment is deposited to the company's Sales Deposit Account (Settings → QuickBooks); when that account is missing, not active or not of an allowed type, the request is rejected with a `base` error naming it — send an account then. With no Sales Deposit Account set, sending neither is rejected on both deposit account fields. When your company is not connected to QuickBooks Online, sending this is rejected. The account must be active and of type "Bank" or "Other Current Asset".
+                quickbooks_deposit_account_name:
+                  type: string
+                  description: 'QuickBooks Online deposit account name. Optional. Mutually exclusive with `quickbooks_deposit_account_id` — sending both is rejected. Omit both to use the company''s Sales Deposit Account (see `quickbooks_deposit_account_id`). A name containing `:` is a sub-account''s full name (`Parent:Child`) and matches that account exactly; it must itself be active and of type "Bank" or "Other Current Asset". Any other name matches among active "Bank" and "Other Current Asset" accounts: a top-level account with that name (its full name) wins; otherwise the one sub-account with that short name. A short name shared by several such sub-accounts is rejected with a message listing their full names — send the full name instead. When the top-level account with that name is inactive or of another type and a sub-account shares its name, the request is rejected with a message naming that sub-account''s full name, rather than depositing to it. When your company is not connected to QuickBooks Online, sending this is rejected.'
+              required:
+              - payment_method_id
+              - amount
+              - payment_datetime
+              - description
+        required: true
+      responses:
+        '200':
+          description: A single payment
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Insert a payment for an invoice
+      tags:
+      - Invoice
+  /public/v1/invoices/{id}/pdf:
+    post:
+      description: 'Generate the PDF for a single invoice — the same document a user downloads from the Distru UI — and download it directly, get a signed link to it, or email it (see `format`). This is a read-only operation: it moves no inventory, changes no invoice data, and triggers no compliance or accounting sync.
+
+
+        The same permissions that govern downloading this PDF in the Distru web app apply to this endpoint; when `format` is `email`, the web app''s permission for emailing it applies instead (documents the web app cannot email keep the download permission).
+
+
+        `format` selects how the generated PDF is delivered and has three modes: `binary` returns the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` returns a JSON envelope `{"data": {"url": ..., "expires_datetime": ...}}` with a temporary signed download URL; `email` sends the PDF to the addresses in `email_addresses` and returns a JSON envelope `{"data": {"emailed_to": [...]}}`. `format` is required, but for backward compatibility omitting it defaults to `binary`.
+
+
+        All PDF download endpoints share a single, combined rate limit for your account: 20 requests per minute and 1000 per day in total across every PDF endpoint (not per endpoint). Requests over the limit return 429 with a Retry-After header, and only successful downloads count toward it.'
+      operationId: DistruPublic.V1.InvoiceController.download_pdf
+      parameters:
+      - description: The invoice's ID — the `id` returned by the list and show invoice endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/DistruPublic.V1.AssemblyController.download_pdfBody'
+      responses:
+        '200':
+          description: 'When `format` is `binary` (or omitted), the raw PDF file (`Content-Type: application/pdf`). When `format` is `url`, a JSON body with a temporary signed download URL; when `format` is `email`, a JSON body listing the addresses the PDF was emailed to (see the PdfResponse schema).'
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/PdfResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's shared PDF download rate limit (20/minute, 1000/day across all PDF endpoints) was exceeded. Retry after the period in the Retry-After header.
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Generate an invoice PDF
+      tags:
+      - Invoice
+  /public/v1/invoices/{id}/test-results/pdf:
+    post:
+      description: 'Generate a single combined Certificate of Analysis (COA) PDF for an invoice — assembled by merging the primary lab-result file of each line item''s batch or package into one document — and download it directly, get a signed link to it, or email it (see `format`). Use it to hand a customer the lab paperwork backing everything they were billed for. This is a read-only operation with no side effects.
+
+
+        Returns 404 when the invoice has no attached lab results — i.e. none of its line items resolve to a batch or package that has a lab-result file. A COA that exists on the batch/package but is not yet uploaded as a file will not appear here. That 404''s message reads `This invoice has no lab results attached`, which tells it apart from an unknown ID (`Not Found`).
+
+
+        The same permissions that govern downloading this PDF in the Distru web app apply to this endpoint; when `format` is `email`, the web app''s permission for emailing it applies instead (documents the web app cannot email keep the download permission).
+
+
+        `format` selects how the generated PDF is delivered and has three modes: `binary` returns the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` returns a JSON envelope `{"data": {"url": ..., "expires_datetime": ...}}` with a temporary signed download URL; `email` sends the PDF to the addresses in `email_addresses` and returns a JSON envelope `{"data": {"emailed_to": [...]}}`. `format` is required, but for backward compatibility omitting it defaults to `binary`.
+
+
+        All PDF download endpoints share a single, combined rate limit for your account: 20 requests per minute and 1000 per day in total across every PDF endpoint (not per endpoint). Requests over the limit return 429 with a Retry-After header, and only successful downloads count toward it.'
+      operationId: DistruPublic.V1.InvoiceController.download_test_results_pdf
+      parameters:
+      - description: The invoice's ID — the `id` returned by the list and show invoice endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/DistruPublic.V1.AssemblyController.download_pdfBody'
+      responses:
+        '200':
+          description: 'When `format` is `binary` (or omitted), the raw PDF file (`Content-Type: application/pdf`). When `format` is `url`, a JSON body with a temporary signed download URL; when `format` is `email`, a JSON body listing the addresses the PDF was emailed to (see the PdfResponse schema).'
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/PdfResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found, or the invoice has no lab results attached (the message says which)
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's shared PDF download rate limit (20/minute, 1000/day across all PDF endpoints) was exceeded. Retry after the period in the Retry-After header.
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Generate an invoice's Certificate of Analysis (COA) PDF
+      tags:
+      - Invoice
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    InvoiceResponse:
+      description: A single invoice wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Invoice'
+      title: Invoice Response
+      type: object
+    BatchesWithActiveQuantityByLocation:
+      description: A location and the product's batches that hold active quantity there.
+      properties:
+        batches:
+          description: The product's batches with active quantity at this location, each carrying its active quantity there, ordered by id.
+          items:
+            $ref: '#/components/schemas/BatchCompactWithQuantityActive'
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+      required:
+      - batches
+      - location
+      title: BatchesWithActiveQuantityByLocation
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CompactInvoice:
+      description: A compact view of an invoice as nested inside another entity (an order or a payment) in Distru. Use its id to fetch the full invoice from the invoices endpoint.
+      properties:
+        id:
+          description: ID for this invoice
+          type: string
+        invoice_number:
+          description: The invoice number as shown in the Distru UI (e.g. "INV-0001"). Unique per company.
+          type: string
+        status:
+          description: 'The payment status of this invoice (SCREAMING_CASE), reflecting how much of its total has been paid — distinct from the parent order''s fulfillment `status`.• NOT_PAID: no payments applied.• PARTIALLY_PAID: paid in part but less than the total.• FULLY_PAID: paid in full.• OVER_PAID: payments exceed the total.'
+          type: string
+        total:
+          description: The invoice total (line items plus charges/taxes minus discounts), as a decimal string (e.g. "150.50").
+          type: string
+      required:
+      - total
+      - status
+      - invoice_number
+      - id
+      title: CompactInvoice
+      type: object
+    BillOfMaterialsProductInput:
+      description: A specific product consumed by a bill of materials
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: How much of the product this recipe consumes, in the product's unit, as a decimal string (e.g. "2.5").
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsProductInput
+      type: object
+    BillOfMaterialsCost:
+      description: An additional cost applied by a bill of materials
+      properties:
+        cost_type:
+          $ref: '#/components/schemas/BillOfMaterialsCostType'
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies, as a decimal string (e.g. "3"). Multiply by the cost type's `cost_per_unit` to get the line total.
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsCost
+      type: object
+    PaymentResponse:
+      description: A single Payment
+      properties:
+        data:
+          $ref: '#/components/schemas/Payment'
+      title: Payment Response
+      type: object
+    InvoiceItem:
+      description: A single billed line on an invoice. Read product, inventory, and cost details from the embedded `order_item`. Responses may also include deprecated legacy copies of some order-item fields at the top level; these are omitted here — use `order_item`.
+      properties:
+        description:
+          description: A free-text description for this billed line, or null when none was set.
+          type: string
+        id:
+          description: ID for this invoice item.
+          type: string
+        inserted_datetime:
+          description: The datetime this invoice item was created.
+          type: string
+        order_item:
+          $ref: '#/components/schemas/SalesOrderItem'
+        order_item_id:
+          description: The `id` of the sales order item this line bills. Always present. This is the raw order item id; it is also the `id` of the embedded `order_item`.
+          type: string
+        quantity:
+          description: Quantity billed on this line, as a decimal string, expressed in the product's unit type. May be less than the order item's quantity when only part of the line was billed; null when no quantity was recorded.
+          type: string
+      required:
+      - inserted_datetime
+      - order_item_id
+      - id
+      title: InvoiceItem
+      type: object
+    PriceTierVersion:
+      description: An immutable snapshot of a [price tier](#model-pricetier), frozen at one of its edits. Every create or update of a tier produces a new version, and a sales order item priced by the tier locks to the version that priced it — so the discount recorded here never changes, even after the live tier is edited.
+      properties:
+        id:
+          description: ID for this price tier version — the value to submit back as an order item's `price_tier_version_id`
+          type: string
+        is_live:
+          description: True when this snapshot is the tier's latest version (the tier's `current_version_id`). False means the tier was edited or deleted after this snapshot was taken, so the pricing frozen here may differ from the live tier's current state.
+          type: boolean
+        price_tier:
+          description: The tier as of this snapshot — its frozen fields rendered in the [price tier](#model-pricetier)'s shape, under the live tier's `id`. This is NOT the tier's current state (which may have changed since); it carries no conditions, menus, or ownership.
+          properties:
+            id:
+              description: ID of the live [price tier](#model-pricetier) this snapshot belongs to — fetch it via GET /public/v1/price-tiers for its conditions and current state
+              type: string
+            is_flat:
+              description: When true the `price` replaces the order item's `price_base` outright instead of discounting off it. Only meaningful when `price_or_percent` is PRICE — never true with PERCENT.
+              type: boolean
+            name:
+              description: Internal name of the tier as of this snapshot
+              type: string
+            percent:
+              description: The discount percentage off the order item's `price_base` used when `price_or_percent` is PERCENT, as a decimal string with up to 3 decimals (e.g. "12.5", 0-100); null when PRICE
+              type: string
+            price:
+              description: The money amount used when `price_or_percent` is PRICE, as a decimal string with up to 5 decimals (e.g. "5.00"); null when PERCENT. A per-unit discount off the order item's `price_base`, or — when `is_flat` is true — the replacement per-unit price itself.
+              type: string
+            price_or_percent:
+              description: Whether the frozen discount is a fixed amount (PRICE) or a percentage (PERCENT)
+              enum:
+              - PRICE
+              - PERCENT
+              type: string
+          type: object
+      required:
+      - price_tier
+      - is_live
+      - id
+      title: PriceTierVersion
+      type: object
+    Payment:
+      description: A record of money exchanged — received from a customer against an invoice, or paid to a vendor against a purchase order.
+      properties:
+        amount:
+          description: 'The payment amount as a decimal string with trailing zeros trimmed (e.g. `"150"` or `"99.5"`), in the currency of the related invoice or purchase. For an INVOICE payment this is the amount applied to the invoice: it includes any portion covered by applied credits (`credit_uses`) but excludes any overpaid portion that became a customer credit (`overpayment_credits`) — the invoice''s `paid_amount` is the sum of `amount` across its active payments. Normally at least `0.01`; the one exception is a payment synced from QuickBooks Online to represent a void, which appears as `"0"`. Always present.'
+          type: string
+        company:
+          $ref: '#/components/schemas/CompanyCompact'
+        credit_uses:
+          description: Credits applied toward this invoice payment (an empty array when none were applied). Null for PURCHASE payments.
+          items:
+            $ref: '#/components/schemas/PaymentCreditUse'
+          type:
+          - array
+          - 'null'
+        description:
+          description: Free-text note attached to the payment, or null if none was entered.
+          type:
+          - string
+          - 'null'
+        fully_paid_with_credits:
+          description: True when the payment was covered entirely by credits; in that case `payment_method` is null. Defaults to false. Always present.
+          type: boolean
+        id:
+          description: The payment's ID. Always present.
+          type: string
+        inserted_datetime:
+          description: ISO8601 datetime the payment record was created in Distru. Distinct from `payment_datetime`. Always present.
+          type: string
+        invoice:
+          $ref: '#/components/schemas/CompactInvoice'
+        overpayment_credits:
+          description: Credits generated from overpaying this invoice payment (an empty array when there was no overpayment). Leaves out credits the authenticated user cannot view under their team restrictions. Null for PURCHASE payments.
+          items:
+            $ref: '#/components/schemas/PaymentCredit'
+          type:
+          - array
+          - 'null'
+        payment_datetime:
+          description: The full ISO8601 datetime the payment was recorded as made (e.g. `"2022-07-10T00:00:00Z"`). This is the user-entered payment datetime, distinct from `inserted_datetime` (when the record was created in Distru). Always present.
+          type: string
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethod'
+        payment_number:
+          description: The payment number as shown in the Distru UI. Unique per company. Always present.
+          type: string
+        payment_type:
+          description: 'What this payment is tied to: INVOICE (money received from a customer against an invoice) or PURCHASE (money paid to a vendor against a purchase). Determines which of `invoice`/`purchase` is populated and whether `credit_uses`/`overpayment_credits` are present. Always present.'
+          type: string
+        purchase:
+          $ref: '#/components/schemas/PaymentPurchase'
+        quickbooks_deposit_account_id:
+          description: ID of the QuickBooks Online deposit account this payment posts to, or null when the payment is not linked to a deposit account.
+          type:
+          - string
+          - 'null'
+        quickbooks_deposit_account_name:
+          description: Name of the QuickBooks Online deposit account in `quickbooks_deposit_account_id`. For an INVOICE payment it is the account's full name (`Parent:Child` for a sub-account), which [POST /public/v1/invoices/{id}/payments](#insert-a-payment-for-an-invoice) accepts back as `quickbooks_deposit_account_name`; for a PURCHASE payment it is the account's own name. Only returned on the single-payment (show) response, and null there when no deposit account is linked; absent from list responses.
+          type:
+          - string
+          - 'null'
+        quickbooks_sync_enqueued:
+          description: Whether a QuickBooks Online sync was queued for this payment. Only present on the payment creation response; absent from list and show responses.
+          type: boolean
+        status:
+          description: The payment's status. POSTED for a live payment; VOIDED for one that was voided (retained for history rather than deleted). Always present.
+          type: string
+        updated_datetime:
+          description: ISO8601 datetime the payment record was last modified in Distru. Equals `inserted_datetime` until the payment is edited or voided. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - fully_paid_with_credits
+      - status
+      - payment_type
+      - payment_datetime
+      - payment_number
+      - amount
+      - id
+      title: Payment
+      type: object
+    CompactMenu:
+      description: A lightweight reference to a DistruCommerce menu — the online catalog a buyer browses to place an order — carrying just its id and name. Where it appears on a sales order, it is the menu that order was placed through. Use the id to fetch the full menu from the menus endpoint.
+      properties:
+        id:
+          description: ID of the menu
+          type: string
+        name:
+          description: Display name of the menu
+          type: string
+      required:
+      - name
+      - id
+      title: CompactMenu
+      type: object
+    SalesOrderItem:
+      description: A single product line on a sales order — what is being sold, how much, at what price, and which inventory (batch/package) fulfills it.
+      properties:
+        batch:
+          $ref: '#/components/schemas/Batch'
+        compliance_quantity:
+          description: The quantity of this order item expressed in its package's unit type, as reported to the state compliance system, as a decimal string. Null when the item is not package-tracked.
+          type: string
+        cost_per_unit:
+          description: Actual cost per unit — `total_cost_actual` divided by this order item's quantity.
+          type: string
+        cost_per_unit_default:
+          description: Default (standard) cost per unit — `total_cost_default` divided by this order item's quantity.
+          type: string
+        id:
+          description: ID for this order item
+          type: string
+        inserted_datetime:
+          description: The datetime this order item was created at
+          type: string
+        is_sample:
+          description: True if this order item is a sample given away rather than sold.
+          type: boolean
+        leaflink_id:
+          description: The LeafLink line-item id this order item maps to (a LeafLink identifier, not a Distru id). Null when the order did not originate from LeafLink.
+          type: integer
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        note:
+          description: Free-text note on this order item, or null when none was entered.
+          type: string
+        package:
+          $ref: '#/components/schemas/Package'
+        price:
+          description: Price per unit actually charged on this order item — the per-unit price after any line-level price tier discount has been applied, as a decimal string (e.g. "25.00"). Equals `price_base` when no discount applied.
+          type: string
+        price_base:
+          description: The per-unit list price of this order item before any price tier discount, as a decimal string (e.g. "30.00").
+          type: string
+        price_tier_mode:
+          description: 'How [price tiers](#model-pricetier) determine this order item''s `price` (SCREAMING_CASE):• AUTO: Distru searches for the best applicable tier on every save of the order. The moment one matches, the line locks to that tier''s current version — the stored mode becomes OVERRIDE and `price_tier_version` is set — so an item created as AUTO reads back as OVERRIDE once a tier has applied. It stays AUTO (with a null `price_tier_version`) only while no tier matches.• OVERRIDE: the line is locked to the exact tier snapshot in `price_tier_version`. Its discount is re-applied to `price_base` on every save, and later edits to the live tier do not change this line''s pricing.• NONE: price tiers are disabled for this line; `price` equals `price_base` and `price_tier_version` is always null.'
+          enum:
+          - AUTO
+          - OVERRIDE
+          - NONE
+          type: string
+        price_tier_version:
+          $ref: '#/components/schemas/PriceTierVersion'
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: Quantity sold on this order item, expressed in the product's unit type, as a decimal string (e.g. "10")
+          type: string
+        returned_quantity:
+          description: Quantity returned against this order item so far, expressed in the product's unit type, as a decimal string (e.g. "2"). Null when nothing has been returned. The cost fields above value only the non-returned quantity (`quantity` minus this).
+          type: string
+        thc_percentage_total:
+          description: The total THC % this order line is reserved at, used when the company sells by potency. Only meaningful for batch- or package-tracked products (always null for product-tracked items). Set from the order/menu selection when the line is created — it is not derived from or changed by the assigned package (a package can only fulfill the line if its primary test result's total THC matches this value). Null when not selling by potency.
+          type: string
+        total_cost_actual:
+          description: Total actual cost of the non-returned quantity in this order item (i.e. `quantity` minus `returned_quantity`). Distru traces the inputs and components that produced the shipped inventory and sums the real costs incurred along that chain — for example the price paid when a component was purchased, assembly costs, and costs added by stock adjustments, among others.
+          type: string
+        total_cost_default:
+          description: Total default (standard) cost of the non-returned quantity in this order item. Traced the same way as `total_cost_actual`, but each input/component is valued at its product's configured unit cost (the product's `unit_cost`) instead of its real cost.
+          type: string
+      required:
+      - inserted_datetime
+      - price_tier_mode
+      - price_base
+      - price
+      - quantity
+      - is_sample
+      - id
+      title: SalesOrderItem
+      type: object
+    LocationWithLicense:
+      description: A location with its license number inlined, as nested on orders/invoices/purchases
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_number:
+          description: The license number of the location's [license](#model-license), inlined so you need not fetch it; null when the location has no license
+          example: C11-1234567890
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationWithLicense
+      type: object
+    Product:
+      description: A sellable or trackable item in your catalog — its name, pricing, category, unit of measure, and how its inventory is tracked (see `inventory_tracking_method`).
+      properties:
+        batches_with_active_quantity_by_location:
+          description: The product's batches that hold active quantity, grouped by location. Present only when the request passes `include_batches_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not batch-tracked or holds no active batches.
+          items:
+            $ref: '#/components/schemas/BatchesWithActiveQuantityByLocation'
+          type: array
+        bill_of_materials:
+          $ref: '#/components/schemas/BillOfMaterials'
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this product
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime the product was soft-deleted at, or null when the product has not been deleted
+          type: string
+        description:
+          description: Plain-text description of this product, or null when none was entered. Always null together with `description_markdown` and non-null together with it — one is never set without the other.
+          type: string
+        description_markdown:
+          description: The same description in Markdown. Null when `description` is null; populated whenever `description` is populated.
+          type: string
+        external_name:
+          description: Customer-facing name shown on DistruCommerce menus and the Order Tracker, or null when none is set (it does not fall back to `name`)
+          type: string
+        gross_weight:
+          description: The gross weight of one unit including packaging, as a decimal string, measured in `gross_weight_unit_type`. Null when not set; it is always set together with `gross_weight_unit_type` and null together with it.
+          type: string
+        gross_weight_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        id:
+          description: ID for this product
+          type: string
+        images:
+          description: 'The images associated with this product, in display order: by `rank`, lowest first (the first is the primary image), then by id. Images with no rank come last. Empty array when the product has no images.'
+          items:
+            $ref: '#/components/schemas/Image'
+          type: array
+        inserted_datetime:
+          description: The datetime this product was created at
+          type: string
+        inventory_tracking_method:
+          description: 'How this product''s inventory is tracked. One of: `BATCH` (grouped into batches sharing traits such as expiration dates and test results), `PACKAGE` (inventory is defined by packages), `PRODUCT` (ungrouped; inventory exists directly on the product).'
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+          type: string
+        is_active:
+          description: True when the product is active. False when it has been marked inactive (archived), which hides it from most product pickers.
+          type: boolean
+        is_featured:
+          description: True when the product is flagged as featured
+          type: boolean
+        leaflink_product_id:
+          description: The LeafLink product ID this product is synced to, or null if not synced
+          type: integer
+        menu_visibility:
+          description: 'Which menus this product is shown in. One of `DO_NOT_INCLUDE`, `INCLUDE_IN_ALL`, `INCLUDE_IN_SELECT` (same values accepted by the upsert endpoint); defaults to `DO_NOT_INCLUDE`. The `menus` field below lists the specific menus the product belongs to — this is how you see which menus when the value is `INCLUDE_IN_SELECT`. Setting `INCLUDE_IN_ALL` adds the product to every menu, and a menu created later gets it too, except a copy of a menu it isn''t on, or a new (not copied) menu made by a user who can''t see the product: read `menus` for where it really is.'
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+          type: string
+        menus:
+          description: 'Menus this product is on, ordered by menu creation time then id (includes inactive menus). Follows `menu_visibility`: the chosen menus for `INCLUDE_IN_SELECT`, every menu but the exceptions listed under `menu_visibility` for `INCLUDE_IN_ALL`, and usually none for `DO_NOT_INCLUDE`. A change made by a team-restricted user never removes the product from menus that user can''t see, so those stay listed.'
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        msrp:
+          description: Manufacturer's suggested retail price, as a decimal string (e.g. "19.99"), or null when not set
+          type: string
+        name:
+          description: Human readable name for this product
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packages_with_active_quantity_by_location:
+          description: The product's packages that hold active quantity, grouped by location. Present only when the request passes `include_packages_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not package-tracked or holds no active packages.
+          items:
+            $ref: '#/components/schemas/PackagesWithActiveQuantityByLocation'
+          type: array
+        product_group:
+          $ref: '#/components/schemas/ProductGroupCompact'
+        quantity_active:
+          description: Total active on-hand quantity of this product across all locations, as a decimal string (e.g. "100"). Sums the product's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the product has no active stock. Reserved stock is still physically on-hand, so it is included here; subtract `quantity_reserved` to get `quantity_available`. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The product's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the product has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        quantity_available:
+          description: Active on-hand quantity minus reserved quantity, as a decimal string (e.g. "100"). Equals `quantity_active` − `quantity_reserved` — what is on-hand and not already spoken for by unfulfilled sales orders or draft assemblies. Can be negative when more is reserved than is on-hand at a location. "0" when the product has no active stock and nothing reserved.
+          type: string
+        quantity_available_threshold_max:
+          description: 'Over-stock alert threshold: Distru flags the product when its available quantity rises above this value. Decimal string, or null when no over-stock alert is configured. When both thresholds are set, this is strictly greater than `quantity_available_threshold_min`.'
+          type: string
+        quantity_available_threshold_min:
+          description: 'Low-stock alert threshold: Distru flags the product when its available quantity drops below this value. Decimal string, or null when no low-stock alert is configured. When both thresholds are set, this is strictly less than `quantity_available_threshold_max`.'
+          type: string
+        quantity_reserved:
+          description: 'Total quantity of this product currently reserved across all locations, as a decimal string (e.g. "100"). Reserved quantity is a soft hold tracked separately from on-hand stock (`quantity_active`): it rises as unfulfilled sales order items and draft assembly inputs are created, and falls as they are deleted or fulfilled. "0" when nothing is reserved.'
+          type: string
+        sku:
+          description: The stock keeping unit (SKU) configured for this product
+          type: string
+        strain:
+          $ref: '#/components/schemas/Strain'
+        subcategory:
+          $ref: '#/components/schemas/ProductSubcategoryCompact'
+        tags:
+          description: The tags associated with this product. Empty array when the product has no tags.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        tasks:
+          description: 'The tasks linked to this product that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total_cannabinoid_unit:
+          description: The unit `total_thc` and `total_cbd` are measured in — one of MG (milligrams per unit) or PERCENT (percent by weight). Null when neither potency value is set.
+          type: string
+        total_cbd:
+          description: Total CBD potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        total_thc:
+          description: Total THC potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        treez_wholesale_price:
+          description: The Treez wholesale price of this product, as a decimal string, or null when not set
+          type: string
+        unit_cost:
+          description: The cost (purchase price) of one unit of this product, as a decimal string, or null when not set
+          type: string
+        unit_net_weight:
+          description: The net contents of one unit of this product (weight, volume, or count of the contents), as a decimal string, measured in `unit_net_weight_serving_size_unit_type`. Null when not set.
+          type: string
+        unit_net_weight_serving_size_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        unit_price:
+          description: The list (sale) price of one unit of this product, as a decimal string (e.g. "25.00")
+          type: string
+        unit_serving_size:
+          description: The serving size per unit, as a decimal string, measured in `unit_net_weight_serving_size_unit_type` (the same unit as `unit_net_weight`). Null when not set. When both are set, this is at most `unit_net_weight`.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        units_per_case:
+          description: The number of units of this product packed in one case, as a decimal string (e.g. "12"), or null when not set
+          type: string
+        upc:
+          description: The UPC barcode of this product, or null when not set
+          type: string
+        updated_datetime:
+          description: The datetime this product was last updated at
+          type: string
+        vendor:
+          $ref: '#/components/schemas/CompanyCompact'
+        wholesale_unit_price:
+          description: The wholesale unit price of this product, as a JSON number (e.g. 12.5) rather than a decimal string — unlike `unit_price`. Null when not set.
+          type: number
+      required:
+      - quantity_reserved
+      - quantity_available
+      - quantity_active_by_location
+      - quantity_active
+      - custom_data
+      - inventory_tracking_method
+      - unit_price
+      - is_featured
+      - is_active
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - sku
+      - name
+      - id
+      title: Product
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    InvoiceItemRequest:
+      description: Invoice item params
+      properties:
+        description:
+          description: An optional free-text description for this billed line.
+          type: string
+        id:
+          description: 'ID for this invoice item. Omit it when creating a new item — Distru assigns one. Provide an existing item''s ID to keep and patch that item: a line sent with an `id` is merged onto the stored line, so you can change one field and omit the rest. Because sending `items` is full-replace, any existing item whose ID you leave out of the request''s `items` is deleted.'
+          type: string
+        order_item_id:
+          description: The `id` of the sales order item this line bills. Required on a new line, and it must belong to the invoice's order; on a patch (a line sent with an `id`) omit it to keep the existing value. The product, batch or package, price, and cost are all taken from that order item — you cannot override them here.
+          type: string
+        quantity:
+          description: The quantity being billed on this line, as a decimal expressed in the product's unit type (up to 9 decimal places). May be less than the order item's quantity to bill only part of the line. Required on a new line; on a patch (a line sent with an `id`) omit it to keep the existing value.
+          type: number
+      required:
+      - quantity
+      - order_item_id
+      title: InvoiceItem (Request)
+      type: object
+    InvoiceChargeRequest:
+      description: Invoice charge params
+      properties:
+        id:
+          description: 'ID for this invoice charge. Omit it when creating a new charge — Distru assigns one. Provide an existing charge''s ID to keep and patch that charge: a charge sent with an `id` is merged onto the stored charge, so you can change one field and omit the rest (its stored price is preserved when omitted). Because sending `charges` is full-replace, any existing charge whose ID you leave out is deleted.'
+          type: string
+        name:
+          description: The label for this charge line, shown on the invoice.
+          type: string
+        percent:
+          description: The rate for a percentage-based line, as a percent (e.g. `8.25` means 8.25%), up to 4 decimal places. Provide this when `unit_type` is PERCENT. Distru computes the resulting amount from the invoice's items on save, so for a PERCENT line the `price` you send is ignored.
+          type: number
+        price:
+          description: The flat amount for a fixed-price line, up to 2 decimal places. Provide this when `unit_type` is PRICE. Ignored for PERCENT lines, where the amount is derived from `percent`.
+          type: number
+        type:
+          description: 'Whether this line adds to or subtracts from the invoice total. SCREAMING_CASE: CHARGE (a fee added to the total) or DISCOUNT (subtracted from the total).'
+          enum:
+          - CHARGE
+          - DISCOUNT
+          type: string
+        unit_type:
+          description: 'How this line''s amount is expressed. SCREAMING_CASE: PERCENT (a percentage of the invoice''s items, taken from `percent`) or PRICE (a flat amount, taken from `price`).'
+          enum:
+          - PERCENT
+          - PRICE
+          type: string
+      required:
+      - unit_type
+      - type
+      title: InvoiceCharge (Request)
+      type: object
+    CompactOrder:
+      description: A compact view of an order as nested inside another entity (an invoice or a payment) in Distru. Use its id to fetch the full order from the orders endpoint.
+      properties:
+        id:
+          description: ID for this order
+          type: string
+        order_number:
+          description: The order number as shown in the Distru UI (e.g. "ORD-0001"). Unique per company.
+          type: string
+        status:
+          description: The fulfillment status of this order (SCREAMING_CASE) — its lifecycle stage, distinct from an invoice's payment status.
+          type: string
+        total:
+          description: The order total (line items plus charges/taxes minus discounts), as a 2-decimal string (e.g. "150.50").
+          type: string
+      required:
+      - total
+      - status
+      - order_number
+      - id
+      title: CompactOrder
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    BillOfMaterials:
+      description: A product's bill of materials (recipe of inputs and additional costs)
+      properties:
+        costs:
+          description: The additional (non-material) costs this recipe applies, ordered oldest first. Empty when none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsCost'
+          type: array
+        description:
+          description: Free-text description of this bill of materials, or null when none was entered
+          type: string
+        dynamic_inputs:
+          description: The inputs that select products by attribute (category, strain, tag, and so on) rather than naming a specific product. Empty when this recipe has none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsDynamicInput'
+          type: array
+        id:
+          description: ID for this bill of materials
+          type: string
+        name:
+          description: Human readable name for this bill of materials
+          type: string
+        product_inputs:
+          description: The inputs that name a specific product to consume. Empty when this recipe has none. See `dynamic_inputs` for inputs that select products by attribute instead.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsProductInput'
+          type: array
+      required:
+      - costs
+      - dynamic_inputs
+      - product_inputs
+      - name
+      - id
+      title: BillOfMaterials
+      type: object
+    BillOfMaterialsDynamicInput:
+      description: A dynamic input of a bill of materials. It selects products by attribute rather than naming a specific product. Each attribute list holds the entities matched by that criterion, or is empty when the criterion is not used.
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product_categories:
+          description: The product categories this input matches on, or empty when it does not match on category. A product must match every non-empty criterion.
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        product_groups:
+          description: The product groups this input matches on, or empty when it does not match on group.
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        product_subcategories:
+          description: The product subcategories this input matches on, or empty when it does not match on subcategory.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        quantity:
+          description: How much this recipe consumes of whatever product matches, as a decimal string (e.g. "2.5").
+          type: string
+        strains:
+          description: The strains this input matches on, or empty when it does not match on strain.
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        tags:
+          description: The tags this input matches on, or empty when it does not match on tag.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - tags
+      - strains
+      - product_groups
+      - product_subcategories
+      - product_categories
+      - quantity
+      - id
+      title: BillOfMaterialsDynamicInput
+      type: object
+    ChargePresetCompact:
+      description: A compact reference to a [charge preset](#model-chargepreset), as embedded on charges applied from one. Fetch the full preset via [GET /public/v1/charge-presets/{id}](#get-a-charge-preset).
+      properties:
+        id:
+          description: ID of the charge preset.
+          type: string
+        name:
+          description: Display name of the charge preset.
+          type: string
+        type:
+          description: Whether an applied line adds to (CHARGE) or subtracts from (DISCOUNT) the order total.
+          enum:
+          - CHARGE
+          - DISCOUNT
+          type: string
+        unit_type:
+          description: Whether the preset's amount is a flat money amount (PRICE) or a percentage (PERCENT).
+          enum:
+          - PERCENT
+          - PRICE
+          type: string
+      required:
+      - unit_type
+      - type
+      - name
+      - id
+      title: ChargePresetCompact
+      type: object
+    PdfResponse:
+      description: 'The JSON envelope a PDF endpoint returns for the non-binary formats: `format=url` returns `url` + `expires_datetime`, `format=email` returns `emailed_to`.'
+      properties:
+        data:
+          description: The response payload; which fields are present depends on the requested `format`.
+          properties:
+            emailed_to:
+              description: The recipient email addresses the PDF was emailed to, present only when `format=email`.
+              items:
+                type: string
+              type: array
+            expires_datetime:
+              description: ISO 8601 datetime when the signed `url` expires (e.g. "2026-08-20T00:00:00Z"), present only when `format=url`.
+              type: string
+            url:
+              description: Temporary signed URL to download the PDF, present only when `format=url`. Stops working once `expires_datetime` passes; request the endpoint again for a fresh URL.
+              type: string
+          type: object
+      title: PdfResponse
+      type: object
+    PaymentCreditUse:
+      description: A credit applied towards an invoice payment
+      properties:
+        amount:
+          description: The amount of credit applied toward the payment, as a decimal string (e.g. `"25.00"`). Always present.
+          type: string
+        credit:
+          $ref: '#/components/schemas/PaymentCredit'
+        id:
+          description: ID for this credit use. Always present.
+          type: string
+      required:
+      - amount
+      - id
+      title: PaymentCreditUse
+      type: object
+    Invoice:
+      description: A bill to a customer for what they owe, tracking the total, how much has been paid, and what remains. Always generated from a sales order.
+      properties:
+        billing_location:
+          $ref: '#/components/schemas/LocationWithLicense'
+        charges:
+          description: The additional charge, discount, and tax lines on this invoice. Always an array (empty when the invoice has none).
+          items:
+            $ref: '#/components/schemas/Charge'
+          title: Charges
+          type: array
+        company:
+          $ref: '#/components/schemas/CompanyCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The invoice's custom field values, one entry per defined Invoice custom field. Always an array (empty when the company has no Invoice custom fields).
+          items:
+            $ref: '#/components/schemas/CustomField'
+          title: CustomData
+          type: array
+        due_datetime:
+          description: The datetime by which the customer should pay the invoice.
+          type: string
+        external_notes:
+          description: Notes on this invoice that are visible to the customer, or null.
+          type: string
+        id:
+          description: ID for this invoice.
+          type: string
+        inserted_datetime:
+          description: The datetime at which the invoice was created in Distru.
+          type: string
+        internal_notes:
+          description: Notes on this invoice that are only visible internally, or null.
+          type: string
+        invoice_datetime:
+          description: The datetime the invoice is dated for.
+          type: string
+        invoice_number:
+          description: The human-readable, per-company sequential invoice number shown in the Distru UI (e.g. `1042`). Assigned by Distru on creation; you cannot set it via the upsert endpoint.
+          type: string
+        items:
+          description: The line items billed on this invoice, one per billed order line. Always an array (possibly empty).
+          items:
+            $ref: '#/components/schemas/InvoiceItem'
+          title: InvoiceItems
+          type: array
+        order:
+          $ref: '#/components/schemas/CompactOrder'
+        owner:
+          $ref: '#/components/schemas/User'
+        paid_amount:
+          description: The total amount recorded against this invoice across its active (non-voided, non-deleted) payments — the sum of those payments' `amount` — as a decimal string; `0` when nothing has been paid. Amounts covered by applied credits count toward it, but any portion of a payment that went toward an overpayment credit does not. Recomputed immediately whenever a payment is recorded, voided, or deleted.
+          type: string
+        payment_term_name:
+          description: The name of the payment term applied to this invoice (e.g. "Net 30"), or null when no payment term is set.
+          type: string
+        payments:
+          description: The invoice's payments, oldest first. Only active payments are returned — voided and deleted payments are excluded. Always an array (empty when nothing has been paid). Summing their `amount` gives the invoice's `paid_amount`.
+          items:
+            $ref: '#/components/schemas/Payment'
+          title: Payments
+          type: array
+        remaining_amount:
+          description: 'The outstanding balance, as a decimal string: the invoice `total` minus `paid_amount`. Negative when the invoice is over-paid.'
+          type: string
+        status:
+          description: 'The payment status of this invoice, always present and SCREAMING_CASE: NOT_PAID (nothing paid yet), PARTIALLY_PAID (some but not all paid), FULLY_PAID (paid in full), or OVER_PAID (payments exceed the total). OVER_PAID is rare and effectively legacy — a new overpayment is turned into a customer credit rather than moving the invoice into this status.'
+          enum:
+          - NOT_PAID
+          - PARTIALLY_PAID
+          - FULLY_PAID
+          - OVER_PAID
+          type: string
+        tasks:
+          description: 'The tasks linked to this invoice that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total:
+          description: The invoice total as a decimal string, including all line items, taxes, and discounts. Recomputed by Distru on every save.
+          type: string
+        updated_datetime:
+          description: The datetime at which the invoice was last updated in Distru.
+          type: string
+        voided_datetime:
+          description: The datetime the invoice was voided. An invoice is automatically voided when its sales order is canceled, and un-voided (cleared back to null) if that order later leaves the canceled status. Null for invoices that have never been voided.
+          type: string
+      required:
+      - custom_data
+      - payments
+      - charges
+      - items
+      - invoice_datetime
+      - due_datetime
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - total
+      - remaining_amount
+      - paid_amount
+      - invoice_number
+      - status
+      - id
+      title: Invoice
+      type: object
+    Invoices:
+      description: A collection of Invoices
+      properties:
+        data:
+          description: Invoices
+          items:
+            $ref: '#/components/schemas/Invoice'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Invoices
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ProductTagRef:
+      description: A tag associated with a product
+      properties:
+        id:
+          description: ID for this tag
+          type: string
+        name:
+          description: The name of this tag
+          type: string
+      required:
+      - name
+      - id
+      title: ProductTagRef
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    ProductGroupCompact:
+      description: A named grouping of products, defined per company (e.g. a brand line or product family).
+      properties:
+        id:
+          description: ID for this product group
+          type: string
+        name:
+          description: The name of this product group
+          type: string
+      required:
+      - name
+      - id
+      title: ProductGroupCompact
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    QuantityActiveByLocation:
+      description: Active on-hand quantity of an entity held at a single location.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        quantity:
+          description: Active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity
+      - location
+      title: QuantityActiveByLocation
+      type: object
+    PaymentCredit:
+      description: A compact representation of a credit related to a payment
+      properties:
+        amount:
+          description: The credit's current remaining amount as a decimal string (e.g. `"50.00"`); reflects credit already spent, not the original issued amount. Always present.
+          type: string
+        credit_number:
+          description: The credit number as shown in the Distru UI. Always present.
+          type: string
+        id:
+          description: ID for this credit. Always present.
+          type: string
+        source:
+          description: How the credit originated. INVOICE_PAYMENT (from an invoice overpayment), RETURN (from a return), USER (manually created), or QB_CREDIT_MEMO / QB_PAYMENT (synced from QuickBooks Online). Always present.
+          enum:
+          - INVOICE_PAYMENT
+          - QB_CREDIT_MEMO
+          - QB_PAYMENT
+          - RETURN
+          - USER
+          type: string
+      required:
+      - source
+      - amount
+      - credit_number
+      - id
+      title: PaymentCredit
+      type: object
+    Charge:
+      description: An order-level adjustment applied on top of the line items — a charge, a discount, or a tax. It shifts the order/invoice total but is not itself a product line. Whether it adds or subtracts is set by `type`; whether the amount is a flat sum or a percentage is set by `unit_type`.
+      properties:
+        charge_preset:
+          $ref: '#/components/schemas/ChargePresetCompact'
+        id:
+          description: ID for this charge
+          type: string
+        inserted_datetime:
+          description: The datetime this charge was created at
+          type: string
+        name:
+          description: Human-readable label for this line (e.g. "Delivery Fee").
+          type: string
+        percent:
+          description: The rate of this line when `unit_type` is PERCENT, as a decimal string in the range -100 to 100 (discounts are negative, e.g. "-10"). Null when `unit_type` is PRICE.
+          type: string
+        price:
+          description: The flat money amount of this line, as a 2-decimal string (e.g. "25.00"). Always present. Negative for a DISCOUNT.
+          type: string
+        tax:
+          description: A tax configured in Distru Settings
+          properties:
+            id:
+              description: ID for this Tax
+              type: string
+            name:
+              description: The name of this tax
+              type: string
+          title: Tax
+          type: object
+        type:
+          description: 'Whether this line adds to or subtracts from the total (SCREAMING_CASE).• CHARGE: adds to the total (e.g. a delivery fee). Tax lines are also returned as CHARGE, with the `tax` object populated.• DISCOUNT: subtracts from the total.'
+          enum:
+          - DISCOUNT
+          - CHARGE
+          type: string
+        unit_type:
+          description: 'How this line''s amount is expressed (SCREAMING_CASE).• PRICE: a flat money amount; `percent` is null.• PERCENT: a percentage; the rate is carried in `percent`.'
+          enum:
+          - PERCENT
+          - PRICE
+          type: string
+      required:
+      - inserted_datetime
+      - price
+      - name
+      - unit_type
+      - type
+      - id
+      title: Charge
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    BillOfMaterialsCostType:
+      description: The cost type applied by a bill-of-materials cost
+      properties:
+        cost_per_unit:
+          description: The cost per unit, as a decimal string (e.g. "5.00"). Present only when the caller has the `costs_permissions_view_cost_types_cost_per_unit` permission; the field is omitted otherwise.
+          type: string
+        id:
+          description: ID for this cost type
+          type: string
+        name:
+          description: Human readable name for this cost type
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - name
+      - id
+      title: BillOfMaterialsCostType
+      type: object
+    PaymentPurchase:
+      description: A compact representation of the purchase a payment belongs to
+      properties:
+        id:
+          description: The purchase's ID. Always present.
+          type: string
+        purchase_number:
+          description: The purchase number as shown in the Distru UI. Always present.
+          type: string
+        status:
+          description: The purchase's status, or null if the purchase has no status set.
+          type:
+          - string
+          - 'null'
+        total:
+          description: The purchase's total as a decimal string (e.g. `"1200.00"`). Defaults to `"0"`. Always present.
+          type: string
+      required:
+      - total
+      - purchase_number
+      - id
+      title: PaymentPurchase
+      type: object
+    PaymentMethod:
+      description: A way payments are made or received (e.g. Cash, Check, Credit Card, Bank Transfer).
+      properties:
+        active:
+          description: True when this payment method is active and can be selected on new payments. Defaults to false.
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this payment method was soft-deleted, or null when it has not been deleted
+          type: string
+        id:
+          description: ID for this payment method
+          type: string
+        inserted_datetime:
+          description: The datetime this payment method was created at
+          type: string
+        name:
+          description: Name of the payment method (e.g. "Cash")
+          type: string
+        qb_payment_method_id:
+          description: The ID of the matching payment method in QuickBooks Online, or null when this payment method is not mapped to one
+          type: string
+        type:
+          description: The payment method type (SCREAMING_CASE). One of CASH, CHECK, CREDIT_CARD, BANK_REMITTANCE, or BANK_TRANSFER.
+          enum:
+          - CASH
+          - CHECK
+          - CREDIT_CARD
+          - BANK_REMITTANCE
+          - BANK_TRANSFER
+          type: string
+        updated_datetime:
+          description: The datetime this payment method was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - active
+      - type
+      - name
+      - id
+      title: PaymentMethod
+      type: object
+    Package:
+      description: A specific, compliance-tracked quantity of a product identified by a unique tag (e.g. a Metrc package). This is the physical unit of inventory for package-tracked products. This is the compact reference; see PackageFull for all fields.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+      required:
+      - distru_status
+      - quantity_active
+      - quantity
+      - location_id
+      - license_id
+      - id
+      title: Package
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    PackagesWithActiveQuantityByLocation:
+      description: A location and the product's packages that hold active quantity there.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        packages:
+          description: The product's packages held at this location that have active quantity, ordered by id.
+          items:
+            $ref: '#/components/schemas/Package'
+          type: array
+      required:
+      - packages
+      - location
+      title: PackagesWithActiveQuantityByLocation
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    BatchCompactWithQuantityActive:
+      description: A compact [batch](#model-batch) reference plus its active on-hand quantity at the location it is nested under.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        quantity_active:
+          description: The batch's active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity_active
+      - name
+      - id
+      title: BatchCompactWithQuantityActive
+      type: object
+    Batch:
+      description: A lot of a product — a group of inventory that shares traits such as a harvest/production run, expiration date, and lab results. Used for batch-tracked products. This is the compact reference; see BatchFull for all fields.
+      properties:
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+      required:
+      - name
+      - id
+      title: Batch
+      type: object
+  requestBodies:
+    DistruPublic.V1.AssemblyController.download_pdfBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              format:
+                enum:
+                - binary
+                - url
+                - email
+                type: string
+                description: 'How the generated PDF is delivered. One of `binary` — the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` — a JSON body with a short-lived signed download URL (see the [PdfResponse](#model-pdfresponse) response); or `email` — emails the PDF to the addresses in `email_addresses` and returns a JSON body listing who it was emailed to. Required, but omitting it defaults to `binary` for backward compatibility.'
+              email_addresses:
+                items:
+                  type: string
+                type: array
+                description: Recipient email addresses, used only when `format` is `email` (required in that case, ignored otherwise). An entry may hold several comma-separated addresses; spaces, blank entries and repeats are dropped, and `emailed_to` lists the addresses actually emailed. At least one address is required and every address must be valid, otherwise the request is rejected with a 400. At most 200 addresses may be given, counted after that cleanup.
+            required:
+            - format
+      required: true
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

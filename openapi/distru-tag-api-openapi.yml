@@ -1,0 +1,349 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Tag API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Tag
+paths:
+  /public/v1/tags:
+    get:
+      description: 'Lists every tag belonging to the authenticated company. Tags are the reusable labels you attach to
+
+        products and taxes to categorize, group, and filter them.
+
+
+        Results are ordered by creation time, oldest first, and paginated. Narrow the set with the
+
+        `inserted_datetime` and `updated_datetime` range filters; otherwise it returns the full set for the
+
+        company, one page at a time. Follow `next_page` in the response until it is null to walk the whole list.
+
+
+        Any authenticated API key for the company may read tags; no additional settings permission is required.'
+      operationId: DistruPublic.V1.TagController.index
+      parameters:
+      - description: Restrict the result to specific tags by ID (the same ID returned as each tag's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to tags by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to tags by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of tags
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Tags'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get tags
+      tags:
+      - Tag
+    post:
+      description: 'Creates a new tag or renames an existing one. Pass `id` to update the tag with that ID; omit `id` to
+
+        create a new tag. A create returns 201, an update returns 200; both return the saved tag.
+
+
+        A tag is only a label. Creating or renaming one does not attach it to anything, and touches no inventory
+
+        and no compliance system (Metrc/BioTrack) — these are Distru-internal labels, unrelated to Metrc''s
+
+        physical package tags. Renaming a tag keeps it attached to every product and tax it was
+
+        already on, so those records simply reflect the new name.
+
+
+        `name` must be unique within the company, compared case-insensitively — "Indica" and "indica" collide, and
+
+        a duplicate is rejected with a validation error. Updating a tag to a name already used by another tag is
+
+        likewise rejected.
+
+
+        Any authenticated API key for the company may manage tags; no additional settings permission is required.'
+      operationId: DistruPublic.V1.TagController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the tag to update. When present, the tag with this ID is renamed and the response is 200. When omitted, a new tag is created and the response is 201. A non-existent ID returns 404.
+                name:
+                  type: string
+                  description: The tag's display name. Required. Up to 255 characters. Must be unique within the company, case-insensitively. Allowed characters are letters, digits, spaces, underscores, and `~#-$/|%&'().` — other symbols and emoji are rejected — and it may not contain two colons (`::`) in a row. On update, the value fully replaces the previous name.
+              required:
+              - name
+        required: true
+      responses:
+        '200':
+          description: The updated tag
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '201':
+          description: The created tag
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a tag
+      tags:
+      - Tag
+  /public/v1/tags/{id}:
+    delete:
+      description: 'Permanently deletes the tag. This is a hard delete — the tag is gone for good and cannot be recovered;
+
+        to reuse the name later you must create a fresh tag.
+
+
+        Deleting a tag also detaches it from everything it was applied to: it is removed from every
+
+        product and every tax that carried it. Those products and taxes are not otherwise
+
+        changed — only the tag label disappears from them. No inventory and no compliance system (Metrc/BioTrack)
+
+        is affected.
+
+
+        Returns 404 when no tag with that ID exists for the authenticated company.
+
+
+        Any authenticated API key for the company may manage tags; no additional settings permission is required.'
+      operationId: DistruPublic.V1.TagController.delete
+      parameters:
+      - description: ID of the tag to delete.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a tag
+      tags:
+      - Tag
+    get:
+      description: 'Fetches a single tag by its ID. Returns 404 when no tag with that ID exists for the authenticated
+
+        company — IDs from another company are never visible.
+
+
+        Any authenticated API key for the company may read tags; no additional settings permission is required.'
+      operationId: DistruPublic.V1.TagController.show
+      parameters:
+      - description: ID of the tag to fetch, as returned by the list and upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single tag
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a tag
+      tags:
+      - Tag
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Tag:
+      description: A tag
+      properties:
+        id:
+          description: ID for this tag.
+          type: string
+        name:
+          description: The tag's display name. May be null when the tag was created without one.
+          type: string
+      required:
+      - id
+      title: Tag
+      type: object
+    Tags:
+      description: A collection of tags
+      properties:
+        data:
+          description: Tags
+          items:
+            $ref: '#/components/schemas/Tag'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Tags
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    TagResponse:
+      description: A single tag envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Tag'
+      title: Tag Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

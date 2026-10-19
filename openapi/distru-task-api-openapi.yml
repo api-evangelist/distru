@@ -1,0 +1,621 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Task API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Task
+paths:
+  /public/v1/tasks:
+    get:
+      description: 'Lists the tasks belonging to the authenticated company, oldest-first (by creation time). Results
+
+        never cross company boundaries and are paginated: `next_page` holds the URL of the following
+
+        page, or null on the last page.
+
+
+        A task may be linked to exactly one other entity. The linked entity is returned as the matching
+
+        relation field (`order`, `invoice`, `purchase`, `contact`, `product`, `batch`, `assembly`,
+
+        `return`, or `company`); every other relation field is null. Tasks linked to an internal-only
+
+        entity that has no public API model return every relation field as null. The relation field is
+
+        also null when the authenticated user lacks the permission the linked entity''s own list endpoint
+
+        requires, or can''t see it under their team restrictions.
+
+
+        Required permission: `tasks_permissions_view`. Only tasks the authenticated user can access
+
+        under their team restrictions are returned.'
+      operationId: DistruPublic.V1.TaskController.index
+      parameters:
+      - description: Restrict the result to specific tasks by ID. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to tasks owned by specific users, by user ID. Repeat the bracketed key once per ID. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to tasks with any of these statuses. Repeat the bracketed key once per status. At most 200.
+        in: query
+        name: statuses
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - ACTIVE
+            - COMPLETED
+            type: string
+      - description: Filter to tasks linked to any of these entity kinds. Repeat the bracketed key once per kind. At most 200.
+        in: query
+        name: related_types
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - ASSEMBLY
+            - BATCH
+            - COMPANY
+            - CONTACT
+            - INVOICE
+            - ORDER
+            - PRODUCT
+            - PURCHASE
+            - RETURN
+            type: string
+      - description: Filter by due datetime, a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: due_datetime
+        required: false
+        example: ?due_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by creation datetime, a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by last-updated datetime, a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of tasks
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Tasks'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get tasks
+      tags:
+      - Task
+    post:
+      description: 'Creates or updates a single task in one call. Omit `id` to create a new task; pass the `id` of
+
+        an existing task to update it. Responds 201 on create and 200 on update, with the full saved
+
+        task as the body. The task''s creator is always the API key''s user; it cannot be set.
+
+
+        On create, `name`, `status`, and `due_datetime` are required. On update every field is optional:
+
+        this is a sparse update, so only the fields you send are changed and any field you omit keeps its
+
+        stored value. Sending a nullable optional field (`description`, `color`, `owner_id`,
+
+        `location_id`) as null clears it; sending a required field as null is rejected with a 400.
+
+
+        Linking to another entity: set exactly one of `order_id`, `invoice_id`, `purchase_id`,
+
+        `contact_id`, `product_id`, `batch_id`, `assembly_id`, `return_id`, or `company_id`. Sending more
+
+        than one is a 400. The linked entity must exist in your company and be visible to the
+
+        authenticated user; otherwise 400. The link is set-once: once a task is linked, the link cannot be
+
+        changed or removed, and sending any relation field for an already-linked task is a 400. The linked
+
+        entity is returned as in GET /public/v1/tasks.
+
+
+        Required permission: `tasks_permissions_create` to create, `tasks_permissions_edit` to update.
+
+        Creating also requires the authenticated user''s team restrictions to allow some access to tasks.
+
+        Updating requires access to the task under those restrictions; a hidden task returns 403.'
+      operationId: DistruPublic.V1.TaskController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the task to update. Omit to create. When present but not matching a task in your company, the request fails.
+                name:
+                  type: string
+                  description: The task's name. Required on create. On update, omit to leave unchanged.
+                description:
+                  type: string
+                  description: Free-form description. Optional. On update, send null to clear.
+                status:
+                  enum:
+                  - ACTIVE
+                  - COMPLETED
+                  type: string
+                  description: The task's status. Required on create.
+                due_datetime:
+                  type: string
+                  description: When the task is due, as a UTC ISO8601 datetime. Required on create.
+                color:
+                  type: string
+                  description: A label color for the task. Must be one of the company's allowed default colors. Optional; send null to clear.
+                owner_id:
+                  type: string
+                  description: ID of the user the task is assigned to. Optional; send null to unassign. Must be a user you are allowed to assign.
+                location_id:
+                  type: string
+                  description: ID of the location the task is at. Optional; send null to clear.
+                custom_data:
+                  type: object
+                  description: Custom field values as an object keyed by custom field ID. Replaces the stored custom data when sent; omit to leave unchanged. Use `GET /public/v1/custom-fields` to find Task field IDs and their value formats.
+                order_id:
+                  type: string
+                  description: Link this task to an order. Set-once; at most one relation field.
+                invoice_id:
+                  type: string
+                  description: Link this task to an invoice. Set-once; at most one relation field.
+                purchase_id:
+                  type: string
+                  description: Link this task to a purchase. Set-once; at most one relation field.
+                contact_id:
+                  type: string
+                  description: Link this task to a contact. Set-once; at most one relation field.
+                product_id:
+                  type: string
+                  description: Link this task to a product. Set-once; at most one relation field.
+                batch_id:
+                  type: string
+                  description: Link this task to a batch. Set-once; at most one relation field.
+                assembly_id:
+                  type: string
+                  description: Link this task to an assembly. Set-once; at most one relation field.
+                return_id:
+                  type: string
+                  description: Link this task to a return. Set-once; at most one relation field.
+                company_id:
+                  type: string
+                  description: Link this task to a company relationship, by its ID. Set-once; at most one relation field.
+      responses:
+        '200':
+          description: The updated task
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '201':
+          description: The created task
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a task
+      tags:
+      - Task
+  /public/v1/tasks/{id}:
+    delete:
+      description: 'Permanently deletes a task. This is a hard delete: the task is removed and cannot be recovered.
+
+        Returns 404 if no matching task exists in your company, and 403 if the authenticated user can''t
+
+        access it under their team restrictions. Responds 204 with no body on success.
+
+
+        Required permission: `tasks_permissions_delete`.'
+      operationId: DistruPublic.V1.TaskController.delete
+      parameters:
+      - description: ID of the task to delete. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a task
+      tags:
+      - Task
+    get:
+      description: 'Fetches a single task by its ID, scoped to the authenticated company. Returns 404 if no task
+
+        with that ID exists in your company, and 403 if the authenticated user can''t access it under
+
+        their team restrictions. The linked entity is returned as in GET /public/v1/tasks, so it is
+
+        null when the authenticated user can''t view it.
+
+
+        Required permission: `tasks_permissions_view`.'
+      operationId: DistruPublic.V1.TaskController.show
+      parameters:
+      - description: ID of the task to fetch, as returned by the list and upsert endpoints. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single task
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a task
+      tags:
+      - Task
+components:
+  schemas:
+    TaskResponse:
+      description: A single task
+      properties:
+        data:
+          $ref: '#/components/schemas/Task'
+      title: Task Response
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    Task:
+      description: A task
+      properties:
+        assembly:
+          description: The linked assembly, or null.
+          type: object
+        batch:
+          description: The linked batch, or null.
+          type: object
+        color:
+          description: The task's label color, or null.
+          type: string
+        company:
+          description: The linked company relationship, or null.
+          type: object
+        contact:
+          description: The linked contact, or null.
+          type: object
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: Custom field values for the task.
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        description:
+          description: Free-form description, or null.
+          type: string
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of this task.
+          type: string
+        inserted_datetime:
+          description: When the task was created, as a UTC ISO8601 timestamp.
+          type: string
+        invoice:
+          description: The linked invoice, or null.
+          type: object
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        name:
+          description: The task's name.
+          type: string
+        order:
+          description: 'The linked order, or null. At most one relation field is non-null. Each relation field is also null when the authenticated user can''t view the linked record: they lack its view permission, or their team restrictions hide it.'
+          type: object
+        owner:
+          $ref: '#/components/schemas/User'
+        product:
+          description: The linked product, or null.
+          type: object
+        purchase:
+          description: The linked purchase, or null.
+          type: object
+        return:
+          description: The linked return, or null.
+          type: object
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+        updated_datetime:
+          description: When the task was last updated, as a UTC ISO8601 timestamp.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - custom_data
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    Tasks:
+      description: A collection of tasks
+      properties:
+        data:
+          description: Tasks
+          items:
+            $ref: '#/components/schemas/Task'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Tasks
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

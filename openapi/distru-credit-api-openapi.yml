@@ -1,0 +1,1097 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Credit API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Credit
+paths:
+  /public/v1/credits:
+    get:
+      description: 'List store credits held by your customers, newest first (by creation datetime, then id). A
+
+        credit is an amount a customer can apply toward what they owe; each row carries its live
+
+        computed `status` and `remaining_balance`.
+
+
+        Only credits belonging to your company are returned; soft-deleted credits are excluded. Filter
+
+        by customer (`company_ids`), by brand (`brand_ids`, `include_no_brand`), by the invoices a
+
+        credit has been applied to (`invoice_ids`), by `amount` range, by `source`, `status`,
+
+        `credit_number`, or the creation/last-modified windows.
+
+        All filters below are combined with AND — a credit must match every filter you send.
+
+
+        This endpoint returns eventually consistent data: a credit you just created, updated, canceled,
+
+        or deleted (and any change to its `status`/`remaining_balance`) can take up to 1 second to be
+
+        reflected here.
+
+
+        Required permission: `credits_permissions_view`. Only credits the authenticated user can access
+
+        under their team restrictions are returned.'
+      operationId: DistruPublic.V1.CreditController.index
+      parameters:
+      - description: Restrict the result to specific credits by ID (the same ID returned as each credit's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter by the credit''s current `amount` as an inclusive `min,max` decimal range separated by a comma. Either bound may be omitted: `100,` keeps credits of 100 or more, `,500` those of 500 or less, `100,500` those in between. A range with both bounds empty is rejected.'
+        in: query
+        name: amount
+        required: false
+        example: ?amount=100,500
+        schema:
+          type: string
+      - description: Restrict to credits for specific brands by company ID (the same ID returned as each credit's `brand.id`). Repeat the bracketed key once per ID; matches ANY. Combine with `include_no_brand=true` to also keep credits without a brand. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to credits held by specific customers by company ID (the same ID returned as each credit's `company.id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: company_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Case-insensitive substring match on the credit number (partial matches count; e.g. `100` matches `CR-1001`).
+        in: query
+        name: credit_number
+        required: false
+        example: ?credit_number=CR-100
+        schema:
+          type: string
+      - description: When `true`, keep credits that have no brand. Alone it returns only credits without a brand; with `brand_ids` it returns credits for those brands OR without a brand. Omitted or `false` applies no brand-less filter.
+        in: query
+        name: include_no_brand
+        required: false
+        schema:
+          type: boolean
+      - description: Restrict to credits that have been applied to any of the given invoices by invoice ID (a credit is applied to an invoice through its credit uses; the applied invoice is visible under each credit's `credit_uses[].payment.invoice.id`, except that `payment` is null when your team can't see that invoice). Repeat the bracketed key once per ID; matches ANY. Credits never applied to one of these invoices are excluded. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: invoice_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to credits owned by any of these Distru users (each credit's `owner.id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter by creation datetime as an ISO8601 `after,before` range separated by a comma. Either bound may be left empty for an open-ended range: `2022-07-10T00:00:00Z,` means on or after that instant, `,2022-07-10T00:00:00Z` means on or before it. Both sides empty is rejected.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-01T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: 'Filter by how the credit was created (SCREAMING_CASE): USER (added by hand), RETURN (generated from a return), INVOICE_PAYMENT (an invoice overpayment in Distru), QB_PAYMENT / QB_CREDIT_MEMO (originated in QuickBooks Online). Exact match.'
+        in: query
+        name: source
+        required: false
+        schema:
+          type: string
+          enum:
+          - INVOICE_PAYMENT
+          - QB_CREDIT_MEMO
+          - QB_PAYMENT
+          - RETURN
+          - USER
+      - description: 'Filter by the credit''s live computed status (SCREAMING_CASE): ACTIVE (has a remaining balance still to spend), REDEEMED (fully applied, nothing left), CANCELED (voided; its balance can no longer be applied). Exact match.'
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - CANCELED
+          - REDEEMED
+      - description: Filter by last-modified datetime as an ISO8601 `after,before` range, same comma format as `inserted_datetime`. Either bound may be empty for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of credits
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Credits'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get credits
+      tags:
+      - Credit
+    post:
+      description: 'Create a new credit or update an existing one through a single endpoint.
+
+
+        Omit `id` to create a new credit; include the `id` of an existing credit to update it. Updates
+
+        are sparse: only the fields you send are changed, and any field you omit keeps its current
+
+        value. On create, the `credit_number` and `original_amount` are assigned automatically —
+
+        `original_amount` is frozen to the create-time `amount` and never changes afterward.
+
+
+        Credits created through the API are always manually-created (`USER` source) credits — the same
+
+        as a credit you would add by hand in the Distru UI. Credits generated automatically (from a
+
+        return, an invoice overpayment, or QuickBooks Online) cannot be created here, and only
+
+        `owner_id`, `brand_id`, `external_note` and `internal_note` can be updated on them — their
+
+        amount, customer and QuickBooks Online item cannot be set through the API. On a credit memo
+
+        created in QuickBooks Online (`QB_CREDIT_MEMO` source) `owner_id` and `brand_id` are the only
+
+        updatable fields: its notes live in QuickBooks Online and are re-imported from there on every
+
+        sync. Sending any other field with its current value is accepted.
+
+
+        Constraints: on update the customer (`company_id`) cannot be changed. `amount` must be greater
+
+        than 0 and, on update, cannot be set below the amount already applied to invoices by this credit
+
+        (its used amount). `owner_id` must be an active user of your company. Once a credit has an owner
+
+        it can be reassigned but not removed.
+
+
+        Credits do not touch inventory or state compliance (Metrc / BioTrack). They do interact with
+
+        QuickBooks Online: if your account syncs credits with QuickBooks Online, updating an existing
+
+        credit first pulls the latest credit and payment state from QuickBooks Online (so a stale local
+
+        amount can be rejected), and any create or update is then pushed to QuickBooks Online in the
+
+        background. A 200/201 confirms the credit was saved in Distru, not that it has finished syncing
+
+        to QuickBooks Online — re-fetch the credit and read `qb_sync_status` to observe the sync result.
+
+        `owner_id` and `brand_id` stay in Distru: an update that changes only those fields neither pulls
+
+        from nor pushes to QuickBooks Online.
+
+
+        Required permission: `credits_permissions_create` to create, `credits_permissions_edit` to
+
+        update. Creating requires a customer (`company_id`) the authenticated user can see under their
+
+        team restrictions; a hidden one is reported as not existing. Updating also requires access to
+
+        the credit under those restrictions (a hidden credit returns 403), and an `owner_id` they can
+
+        assign under the same restrictions.'
+      operationId: DistruPublic.V1.CreditController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertCredit'
+        description: Credit data
+        required: true
+      responses:
+        '200':
+          description: The updated credit
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CreditResponse'
+        '201':
+          description: The created credit
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CreditResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create or update a credit
+      tags:
+      - Credit
+  /public/v1/credits/{id}:
+    delete:
+      description: 'Soft-delete a credit. The credit is marked as deleted and stops appearing in this API and the
+
+        Distru UI, but the record is retained rather than being permanently removed, so its history is
+
+        preserved. Returns 204 with no body on success.
+
+
+        A credit cannot be deleted once it has been used (has at least one active application to an
+
+        invoice). Overpayment credits (created from an invoice overpayment or a QuickBooks Online
+
+        payment) cannot be deleted unless they have already been canceled — void the associated payment
+
+        instead. Either case returns an error.
+
+
+        If your account syncs credits with QuickBooks Online, the deletion is also pushed to QuickBooks
+
+        Online in the background; a 204 confirms the delete in Distru, not that the QuickBooks Online
+
+        side has finished.
+
+
+        Required permission: `credits_permissions_delete`. The authenticated user must also have access
+
+        to the credit under their team restrictions, otherwise the request returns 403.'
+      operationId: DistruPublic.V1.CreditController.delete
+      parameters:
+      - description: The credit's ID (as returned in the `id` field of a credit).
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a credit
+      tags:
+      - Credit
+    get:
+      description: 'Get a single credit by its ID, scoped to your company. The response carries the credit''s live
+
+        computed `status` and `remaining_balance` alongside its stored fields. Returns 404 if no such
+
+        credit exists for your company or it has been soft-deleted.
+
+
+        Required permission: `credits_permissions_view`. The authenticated user must also have access to
+
+        the requested credit under their team restrictions, otherwise the request returns 403.'
+      operationId: DistruPublic.V1.CreditController.show
+      parameters:
+      - description: The credit's ID (as returned in the `id` field of a credit).
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single credit
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CreditResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a credit
+      tags:
+      - Credit
+  /public/v1/credits/{id}/cancel:
+    post:
+      description: 'Cancel (void) a credit. A canceled credit keeps its record and history and still appears in
+
+        this API, but its `status` becomes CANCELED and its remaining balance can no longer be applied
+
+        to invoices. The response returns the credit with its updated status.
+
+
+        By default the credit''s existing applications to invoices (its credit uses) are left in place.
+
+        Set `should_delete_credit_uses` to true to also remove those applications, returning the used
+
+        amounts to the affected invoices and payments.
+
+
+        Overpayment credits (created from an invoice overpayment or a QuickBooks Online payment) cannot
+
+        be canceled — void the associated payment instead, which returns an error here. Canceling an
+
+        already-canceled credit returns an error, unless `should_delete_credit_uses` is true: that
+
+        removes the applications an earlier cancel left in place, and keeps the credit''s original
+
+        `canceled_at`.
+
+
+        If your account syncs credits with QuickBooks Online, the cancellation is pushed to QuickBooks
+
+        Online in the background; a 200 confirms the cancel in Distru, not that the QuickBooks Online
+
+        side has finished. Credits do not touch inventory or state compliance (Metrc / BioTrack).
+
+
+        Required permission: `credits_permissions_edit`. The authenticated user must also have access to
+
+        the credit under their team restrictions, otherwise the request returns 403.'
+      operationId: DistruPublic.V1.CreditController.cancel
+      parameters:
+      - description: The credit's ID (as returned in the `id` field of a credit).
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelCredit'
+        description: Cancel options (optional body)
+      responses:
+        '200':
+          description: The canceled credit
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CreditResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Cancel a credit
+      tags:
+      - Credit
+components:
+  schemas:
+    Credit:
+      description: Store credit held by a customer that can be applied toward what they owe. Credits can be issued manually or generated automatically (for example from a return or an invoice overpayment).
+      properties:
+        amount:
+          description: The current spendable face value of this credit, as a decimal string (e.g. `"100.00"`). Always greater than 0 for a live credit. May differ from `original_amount` if the credit was edited after creation.
+          type: string
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        canceled_datetime:
+          description: The ISO8601 UTC datetime at which the credit was canceled (e.g. `2022-07-10T00:00:00Z`). Only set for CANCELED credits; null otherwise.
+          type: string
+        company:
+          $ref: '#/components/schemas/CompanyCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        credit_number:
+          description: The human-readable credit number as shown in the Distru UI (e.g. `CR-1001`). Assigned automatically on create.
+          type: string
+        credit_uses:
+          description: This credit's applications to invoices, one entry per active application. Each use carries the applied amount, the compact credit, and the invoice payment it was applied to. Empty array when the credit has not been applied anywhere.
+          items:
+            $ref: '#/components/schemas/CreditUse'
+          type: array
+        deleted_in_qbo:
+          description: Whether this credit was pushed to QuickBooks Online and later deleted there. False for credits never synced to QuickBooks Online.
+          type: boolean
+        external_note:
+          description: A note on this credit, visible to the customer. Null if unset.
+          type: string
+        id:
+          description: ID for this credit
+          type: string
+        inserted_datetime:
+          description: The ISO8601 UTC datetime at which the credit was created in Distru (e.g. `2022-07-10T00:00:00Z`).
+          type: string
+        internal_note:
+          description: An internal note on this credit, not shown to the customer. Null if unset.
+          type: string
+        original_amount:
+          description: The amount this credit was created with, as a decimal string. Frozen at create time and never changes, even when `amount` is later edited — useful for looking a credit up by the value it was first issued for.
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        payment:
+          $ref: '#/components/schemas/Payment'
+        qb_credit_memo_id:
+          description: The id of the QuickBooks Online credit memo this credit maps to. Null until the credit has been synced to QuickBooks Online as a credit memo, and for credits that back an overpayment payment instead (see `qb_payment_id`).
+          type: string
+        qb_payment_id:
+          description: The id of the QuickBooks Online payment this credit maps to (for overpayment credits carried as an unapplied amount on a payment). Null when the credit is not backed by a QuickBooks Online payment. A credit never has both this and `qb_credit_memo_id` set.
+          type: string
+        qb_sync_status:
+          description: 'The credit''s QuickBooks Online sync status. Only meaningful when the QuickBooks Online integration is enabled; null otherwise. Values: PENDING (the latest sync covering this credit is still in flight), ERROR (the latest sync covering this credit failed), DELETED_IN_QBO (pushed to QuickBooks Online once, then deleted there), NOT_SYNCED (never pushed to QuickBooks Online), PARTIALLY_SYNCED (the credit is in QuickBooks Online but at least one of its applications has not been synced yet), SYNCED (fully synced).'
+          enum:
+          - PENDING
+          - ERROR
+          - DELETED_IN_QBO
+          - NOT_SYNCED
+          - PARTIALLY_SYNCED
+          - SYNCED
+          type: string
+        remaining_balance:
+          description: 'The unused balance still available to apply to invoices, as a decimal string: `amount` minus the sum of its active credit uses. Equals `amount` when nothing has been applied, and `"0.00"` when fully used (REDEEMED).'
+          type: string
+        return:
+          $ref: '#/components/schemas/CompactReturn'
+        source:
+          description: 'How this credit was created (SCREAMING_CASE): USER (added by hand — the only kind the API can create), RETURN (from a return), INVOICE_PAYMENT (an invoice overpayment in Distru), QB_PAYMENT / QB_CREDIT_MEMO (originated in QuickBooks Online). Immutable after creation.'
+          enum:
+          - INVOICE_PAYMENT
+          - QB_CREDIT_MEMO
+          - QB_PAYMENT
+          - RETURN
+          - USER
+          type: string
+        status:
+          description: 'The credit''s live computed status (SCREAMING_CASE), derived from its balance and cancellation state rather than stored. • ACTIVE: has a remaining balance still available to apply. • REDEEMED: fully applied, `remaining_balance` is `"0.00"`. • CANCELED: voided; its balance can no longer be applied.'
+          enum:
+          - ACTIVE
+          - CANCELED
+          - REDEEMED
+          type: string
+        updated_datetime:
+          description: The ISO8601 UTC datetime at which the credit was last updated in Distru.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - deleted_in_qbo
+      - credit_uses
+      - status
+      - source
+      - credit_number
+      - original_amount
+      - amount
+      - id
+      title: Credit
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CompactInvoice:
+      description: A compact view of an invoice as nested inside another entity (an order or a payment) in Distru. Use its id to fetch the full invoice from the invoices endpoint.
+      properties:
+        id:
+          description: ID for this invoice
+          type: string
+        invoice_number:
+          description: The invoice number as shown in the Distru UI (e.g. "INV-0001"). Unique per company.
+          type: string
+        status:
+          description: 'The payment status of this invoice (SCREAMING_CASE), reflecting how much of its total has been paid — distinct from the parent order''s fulfillment `status`.• NOT_PAID: no payments applied.• PARTIALLY_PAID: paid in part but less than the total.• FULLY_PAID: paid in full.• OVER_PAID: payments exceed the total.'
+          type: string
+        total:
+          description: The invoice total (line items plus charges/taxes minus discounts), as a decimal string (e.g. "150.50").
+          type: string
+      required:
+      - total
+      - status
+      - invoice_number
+      - id
+      title: CompactInvoice
+      type: object
+    CancelCredit:
+      description: Options for canceling a credit
+      example:
+        should_delete_credit_uses: false
+      properties:
+        should_delete_credit_uses:
+          description: When true, also removes this credit's existing applications to invoices (its credit uses), returning the used amounts to the affected invoices and payments. When false or omitted, those applications are left in place and only the remaining balance is voided. Defaults to false.
+          type: boolean
+      title: Cancel Credit
+      type: object
+    CreditUse:
+      description: An application of a credit to an invoice payment
+      properties:
+        amount:
+          description: The amount of the credit applied to this invoice payment, as a decimal string (e.g. `"25.00"`). Always greater than 0.
+          type: string
+        credit:
+          $ref: '#/components/schemas/CompactCredit'
+        id:
+          description: ID for this credit use
+          type: string
+        inserted_datetime:
+          description: The ISO8601 UTC datetime at which this credit use was created in Distru.
+          type: string
+        payment:
+          $ref: '#/components/schemas/Payment'
+      required:
+      - inserted_datetime
+      - amount
+      - id
+      title: CreditUse
+      type: object
+    Payment:
+      description: A record of money exchanged — received from a customer against an invoice, or paid to a vendor against a purchase order.
+      properties:
+        amount:
+          description: 'The payment amount as a decimal string with trailing zeros trimmed (e.g. `"150"` or `"99.5"`), in the currency of the related invoice or purchase. For an INVOICE payment this is the amount applied to the invoice: it includes any portion covered by applied credits (`credit_uses`) but excludes any overpaid portion that became a customer credit (`overpayment_credits`) — the invoice''s `paid_amount` is the sum of `amount` across its active payments. Normally at least `0.01`; the one exception is a payment synced from QuickBooks Online to represent a void, which appears as `"0"`. Always present.'
+          type: string
+        company:
+          $ref: '#/components/schemas/CompanyCompact'
+        credit_uses:
+          description: Credits applied toward this invoice payment (an empty array when none were applied). Null for PURCHASE payments.
+          items:
+            $ref: '#/components/schemas/PaymentCreditUse'
+          type:
+          - array
+          - 'null'
+        description:
+          description: Free-text note attached to the payment, or null if none was entered.
+          type:
+          - string
+          - 'null'
+        fully_paid_with_credits:
+          description: True when the payment was covered entirely by credits; in that case `payment_method` is null. Defaults to false. Always present.
+          type: boolean
+        id:
+          description: The payment's ID. Always present.
+          type: string
+        inserted_datetime:
+          description: ISO8601 datetime the payment record was created in Distru. Distinct from `payment_datetime`. Always present.
+          type: string
+        invoice:
+          $ref: '#/components/schemas/CompactInvoice'
+        overpayment_credits:
+          description: Credits generated from overpaying this invoice payment (an empty array when there was no overpayment). Leaves out credits the authenticated user cannot view under their team restrictions. Null for PURCHASE payments.
+          items:
+            $ref: '#/components/schemas/PaymentCredit'
+          type:
+          - array
+          - 'null'
+        payment_datetime:
+          description: The full ISO8601 datetime the payment was recorded as made (e.g. `"2022-07-10T00:00:00Z"`). This is the user-entered payment datetime, distinct from `inserted_datetime` (when the record was created in Distru). Always present.
+          type: string
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethod'
+        payment_number:
+          description: The payment number as shown in the Distru UI. Unique per company. Always present.
+          type: string
+        payment_type:
+          description: 'What this payment is tied to: INVOICE (money received from a customer against an invoice) or PURCHASE (money paid to a vendor against a purchase). Determines which of `invoice`/`purchase` is populated and whether `credit_uses`/`overpayment_credits` are present. Always present.'
+          type: string
+        purchase:
+          $ref: '#/components/schemas/PaymentPurchase'
+        quickbooks_deposit_account_id:
+          description: ID of the QuickBooks Online deposit account this payment posts to, or null when the payment is not linked to a deposit account.
+          type:
+          - string
+          - 'null'
+        quickbooks_deposit_account_name:
+          description: Name of the QuickBooks Online deposit account in `quickbooks_deposit_account_id`. For an INVOICE payment it is the account's full name (`Parent:Child` for a sub-account), which [POST /public/v1/invoices/{id}/payments](#insert-a-payment-for-an-invoice) accepts back as `quickbooks_deposit_account_name`; for a PURCHASE payment it is the account's own name. Only returned on the single-payment (show) response, and null there when no deposit account is linked; absent from list responses.
+          type:
+          - string
+          - 'null'
+        quickbooks_sync_enqueued:
+          description: Whether a QuickBooks Online sync was queued for this payment. Only present on the payment creation response; absent from list and show responses.
+          type: boolean
+        status:
+          description: The payment's status. POSTED for a live payment; VOIDED for one that was voided (retained for history rather than deleted). Always present.
+          type: string
+        updated_datetime:
+          description: ISO8601 datetime the payment record was last modified in Distru. Equals `inserted_datetime` until the payment is edited or voided. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - fully_paid_with_credits
+      - status
+      - payment_type
+      - payment_datetime
+      - payment_number
+      - amount
+      - id
+      title: Payment
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    CompactCredit:
+      description: A compact representation of a credit
+      properties:
+        amount:
+          description: The current spendable face value of this credit, as a decimal string (e.g. `"100.00"`).
+          type: string
+        credit_number:
+          description: The credit number as shown in the Distru UI (e.g. `CR-1001`).
+          type: string
+        id:
+          description: ID for this credit
+          type: string
+        source:
+          description: 'How this credit was created (SCREAMING_CASE): USER, RETURN, INVOICE_PAYMENT, QB_PAYMENT, or QB_CREDIT_MEMO.'
+          enum:
+          - INVOICE_PAYMENT
+          - QB_CREDIT_MEMO
+          - QB_PAYMENT
+          - RETURN
+          - USER
+          type: string
+      required:
+      - source
+      - credit_number
+      - amount
+      - id
+      title: CompactCredit
+      type: object
+    UpsertCredit:
+      description: Parameters for creating or updating a credit
+      example:
+        amount: 100
+        company_id: 00000000-0000-0000-0000-00000000000a
+        external_note: External note
+        internal_note: Internal note
+      properties:
+        amount:
+          description: The credit's spendable face value. Must be greater than 0. Required when creating. On update, omitting it leaves the amount unchanged; when provided it cannot be set below the amount already applied to invoices by this credit (its used amount). Sets `original_amount` only at create time; `original_amount` never changes afterward.
+          type: number
+        brand_id:
+          description: 'ID of the brand (a company) this credit is for. Informational only: it never limits which invoices the credit can be applied to. Optional; can be set or changed on any credit, including automatically-created ones. Must be a company of yours that is not deleted. Omit to leave unchanged on update; send null to clear.'
+          type: string
+        company_id:
+          description: ID of the customer (company relationship) this credit applies to. Required when creating and the customer must exist and not be deleted. Immutable on update — sending a different value is rejected; omit it when updating.
+          type: string
+        external_note:
+          description: A note on this credit, visible to the customer. Omit to leave unchanged on update; send null to clear.
+          type: string
+        id:
+          description: ID of the credit to update. Omit to create a new credit; include it to update an existing one. Automatically-created credits accept only some fields; see the endpoint description.
+          type: string
+        internal_note:
+          description: An internal note on this credit, not shown to the customer. Omit to leave unchanged on update; send null to clear.
+          type: string
+        owner_id:
+          description: ID of the user who owns this credit. Defaults to the API key's user when creating if omitted. On update, omitting it leaves the owner unchanged; the owner can be reassigned on any credit but cannot be removed once set.
+          type: string
+        quickbooks_sales_item_id:
+          description: Optional ID of the QuickBooks Online sales item this credit maps to, used only when QuickBooks Online credit sync is enabled. Omit or send null to use the default "Distru Sales" item. When set it must reference an active QuickBooks Online sales item. Never required.
+          type: string
+      title: Upsert Credit
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Credits:
+      description: A collection of Credits
+      properties:
+        data:
+          description: Credits
+          items:
+            $ref: '#/components/schemas/Credit'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Credits
+      type: object
+    PaymentCreditUse:
+      description: A credit applied towards an invoice payment
+      properties:
+        amount:
+          description: The amount of credit applied toward the payment, as a decimal string (e.g. `"25.00"`). Always present.
+          type: string
+        credit:
+          $ref: '#/components/schemas/PaymentCredit'
+        id:
+          description: ID for this credit use. Always present.
+          type: string
+      required:
+      - amount
+      - id
+      title: PaymentCreditUse
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    CreditResponse:
+      description: A single credit wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Credit'
+      title: Credit Response
+      type: object
+    PaymentCredit:
+      description: A compact representation of a credit related to a payment
+      properties:
+        amount:
+          description: The credit's current remaining amount as a decimal string (e.g. `"50.00"`); reflects credit already spent, not the original issued amount. Always present.
+          type: string
+        credit_number:
+          description: The credit number as shown in the Distru UI. Always present.
+          type: string
+        id:
+          description: ID for this credit. Always present.
+          type: string
+        source:
+          description: How the credit originated. INVOICE_PAYMENT (from an invoice overpayment), RETURN (from a return), USER (manually created), or QB_CREDIT_MEMO / QB_PAYMENT (synced from QuickBooks Online). Always present.
+          enum:
+          - INVOICE_PAYMENT
+          - QB_CREDIT_MEMO
+          - QB_PAYMENT
+          - RETURN
+          - USER
+          type: string
+      required:
+      - source
+      - amount
+      - credit_number
+      - id
+      title: PaymentCredit
+      type: object
+    PaymentPurchase:
+      description: A compact representation of the purchase a payment belongs to
+      properties:
+        id:
+          description: The purchase's ID. Always present.
+          type: string
+        purchase_number:
+          description: The purchase number as shown in the Distru UI. Always present.
+          type: string
+        status:
+          description: The purchase's status, or null if the purchase has no status set.
+          type:
+          - string
+          - 'null'
+        total:
+          description: The purchase's total as a decimal string (e.g. `"1200.00"`). Defaults to `"0"`. Always present.
+          type: string
+      required:
+      - total
+      - purchase_number
+      - id
+      title: PaymentPurchase
+      type: object
+    PaymentMethod:
+      description: A way payments are made or received (e.g. Cash, Check, Credit Card, Bank Transfer).
+      properties:
+        active:
+          description: True when this payment method is active and can be selected on new payments. Defaults to false.
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this payment method was soft-deleted, or null when it has not been deleted
+          type: string
+        id:
+          description: ID for this payment method
+          type: string
+        inserted_datetime:
+          description: The datetime this payment method was created at
+          type: string
+        name:
+          description: Name of the payment method (e.g. "Cash")
+          type: string
+        qb_payment_method_id:
+          description: The ID of the matching payment method in QuickBooks Online, or null when this payment method is not mapped to one
+          type: string
+        type:
+          description: The payment method type (SCREAMING_CASE). One of CASH, CHECK, CREDIT_CARD, BANK_REMITTANCE, or BANK_TRANSFER.
+          enum:
+          - CASH
+          - CHECK
+          - CREDIT_CARD
+          - BANK_REMITTANCE
+          - BANK_TRANSFER
+          type: string
+        updated_datetime:
+          description: The datetime this payment method was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - active
+      - type
+      - name
+      - id
+      title: PaymentMethod
+      type: object
+    CompactReturn:
+      description: A compact representation of a return
+      properties:
+        company:
+          $ref: '#/components/schemas/CompanyCompact'
+        id:
+          description: ID for this return
+          type: string
+        return_datetime:
+          description: The date of this return, as `YYYY-MM-DD` (e.g. `2022-07-10`)
+          type: string
+        return_number:
+          description: The return number as shown in the Distru UI (e.g. `RET-1001`)
+          type: string
+        status:
+          description: 'The return''s status (SCREAMING_CASE): PROCESSING, SHIPPED, RECEIVED, or COMPLETED.'
+          enum:
+          - PROCESSING
+          - SHIPPED
+          - RECEIVED
+          - COMPLETED
+          type: string
+        total:
+          description: The total value of this return
+          type: number
+      required:
+      - total
+      - id
+      title: CompactReturn
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

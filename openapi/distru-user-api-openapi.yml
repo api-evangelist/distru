@@ -1,0 +1,262 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru User API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: User
+paths:
+  /public/v1/users:
+    get:
+      description: 'Get a paginated list of the team members (users) in your company, sorted oldest-first by their creation datetime.
+
+
+        Use this to enumerate everyone on your team along with their email, role, and full name, or to keep an external system in sync with your Distru user list. Results are always scoped to your own company; users in other companies are never returned. By default soft-deleted users are excluded — use the `deleted` filter to include or isolate them.
+
+
+        This is a read-only endpoint and does not change anything in the system. Its data is eventually consistent: a user that was just created, modified, or deleted may take up to ~1 second to appear or reflect the change here.
+
+
+        The response is an envelope of `{ data: [...], next_page: ... }`. When more pages remain, `next_page` is a ready-to-follow URL for the next page, and it is null on the last page. Page size is fixed by the server and is not client-controllable.
+
+
+        Required permission: `settings_permissions_manage_team`.'
+      operationId: DistruPublic.V1.UserController.index
+      parameters:
+      - description: Restrict the result to specific users by ID (the same ID returned as each user's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to users created within a datetime window. Supply a comma-separated `after,before` pair of ISO8601 UTC datetimes; both bounds are inclusive and either side may be omitted to leave that end open. `2022-07-10T00:00:00Z,` matches users created on or after that instant; `,2022-07-10T00:00:00Z` matches users created on or before it; `2022-07-01T00:00:00Z,2022-07-31T00:00:00Z` matches users created within that closed range. An empty pair (`,`) is rejected.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Which users to include based on soft-delete state. `no` (the default when omitted) returns only active users; `only` returns only soft-deleted users; `include` returns both. Soft-deleted users carry a non-null `deleted_at` in the response.
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: 'Filter to users last modified (their `updated_datetime`) within a datetime window. Same format as `inserted_datetime`: a comma-separated `after,before` pair of ISO8601 UTC datetimes, both bounds inclusive, either side optional. `,2022-07-10T00:00:00Z` matches users last modified on or before that instant. To keep a copy of your users in sync, see [Incremental Sync](#incremental-sync).'
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of users
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Users'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get users
+      tags:
+      - User
+  /public/v1/users/{id}:
+    get:
+      description: 'Get a single team member (user) by their Distru user ID, scoped to your company.
+
+
+        This is a read-only endpoint and does not change anything in the system. Returns 404 if no user with that ID exists within your company — including a user that belongs to a different company, whose ID is treated as not found rather than leaked across companies. Soft-deleted users are still returned here (unlike the list endpoint, which hides them by default); a soft-deleted user comes back with a non-null `deleted_at`.
+
+
+        Like the list endpoint, this data is eventually consistent and may lag a recent create, update, or delete by up to ~1 second.
+
+
+        Required permission: `settings_permissions_manage_team`.'
+      operationId: DistruPublic.V1.UserController.show
+      parameters:
+      - description: The user's Distru ID, as returned in the `id` field of the users list.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single user
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a user
+      tags:
+      - User
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Users:
+      description: A collection of Users
+      properties:
+        data:
+          description: Users
+          items:
+            $ref: '#/components/schemas/User'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Users
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    UserResponse:
+      description: A single user envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+      title: User Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

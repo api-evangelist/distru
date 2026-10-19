@@ -1,0 +1,222 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Sales By User API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: SalesByUser
+paths:
+  /public/v1/reports/sales-by-user:
+    get:
+      description: 'Returns the Sales By User leaderboard: one row per user (sales rep) with their leaderboard rank, order count, pre-tax sales, and total sales over the reported date range. Rows are always ranked by total sales and returned in that order, with the top seller at rank 1 — this ordering is fixed and cannot be changed by the caller.
+
+
+        This is a read-only aggregate of the orders already in your account; it creates nothing and changes no inventory, compliance, or order state. Each order is attributed to the user set as its sales rep, and the money columns are net of returns — a return lowers that rep''s pre-tax and total sales. Both money columns reflect the same set of orders; `total_sales` includes tax while `sales_pre_tax` excludes it.
+
+
+        Scope of what is counted:
+
+        • Date range — orders are included by their order date. When `order_datetime` is omitted, the report covers the last 30 days (from the start of the day 30 days ago through the end of today), resolved in the account''s time zone.
+
+        • Status — canceled orders are excluded by default. To count them, pass `CANCELED` in the `status` filter; passing `status` at all replaces the default set entirely, so list every status you want counted.
+
+        • Users — every sales rep with at least one qualifying order appears; deactivated users are omitted. Use `user_ids` to restrict the leaderboard to specific reps.
+
+
+        Response values mirror the report''s CSV export with numeric cells returned as strings, so `leaderboard_rank`, `order_count`, and the two money columns come back as strings (currency and comma formatting stripped), matching the rest of the API. Report-level context — the resolved human-readable date range and the column definitions — is returned under `meta`.
+
+
+        Each row also carries `user_id`, the ID of the user it ranks, right after the `user` column, so a row can be followed to the user endpoints without a name lookup. The CSV export leaves this ID column out.
+
+
+        Requires the "view the sales by user report" permission on the API key''s user.'
+      operationId: DistruPublic.V1.Report.SalesByUserController.index
+      parameters:
+      - description: Restricts the report to orders in these statuses (SCREAMING_CASE). Repeat the key to pass several. When omitted, every status except CANCELED is counted; passing this parameter replaces that default entirely, so include CANCELED here if you want canceled orders in the totals, and list every status you want counted.
+        in: query
+        name: status
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - PENDING
+            - PROCESSING
+            - READY_TO_SHIP
+            - DELIVERING
+            - DELIVERED
+            - COMPLETED
+            - CANCELED
+            type: string
+      - description: Restricts the report to orders whose order date falls in this range, given as two comma-separated ISO8601 timestamps, `after,before`. Either side may be left empty for an open-ended range (`,2026-02-01T00:00:00Z` is everything up to that instant; `2026-01-01T00:00:00Z,` is everything from that instant on). When omitted entirely, the report covers the last 30 days (start of the day 30 days ago through end of today), resolved in the account's time zone.
+        in: query
+        name: order_datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Restricts the report to orders whose order number, customer name, or LeafLink short id matches this term (case-insensitive, partial match) before the per-user totals are computed. Omit to include all orders in range.
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+      - description: Restricts the leaderboard to these users (sales reps), by their Distru user id. Repeat the key to pass several. When omitted, every sales rep with a qualifying order appears. Deactivated users are never included, even if listed here.
+        in: query
+        name: user_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: The Sales By User report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/SalesByUserReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Sales By User report
+      tags:
+      - SalesByUser
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    SalesByUserReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: 'Definitions for every column in each data row, in order: the `key` matches a field name on the row objects and `label` is its display name.'
+          items:
+            $ref: '#/components/schemas/SalesByUserReportColumn'
+          type: array
+        date_range:
+          description: The resolved date range the report covers, as a human-readable label (reflects the `order_datetime` filter, or the default last-30-days window when it was omitted).
+          type: string
+        report:
+          description: The report identifier, always `sales_by_user`.
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: SalesByUserReportMeta
+      type: object
+    SalesByUserReport:
+      description: The Sales By User report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/SalesByUserReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/SalesByUserReportMeta'
+      required:
+      - meta
+      - data
+      title: SalesByUserReport
+      type: object
+    SalesByUserReportRow:
+      description: A single row of the Sales By User report.
+      properties:
+        leaderboard_rank:
+          description: The user's rank by total sales within this report, starting at 1 for the top seller. Rows are always returned in this order.
+          type: string
+        order_count:
+          description: How many of the user's orders fall in the report's date range and status set.
+          type: string
+        sales_pre_tax:
+          description: The user's pre-tax sales total for the counted orders, net of returns. Excludes tax; a returned order lowers this figure.
+          type: string
+        total_sales:
+          description: The user's total sales for the counted orders, net of returns. Same orders as `sales_pre_tax` but including tax.
+          type: string
+        user:
+          description: The user's (sales rep's) name
+          type: string
+        user_id:
+          description: The user's ID — the `id` [GET /public/v1/users](#get-users) returns and the value `user_ids` filters on.
+          type: string
+      required:
+      - total_sales
+      - sales_pre_tax
+      - order_count
+      - user_id
+      - user
+      - leaderboard_rank
+      title: SalesByUserReportRow
+      type: object
+    SalesByUserReportColumn:
+      description: Definition of one column in the report, pairing its data-row key with a display label.
+      properties:
+        key:
+          description: The key used for this column in each data row; matches a field name on the row objects (for example `leaderboard_rank`, `sales_pre_tax`).
+          type: string
+        label:
+          description: The human-readable label of the column, suitable for a table header (for example `Sales (Pre-Tax)`).
+          type: string
+      required:
+      - label
+      - key
+      title: SalesByUserReportColumn
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

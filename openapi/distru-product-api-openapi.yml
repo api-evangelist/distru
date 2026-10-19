@@ -1,0 +1,1720 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Product API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Product
+paths:
+  /public/v1/products:
+    get:
+      description: 'Returns a paginated list of products, oldest first (ascending by creation
+
+        time). Soft-deleted products are excluded unless you opt into them with the
+
+        `deleted` filter. The response is a `{data, next_page}` envelope; follow
+
+        `next_page` (null on the last page) to walk every page.
+
+
+        This endpoint is eventually consistent: a create or update made through the
+
+        API can take up to about one second to appear or change here, so a product
+
+        you just wrote may briefly be missing or stale in the list.
+
+
+        Required permission: `products_permissions_view`. Results are additionally
+
+        limited to the products the authenticated user can see under their team
+
+        restrictions, so two API keys at the same company can return different sets.'
+      operationId: DistruPublic.V1.ProductController.index
+      parameters:
+      - description: Case-insensitive substring match on the product's name. Omit to match products of any name.
+        in: query
+        name: name
+        required: false
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the product's SKU. Omit to match products of any SKU.
+        in: query
+        name: sku
+        required: false
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the product's UPC. Omit to match products of any UPC.
+        in: query
+        name: upc
+        required: false
+        schema:
+          type: string
+      - description: Restrict to products whose name exactly matches (case-insensitive) any value in the list. Repeat the bracketed key once per value.
+        in: query
+        name: names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products whose SKU exactly matches (case-insensitive) any value in the list. Repeat the bracketed key once per value.
+        in: query
+        name: skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products whose UPC exactly matches (case-insensitive) any value in the list. Repeat the bracketed key once per value.
+        in: query
+        name: upcs
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Distru menu IDs; a product is returned if it belongs to any one of them (OR). Repeat the bracketed key once per value. IDs that don't resolve to a menu in your company are ignored; if that leaves no valid menu ID, `data` comes back empty rather than unfiltered. At most 200 IDs may be given.
+        in: query
+        name: menu_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: DEPRECATED — use `menu_ids[]` instead; the comma form will be removed in a future version. Comma-separated Distru menu IDs; a product is returned if it belongs to any one of them (OR). Tokens that don't resolve to a menu in your company are ignored; if that leaves no valid menu ID, `data` comes back empty rather than unfiltered.
+        in: query
+        name: menu_id
+        required: false
+        example: ?menu_id=550e8400-e29b-41d4-a716-446655440000,6ba7b810-9dad-11d1-80b4-00c04fd430c8
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the name of a menu the product belongs to. When combined with `menu_ids`, both must hold (AND).
+        in: query
+        name: menu_name
+        required: false
+        schema:
+          type: string
+      - description: 'Filter by product creation time. A comma-separated `after,before` pair of ISO8601 UTC datetimes, both bounds inclusive. Leave either side empty to make that bound open-ended: `2022-07-10T00:00:00Z,` returns products created at or after that instant, `,2022-07-10T00:00:00Z` returns those created at or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Whether to include soft-deleted products. `no` (the default) returns only non-deleted products, `only` returns only soft-deleted ones, `include` returns both. Note these values are lower-case, unlike response enums.
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: Restrict the result to specific products by ID (the same ID returned as each product's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products in any of these categories (the same ID returned as each product's `category.id`). Repeat the bracketed key once per ID. IDs that don't resolve match nothing.
+        in: query
+        name: category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products in any of these subcategories (the same ID returned as each product's `subcategory.id`). Repeat the bracketed key once per ID.
+        in: query
+        name: subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products in any of these groups (the same ID returned as each product's `product_group.id`). Repeat the bracketed key once per ID.
+        in: query
+        name: product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products with any of these brands (the same ID returned as each product's `brand.id`). Repeat the bracketed key once per ID.
+        in: query
+        name: brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products with any of these strains (the same ID returned as each product's `strain.id`). Repeat the bracketed key once per ID.
+        in: query
+        name: strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products carrying any of these tags (the same ID returned in each product's `tags[].id`). Repeat the bracketed key once per ID.
+        in: query
+        name: tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products supplied by any of these vendors (the same ID returned as each product's `vendor.id`). This is the company-relationship ID, not the raw company ID. Repeat the bracketed key once per ID.
+        in: query
+        name: vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products owned by any of these users (the same ID returned as each product's `owner.id`). Repeat the bracketed key once per ID.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products with any of these unit types (the same ID returned as each product's `unit_type.id`). Repeat the bracketed key once per ID.
+        in: query
+        name: unit_type_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to products whose strain is of any of these types. Repeat the bracketed key once per value. SCREAMING_CASE.
+        in: query
+        name: strain_types
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - INDICA
+            - INDICA_DOMINANT
+            - SATIVA
+            - SATIVA_DOMINANT
+            - HYBRID
+            - HIGH_CBD
+            type: string
+      - description: Restrict to products linked to any of these LeafLink product IDs (the integer `leaflink_product_id` returned on each product). Repeat the bracketed key once per ID.
+        in: query
+        name: leaflink_product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Restrict to products with this inventory tracking method (the same value returned as each product's `inventory_tracking_method`). SCREAMING_CASE.
+        in: query
+        name: inventory_tracking_method
+        required: false
+        schema:
+          type: string
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+      - description: Restrict to products with this menu visibility (the same value returned as each product's `menu_visibility`). SCREAMING_CASE.
+        in: query
+        name: menu_visibility
+        required: false
+        schema:
+          type: string
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+      - description: Restrict to active (`true`) or inactive (`false`) products. Omit to match products regardless of active state.
+        in: query
+        name: is_active
+        required: false
+        schema:
+          type: boolean
+      - description: Restrict to featured (`true`) or non-featured (`false`) products. Omit to match products regardless of featured state.
+        in: query
+        name: is_featured
+        required: false
+        schema:
+          type: boolean
+      - description: Restrict to products that currently hold active inventory quantity (`true`) or none (`false`). Omit to match products regardless of active quantity.
+        in: query
+        name: has_quantity_active
+        required: false
+        schema:
+          type: boolean
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Filter by the time a product was last modified. Same `after,before` comma-separated ISO8601 UTC range format as `inserted_datetime`, both bounds inclusive, either side optional.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: When true, each product carries its `bill_of_materials` object (or null if it has none). Defaults to false, in which case `bill_of_materials` is omitted entirely to keep the list light.
+        in: query
+        name: include_bill_of_materials
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - description: When true, each product carries `packages_with_active_quantity_by_location` — its packages that hold active quantity, grouped by location (empty for products that are not package-tracked). Defaults to false, in which case the field is omitted. Because this runs extra per-product queries, setting it (or `include_batches_with_active_quantity_by_location`) shrinks the page size to 50.
+        in: query
+        name: include_packages_with_active_quantity_by_location
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - description: When true, each product carries `batches_with_active_quantity_by_location` — its batches that hold active quantity, grouped by location, each batch carrying its active quantity at that location (empty for products that are not batch-tracked). Defaults to false, in which case the field is omitted. Because this runs extra per-product queries, setting it (or `include_packages_with_active_quantity_by_location`) shrinks the page size to 50.
+        in: query
+        name: include_batches_with_active_quantity_by_location
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=product` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      responses:
+        '200':
+          description: A list of products
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Products'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get products
+      tags:
+      - Product
+    post:
+      description: 'Creates or updates a single product catalog entry through one endpoint. Omit `id` to create a new product (Distru assigns and returns its ID); pass an existing product''s `id` to update it. An `id` that isn''t valid, or one that doesn''t belong to your company, returns a not-found error. On create you must supply at minimum `name`, `sku`, `category_id`, `vendor_id`, `unit_type_id`, `unit_price`, and `inventory_tracking_method`; your company settings can make more fields mandatory (for example a required description or a required product photo). `name` and `sku` must each be unique within your company.
+
+
+        Updates are sparse: only the fields you send are changed, and any field you omit keeps its stored value. The list- and map-valued fields replace wholesale *when you send them*, but omitting the field leaves the current value untouched. `tags` replaces the product''s entire tag set when sent — any tag you leave out of the list is removed, and an empty array clears them all; omit `tags` to leave the current tags unchanged. `custom_data` likewise replaces the entire custom-field map when sent, and is left untouched when omitted. Menu placement is driven by `menu_visibility`: omit it to leave the product''s current menu placement untouched; send DO_NOT_INCLUDE to remove it from all menus, INCLUDE_IN_ALL to place it on every menu, or INCLUDE_IN_SELECT with `menus` to set the exact set (that list replaces the product''s full menu set — omit a menu to remove it). `menus` may only be sent alongside `menu_visibility`: it is required with INCLUDE_IN_SELECT and ignored with the other two modes, so sending `menus` without `menu_visibility`, or INCLUDE_IN_SELECT without `menus`, is rejected with a 400.
+
+
+        Some attributes are locked once established. `inventory_tracking_method` cannot be changed after it is first set — the only allowed transition is PRODUCT to BATCH. `unit_type_id` cannot be changed once the product has any inventory. Attempting either returns a validation error.
+
+
+        This endpoint writes only the product''s catalog record. It does NOT create, move, reserve, or release inventory (add packages or batches separately), and it does NOT itself push the product to Metrc or BioTrack — products are local catalog data and only their inventory syncs to state traceability. For BioTrack companies the `category_id` you choose must be compatible with `inventory_tracking_method` (a PACKAGE-tracked product needs a category tied to a BioTrack inventory type; a non-package one needs a category that is not). Changing `menu_visibility` or `menus` changes which DistruCommerce menus and the Order Tracker surface the product. If the product is linked to a connected sales channel (LeafLink, or a POS such as Blaze/Dutchie/Treez), catalog and price edits made here propagate to that channel. The product''s bill_of_materials is readable in the response but is NOT settable here — set it with POST /public/v1/products/{id}/bill-of-materials and remove it with DELETE /public/v1/products/{id}/bill-of-materials.
+
+
+        Required permission: `products_permissions_create` to create a new product, or `products_permissions_edit` (plus access to the product under team restrictions) to update an existing one.'
+      operationId: DistruPublic.V1.ProductController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID for this product. Omit it to create a new product — Distru assigns the ID. Provide an existing product's ID to update that product; an ID that doesn't exist returns a not-found error.
+                inventory_tracking_method:
+                  enum:
+                  - PACKAGE
+                  - BATCH
+                  - PRODUCT
+                  type: string
+                  description: 'How this product''s inventory is tracked. Required on create. Once set it cannot be changed, with the single exception that a PRODUCT-tracked product may later be switched to BATCH. SCREAMING_CASE, one of:• PACKAGE: Inventory is defined by individual packages (the tracking method used for state-compliance/Metrc packages).• PRODUCT: Not grouped in any manner. Inventory is a simple running quantity you add to or remove from as you transact.• BATCH: Grouped into batches that share common traits such as expiration dates and test results.'
+                sku:
+                  type: string
+                  description: Stock Keeping Unit (SKU). Required on create and must be unique within your company.
+                name:
+                  type: string
+                  description: Product name. Required on create and must be unique within your company. Cannot contain the characters `:`, `[`, or `]`, or other Metrc-disallowed special characters.
+                vendor_id:
+                  type: string
+                  description: ID of the company relationship for the vendor company that supplies this product. This is the company-relationship ID, not the raw company ID. Required on create.
+                category_id:
+                  type: string
+                  description: 'ID of the product''s category. Required on create. For BioTrack companies this must be compatible with `inventory_tracking_method`: a PACKAGE-tracked product needs a category tied to a BioTrack inventory type, a non-package one needs a category that is not.'
+                external_name:
+                  type: string
+                  description: Customer-facing name shown on DistruCommerce menus and the Order Tracker. Falls back to `name` when left blank or omitted, so the response's `external_name` is never null.
+                unit_type_id:
+                  type: string
+                  description: ID of the product's unit type. Required on create. Cannot be changed once the product has any inventory.
+                unit_price:
+                  type: number
+                  description: Sale price of the product per unit, as a decimal. Required on create. Must be non-negative (>= 0).
+                description:
+                  type: string
+                  description: Plain-text description of the product. If you send `description` without `description_markdown`, the markdown description is overwritten with this plain text. If you send `description_markdown` without `description`, the request is rejected — the two must be provided together (or neither). Some companies require a description; those companies reject a create/update that omits both.
+                description_markdown:
+                  type: string
+                  description: Markdown-formatted description. Must be provided together with `description`. Only italic, bold, strikethrough, and links are supported by the display — other markdown may render unpredictably.
+                upc:
+                  type: string
+                  description: Universal Product Code (UPC) for this product
+                subcategory_id:
+                  type: string
+                  description: ID of the product's subcategory. When provided it must be a child of the category given in `category_id`.
+                group_id:
+                  type: string
+                  description: ID of the product's group.
+                brand_id:
+                  type: string
+                  description: ID of the company relationship for the brand company associated with this product. This is the company-relationship ID, not the raw company ID.
+                quantity_available_threshold_min:
+                  type: number
+                  description: Minimum quantity you want to keep in stock. When the product's available quantity dips below this number it is automatically included in scheduled Low Inventory Reports. Optional; omit to set no low threshold. When both thresholds are set, `quantity_available_threshold_max` must be greater than this value.
+                quantity_available_threshold_max:
+                  type: number
+                  description: Maximum quantity you want to keep in stock. When the product's available quantity exceeds this number it is automatically included in scheduled Inventory Reports. Optional; omit to set no high threshold. When both thresholds are set, this must be greater than `quantity_available_threshold_min`.
+                units_per_case:
+                  type: number
+                  description: Number of units in a case of the product. When provided must be greater than 0.
+                unit_cost:
+                  type: number
+                  description: Cost of the product per unit, as a decimal. When provided must be non-negative (>= 0).
+                msrp:
+                  type: number
+                  description: The Manufacturer's Suggested Retail Price (MSRP) of the product per unit. If you have POS integrations enabled in Distru, this may be synced to your POS
+                wholesale_unit_price:
+                  type: number
+                  description: The wholesale price of the product per unit. When provided must be non-negative (>= 0).
+                treez_wholesale_price:
+                  type: number
+                  description: The Treez wholesale price of the product per unit, as a decimal. When your company has the Treez wholesale price setting enabled, this value is used as the default price on order items for this product. Omit to leave an existing value unchanged; send null to clear it.
+                is_featured:
+                  type: boolean
+                  description: Whether the product is featured. Featured products are shown at the top of menus. Defaults to false when omitted on create.
+                strain_id:
+                  type: string
+                  description: ID of the strain associated with the product.
+                owner_id:
+                  type: string
+                  description: ID of the user considered the owner of the product. Must be a user the authenticated caller is allowed to assign as owner under their team restrictions.
+                leaflink_product_id:
+                  type: integer
+                  description: The LeafLink product ID this product is linked to, used to match LeafLink orders to this product. Must be unique within your account — sending a value already linked to another product is rejected. Omit to leave an existing link unchanged; send null to unlink.
+                is_inactive:
+                  type: boolean
+                  description: Whether the product is inactive (hidden from normal use). Defaults to false when omitted on create. Can be flipped back to active at any time.
+                total_cannabinoid_unit:
+                  type: string
+                  description: Unit for this product's THC/CBD content. One of PERCENT or MG (SCREAMING_CASE). Required whenever `total_thc` or `total_cbd` is provided.
+                total_thc:
+                  type: string
+                  description: THC content of the product, expressed in the unit given by `total_cannabinoid_unit` (which must be provided alongside it). Must be non-negative (>= 0); when `total_cannabinoid_unit` is PERCENT it cannot exceed 100.
+                total_cbd:
+                  type: string
+                  description: CBD content of the product, expressed in the unit given by `total_cannabinoid_unit` (which must be provided alongside it). Must be non-negative (>= 0); when `total_cannabinoid_unit` is PERCENT it cannot exceed 100.
+                menu_visibility:
+                  enum:
+                  - DO_NOT_INCLUDE
+                  - INCLUDE_IN_ALL
+                  - INCLUDE_IN_SELECT
+                  type: string
+                  description: 'Controls which menus (if any) the product appears on. Defaults to DO_NOT_INCLUDE when omitted on create; on update, omit it to leave the product''s current menu placement untouched. SCREAMING_CASE, one of:• DO_NOT_INCLUDE: The product appears on no menus; any `menus` you send are ignored.• INCLUDE_IN_ALL: The product appears on every menu in your company; `menus` is ignored.• INCLUDE_IN_SELECT: The product appears only on the menus listed in `menus`, which fully replaces its current menu set. `menus` is required in this mode.
+
+                    Required whenever `menus` is provided — sending `menus` without `menu_visibility` is rejected.'
+                unit_net_weight:
+                  type: number
+                  description: Net weight/volume of the product per unit. When provided must be greater than 0 and requires `unit_net_weight_and_serving_size_unit_type_id` to be set.
+                unit_serving_size:
+                  type: number
+                  description: Serving size of the product per unit. When provided must be greater than 0, cannot exceed `unit_net_weight`, and requires `unit_net_weight_and_serving_size_unit_type_id` to be set.
+                unit_net_weight_and_serving_size_unit_type_id:
+                  type: string
+                  description: ID of the unit type that `unit_net_weight` and `unit_serving_size` are measured in. Required whenever either of those is set. Applies only to count-based products; leave null otherwise. Once set, changing the product away from a count/'Unit' category is rejected.
+                gross_weight:
+                  type: number
+                  description: Gross weight of the product. When provided must be greater than 0 and must be set together with `gross_weight_unit_type_id` (both present or both absent).
+                gross_weight_unit_type_id:
+                  type: string
+                  description: ID of the weight unit type `gross_weight` is measured in. Must be a weight-based unit type that Metrc supports, and must be set together with `gross_weight` (both present or both absent).
+                tags:
+                  items:
+                    type: string
+                  type: array
+                  description: Tag IDs to associate with the product. When sent, the list replaces the product's complete tag set — any tag left out is removed, and an empty array clears all tags. Omit `tags` on update to leave the current tags unchanged.
+                menus:
+                  items:
+                    type: string
+                  type: array
+                  description: 'Menu IDs the product should appear on. Only used when `menu_visibility` is INCLUDE_IN_SELECT — required in that mode, ignored with DO_NOT_INCLUDE and INCLUDE_IN_ALL. When applied, this list becomes the product''s complete menu set, so omit a menu from the list to remove the product from it. Must be sent together with `menu_visibility`: sending `menus` without `menu_visibility` is rejected, as is INCLUDE_IN_SELECT without `menus`. Omitting `menu_visibility` entirely leaves the current menu placement untouched.'
+                custom_data:
+                  type: object
+                  description: 'A map of custom field IDs to their values. Use GET /public/v1/custom-fields?parent_object=product to retrieve available custom fields, their IDs, and their types. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options. On update, omit `custom_data` to leave the stored map unchanged; when sent it replaces the entire map, so include every field you want to keep.'
+      responses:
+        '200':
+          description: A single product
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a product
+      tags:
+      - Product
+  /public/v1/products/{id}:
+    delete:
+      description: 'Deletes a product from your catalog. This is a soft delete: the product stops appearing in `GET /public/v1/products` by default (pass the `deleted` filter as `include` or `only` to still see it) and this endpoint returns 404 for it, but the record is retained — `GET /public/v1/products/{id}` keeps resolving it with a non-null `deleted_at`. The delete cannot be undone through the API; recreating the product via upsert produces a new product with a new `id`. Responds 204 with no body on success, or 404 if no non-deleted product with that `id` exists on your account (including one that was already deleted or belongs to another account).
+
+
+        A product can only be deleted while nothing depends on it. The delete is refused with a 400 when the product: holds any active inventory (every package, batch, or product-level quantity must be zero first), appears on any sales order or purchase, has any returns, appears on any inventory transfer, has any product requests, or is used as an input or output of any assembly. The product only becomes deletable once no such record references it. In practice this means a product that has been used can rarely be deleted — to retire it, set `is_inactive` to `true` via `POST /public/v1/products` instead. An inactive product is hidden from normal use but keeps its history, and can be reactivated at any time.
+
+
+        The delete cascades, all in one atomic call: the product''s batches are soft-deleted, its own bill of materials is deleted, and the product is removed as an input from every other product''s bill of materials (a bill left with no inputs is deleted too). The product is also removed from menus, and if it is linked to a LeafLink product that link is removed. No inventory is created, consumed, or released, and nothing is synced to Metrc or BioTrack. A successful delete records a `delete` entry in the product''s activity log and notifies the relevant users.
+
+
+        Required permission: `products_permissions_delete` (plus access to the product under team restrictions).'
+      operationId: DistruPublic.V1.ProductController.delete
+      parameters:
+      - description: ID of the product to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your account (or was already deleted) returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a product
+      tags:
+      - Product
+    get:
+      description: 'Get a single product by ID. Unlike the list endpoint, the response always
+
+        includes the product''s `bill_of_materials` (or null if it has none).
+
+
+        Returns 404 if no product with that ID exists in your company, or if the
+
+        authenticated user cannot see it under their team restrictions — the two
+
+        cases are indistinguishable from the response.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.ProductController.show
+      parameters:
+      - description: Product ID.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - description: When true, the product carries `packages_with_active_quantity_by_location` — its packages that hold active quantity, grouped by location (empty when the product is not package-tracked). Defaults to false, in which case the field is omitted.
+        in: query
+        name: include_packages_with_active_quantity_by_location
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - description: When true, the product carries `batches_with_active_quantity_by_location` — its batches that hold active quantity, grouped by location, each batch carrying its active quantity at that location (empty when the product is not batch-tracked). Defaults to false, in which case the field is omitted.
+        in: query
+        name: include_batches_with_active_quantity_by_location
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: A single product
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a product
+      tags:
+      - Product
+  /public/v1/products/{id}/bill-of-materials:
+    delete:
+      description: 'Removes a product''s bill of materials, with its inputs and additional costs. This is a soft delete: the bill stops appearing on the product, and new assemblies in the web app are no longer pre-filled from it. Existing assemblies keep their inputs, and no inventory, product cost or Metrc/BioTrack data changes. Create a new bill with POST /public/v1/products/{id}/bill-of-materials. Responds 204 with no body; 404 when the product doesn''t exist for your company, is deleted, or has no bill of materials.
+
+
+        Requires the Core module (otherwise 403). Required permission: `products_permissions_edit` (plus access to the product under team restrictions).'
+      operationId: DistruPublic.V1.ProductController.delete_bill_of_materials
+      parameters:
+      - description: ID of the product whose bill to delete. An ID that doesn't exist for your company, or a deleted product, returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a product bill of materials
+      tags:
+      - Product
+    post:
+      description: 'Creates or updates the bill of materials of a product: the inputs and additional costs it takes to make one unit of it. A product has at most one bill, so there is no bill id to pass: the first call creates it, later calls update it. Returns the bill exactly as GET /public/v1/products/{id} shows it.
+
+
+        Creating needs at least one input (in `product_inputs` or `dynamic_inputs`); `name` defaults to the product''s name. Updates are sparse: a field you omit keeps its stored value, and `description: null` clears the description. `product_inputs`, `dynamic_inputs` and `costs` each replace their whole list when sent and are left untouched when omitted. Within a sent list, an entry with the `id` of a stored row patches that row with only the fields it carries; an entry without `id` is added; a stored row whose `id` you leave out is deleted. The two input lists together must keep at least one input: to remove the bill, use DELETE /public/v1/products/{id}/bill-of-materials.
+
+
+        A product input names a product to consume; its `quantity` is in that product''s unit type. Inactive products can be inputs; deleted products and the product itself cannot, and a product that is not package-tracked cannot take a package-tracked input. A dynamic input takes any product that meets every condition list you fill (any entry within a list) and whose unit type measures the same thing as `unit_type_id` (count, weight or volume); its `quantity` is in `unit_type_id` and is converted to the matching product''s unit type. Every quantity is per one unit of this product. For BioTrack companies the inputs must also be valid ingredients for the product''s BioTrack inventory type.
+
+
+        The bill is a recipe only. It pre-fills the inputs and additional costs of new manufacturing assemblies created in the Distru web app; assemblies created through the API do not read it, and existing assemblies keep their own inputs. It creates, reserves or consumes no inventory, never changes the product''s cost, and syncs nothing to Metrc or BioTrack. The operation is all-or-nothing: if any entry is rejected, nothing is changed.
+
+
+        Requires the Core module (otherwise 403). Required permission: `products_permissions_edit` (plus access to the product under team restrictions).'
+      operationId: DistruPublic.V1.ProductController.upsert_bill_of_materials
+      parameters:
+      - description: ID of the product whose bill this is. An ID that doesn't exist for your company, or a deleted product, returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the bill. Defaults to the product's name on create; omit to keep the stored name. Cannot be null.
+                description:
+                  type: string
+                  description: Free-text description. Omit to keep the stored one; send null to clear it.
+                product_inputs:
+                  items:
+                    $ref: '#/components/schemas/BillOfMaterialsProductInputRequest'
+                  type: array
+                  description: 'The inputs that name a specific product, each following [BillOfMaterialsProductInputRequest](#model-billofmaterialsproductinputrequest). Omit to keep the stored product inputs. When sent, it is the complete set: a stored product input whose `id` you leave out is deleted, an entry with a stored `id` is patched, an entry without `id` is added. Send `[]` to remove every product input, as long as `dynamic_inputs` keeps at least one.'
+                dynamic_inputs:
+                  items:
+                    $ref: '#/components/schemas/BillOfMaterialsDynamicInputRequest'
+                  type: array
+                  description: The inputs that select products by attribute, each following [BillOfMaterialsDynamicInputRequest](#model-billofmaterialsdynamicinputrequest). Omit to keep the stored dynamic inputs. When sent, it is the complete set, with the same `id` rules as `product_inputs`. Send `[]` to remove every dynamic input, as long as `product_inputs` keeps at least one.
+                costs:
+                  items:
+                    $ref: '#/components/schemas/BillOfMaterialsCostRequest'
+                  type: array
+                  description: The additional costs, each following [BillOfMaterialsCostRequest](#model-billofmaterialscostrequest). They only pre-fill the additional costs of new assemblies in the web app. Omit to keep the stored costs. When sent, it is the complete set, with the same `id` rules as `product_inputs`; send `[]` to remove every cost.
+      responses:
+        '200':
+          description: The product's bill of materials
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BillOfMaterialsResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a product bill of materials
+      tags:
+      - Product
+  /public/v1/products/{id}/images:
+    post:
+      description: 'Replaces the full set of images on a product with images Distru already hosts. Each URL must be the `url` of an existing product image, as GET /public/v1/products/{id} returns it, from this product or another one. Distru copies each image and attaches the copy to the product. Any other URL is rejected with a 400. To add a new image, upload the file with POST /public/v1/product-images.
+
+
+        This is a full replacement, not an append: the product''s existing images are removed and replaced by exactly what you send. Send an empty array to remove all images; omitting `image_urls` does the same. The order of the array is the display order: the first URL becomes the product''s primary image, and product responses list images in that order. At most 4 URLs are accepted. The operation is all-or-nothing: if any URL is rejected or fails to copy, no images are changed and the response is a 400 with a single human-readable error message.
+
+
+        This affects only the product''s images, and updates the product''s `updated_datetime`; it does not touch inventory or push anything to Metrc or BioTrack. On success the response is 204 with no body; re-fetch the product to see the new image URLs.
+
+
+        Required permission: `products_permissions_edit` (plus access to the product under team restrictions).'
+      operationId: DistruPublic.V1.ProductController.upsert_images
+      parameters:
+      - description: Product ID.
+        in: path
+        name: id
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertProductImagesRequest'
+        description: The product's new set of images
+      responses:
+        '204':
+          description: Images updated successfully
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Associate images with a product
+      tags:
+      - Product
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    BatchesWithActiveQuantityByLocation:
+      description: A location and the product's batches that hold active quantity there.
+      properties:
+        batches:
+          description: The product's batches with active quantity at this location, each carrying its active quantity there, ordered by id.
+          items:
+            $ref: '#/components/schemas/BatchCompactWithQuantityActive'
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+      required:
+      - batches
+      - location
+      title: BatchesWithActiveQuantityByLocation
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    BillOfMaterialsDynamicInputRequest:
+      description: 'A dynamic input of a bill of materials upsert: any product that meets every non-empty condition list (any entry within a list) and whose unit type measures the same thing as `unit_type_id` (count, weight or volume). On an entry with a stored `id`, a condition list you omit keeps its stored value and one you send replaces it; `[]` or null clears it.'
+      properties:
+        id:
+          description: ID of a stored dynamic input to patch; only the fields you send change. Omit to add a new input. An ID that isn't a dynamic input of this bill returns 400.
+          type: string
+        product_category_ids:
+          description: IDs of product categories; a matching product is in one of them.
+          items:
+            type: string
+          type: array
+        product_group_ids:
+          description: IDs of product groups; a matching product is in one of them.
+          items:
+            type: string
+          type: array
+        product_subcategory_ids:
+          description: IDs of product subcategories; a matching product is in one of them. Each must belong to a category in `product_category_ids`.
+          items:
+            type: string
+          type: array
+        quantity:
+          description: How much of a matching product one unit of this product takes, in `unit_type_id`, as a decimal greater than 0; converted to the matching product's unit type. Required on a new input.
+          type: number
+        strain_ids:
+          description: IDs of strains; a matching product has one of them.
+          items:
+            type: string
+          type: array
+        tag_ids:
+          description: IDs of product tags; a matching product has at least one of them.
+          items:
+            type: string
+          type: array
+        unit_type_id:
+          description: ID of the unit type `quantity` is in. Required on a new input.
+          type: string
+      title: BillOfMaterialsDynamicInput (Request)
+      type: object
+    BillOfMaterialsProductInput:
+      description: A specific product consumed by a bill of materials
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: How much of the product this recipe consumes, in the product's unit, as a decimal string (e.g. "2.5").
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsProductInput
+      type: object
+    BillOfMaterialsCost:
+      description: An additional cost applied by a bill of materials
+      properties:
+        cost_type:
+          $ref: '#/components/schemas/BillOfMaterialsCostType'
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies, as a decimal string (e.g. "3"). Multiply by the cost type's `cost_per_unit` to get the line total.
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsCost
+      type: object
+    UpsertProductImagesRequest:
+      properties:
+        image_urls:
+          description: URLs of existing Distru product images, in display order (first = primary image). At most 4. An empty array, or omitting the field, removes every image from the product.
+          example:
+          - https://distru-prod.s3-us-west-1.amazonaws.com/uploads/images/0b6f5c2e-3f1a-4d8e-9c1b-2a7d5e4f6a10/front.png
+          items:
+            type: string
+          type: array
+      title: Upsert Product Images Request
+      type: object
+    CompactMenu:
+      description: A lightweight reference to a DistruCommerce menu — the online catalog a buyer browses to place an order — carrying just its id and name. Where it appears on a sales order, it is the menu that order was placed through. Use the id to fetch the full menu from the menus endpoint.
+      properties:
+        id:
+          description: ID of the menu
+          type: string
+        name:
+          description: Display name of the menu
+          type: string
+      required:
+      - name
+      - id
+      title: CompactMenu
+      type: object
+    BillOfMaterialsCostRequest:
+      description: An additional cost of a bill of materials upsert
+      properties:
+        cost_type_id:
+          description: ID of the [cost type](#model-costtype). Required on a new cost.
+          type: string
+        description:
+          description: Free-text description; null clears it.
+          type: string
+        id:
+          description: ID of a stored cost to patch; only the fields you send change. Omit to add a new cost. An ID that isn't a cost of this bill returns 400.
+          type: string
+        quantity:
+          description: How many units of the cost type one unit of this product takes, as a decimal greater than 0. Required on a new cost.
+          type: number
+      title: BillOfMaterialsCost (Request)
+      type: object
+    BillOfMaterialsProductInputRequest:
+      description: A product input of a bill of materials upsert
+      properties:
+        id:
+          description: ID of a stored product input to patch; only the fields you send change. Omit to add a new input. An ID that isn't a product input of this bill returns 400.
+          type: string
+        product_id:
+          description: ID of the product to consume. Required on a new input. Inactive products are allowed; deleted products and the bill's own product are refused.
+          type: string
+        quantity:
+          description: How much of the product one unit of this product takes, in the input product's unit type, as a decimal greater than 0. Required on a new input.
+          type: number
+      title: BillOfMaterialsProductInput (Request)
+      type: object
+    Product:
+      description: A sellable or trackable item in your catalog — its name, pricing, category, unit of measure, and how its inventory is tracked (see `inventory_tracking_method`).
+      properties:
+        batches_with_active_quantity_by_location:
+          description: The product's batches that hold active quantity, grouped by location. Present only when the request passes `include_batches_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not batch-tracked or holds no active batches.
+          items:
+            $ref: '#/components/schemas/BatchesWithActiveQuantityByLocation'
+          type: array
+        bill_of_materials:
+          $ref: '#/components/schemas/BillOfMaterials'
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this product
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime the product was soft-deleted at, or null when the product has not been deleted
+          type: string
+        description:
+          description: Plain-text description of this product, or null when none was entered. Always null together with `description_markdown` and non-null together with it — one is never set without the other.
+          type: string
+        description_markdown:
+          description: The same description in Markdown. Null when `description` is null; populated whenever `description` is populated.
+          type: string
+        external_name:
+          description: Customer-facing name shown on DistruCommerce menus and the Order Tracker, or null when none is set (it does not fall back to `name`)
+          type: string
+        gross_weight:
+          description: The gross weight of one unit including packaging, as a decimal string, measured in `gross_weight_unit_type`. Null when not set; it is always set together with `gross_weight_unit_type` and null together with it.
+          type: string
+        gross_weight_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        id:
+          description: ID for this product
+          type: string
+        images:
+          description: 'The images associated with this product, in display order: by `rank`, lowest first (the first is the primary image), then by id. Images with no rank come last. Empty array when the product has no images.'
+          items:
+            $ref: '#/components/schemas/Image'
+          type: array
+        inserted_datetime:
+          description: The datetime this product was created at
+          type: string
+        inventory_tracking_method:
+          description: 'How this product''s inventory is tracked. One of: `BATCH` (grouped into batches sharing traits such as expiration dates and test results), `PACKAGE` (inventory is defined by packages), `PRODUCT` (ungrouped; inventory exists directly on the product).'
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+          type: string
+        is_active:
+          description: True when the product is active. False when it has been marked inactive (archived), which hides it from most product pickers.
+          type: boolean
+        is_featured:
+          description: True when the product is flagged as featured
+          type: boolean
+        leaflink_product_id:
+          description: The LeafLink product ID this product is synced to, or null if not synced
+          type: integer
+        menu_visibility:
+          description: 'Which menus this product is shown in. One of `DO_NOT_INCLUDE`, `INCLUDE_IN_ALL`, `INCLUDE_IN_SELECT` (same values accepted by the upsert endpoint); defaults to `DO_NOT_INCLUDE`. The `menus` field below lists the specific menus the product belongs to — this is how you see which menus when the value is `INCLUDE_IN_SELECT`. Setting `INCLUDE_IN_ALL` adds the product to every menu, and a menu created later gets it too, except a copy of a menu it isn''t on, or a new (not copied) menu made by a user who can''t see the product: read `menus` for where it really is.'
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+          type: string
+        menus:
+          description: 'Menus this product is on, ordered by menu creation time then id (includes inactive menus). Follows `menu_visibility`: the chosen menus for `INCLUDE_IN_SELECT`, every menu but the exceptions listed under `menu_visibility` for `INCLUDE_IN_ALL`, and usually none for `DO_NOT_INCLUDE`. A change made by a team-restricted user never removes the product from menus that user can''t see, so those stay listed.'
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        msrp:
+          description: Manufacturer's suggested retail price, as a decimal string (e.g. "19.99"), or null when not set
+          type: string
+        name:
+          description: Human readable name for this product
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packages_with_active_quantity_by_location:
+          description: The product's packages that hold active quantity, grouped by location. Present only when the request passes `include_packages_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not package-tracked or holds no active packages.
+          items:
+            $ref: '#/components/schemas/PackagesWithActiveQuantityByLocation'
+          type: array
+        product_group:
+          $ref: '#/components/schemas/ProductGroupCompact'
+        quantity_active:
+          description: Total active on-hand quantity of this product across all locations, as a decimal string (e.g. "100"). Sums the product's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the product has no active stock. Reserved stock is still physically on-hand, so it is included here; subtract `quantity_reserved` to get `quantity_available`. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The product's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the product has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        quantity_available:
+          description: Active on-hand quantity minus reserved quantity, as a decimal string (e.g. "100"). Equals `quantity_active` − `quantity_reserved` — what is on-hand and not already spoken for by unfulfilled sales orders or draft assemblies. Can be negative when more is reserved than is on-hand at a location. "0" when the product has no active stock and nothing reserved.
+          type: string
+        quantity_available_threshold_max:
+          description: 'Over-stock alert threshold: Distru flags the product when its available quantity rises above this value. Decimal string, or null when no over-stock alert is configured. When both thresholds are set, this is strictly greater than `quantity_available_threshold_min`.'
+          type: string
+        quantity_available_threshold_min:
+          description: 'Low-stock alert threshold: Distru flags the product when its available quantity drops below this value. Decimal string, or null when no low-stock alert is configured. When both thresholds are set, this is strictly less than `quantity_available_threshold_max`.'
+          type: string
+        quantity_reserved:
+          description: 'Total quantity of this product currently reserved across all locations, as a decimal string (e.g. "100"). Reserved quantity is a soft hold tracked separately from on-hand stock (`quantity_active`): it rises as unfulfilled sales order items and draft assembly inputs are created, and falls as they are deleted or fulfilled. "0" when nothing is reserved.'
+          type: string
+        sku:
+          description: The stock keeping unit (SKU) configured for this product
+          type: string
+        strain:
+          $ref: '#/components/schemas/Strain'
+        subcategory:
+          $ref: '#/components/schemas/ProductSubcategoryCompact'
+        tags:
+          description: The tags associated with this product. Empty array when the product has no tags.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        tasks:
+          description: 'The tasks linked to this product that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total_cannabinoid_unit:
+          description: The unit `total_thc` and `total_cbd` are measured in — one of MG (milligrams per unit) or PERCENT (percent by weight). Null when neither potency value is set.
+          type: string
+        total_cbd:
+          description: Total CBD potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        total_thc:
+          description: Total THC potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        treez_wholesale_price:
+          description: The Treez wholesale price of this product, as a decimal string, or null when not set
+          type: string
+        unit_cost:
+          description: The cost (purchase price) of one unit of this product, as a decimal string, or null when not set
+          type: string
+        unit_net_weight:
+          description: The net contents of one unit of this product (weight, volume, or count of the contents), as a decimal string, measured in `unit_net_weight_serving_size_unit_type`. Null when not set.
+          type: string
+        unit_net_weight_serving_size_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        unit_price:
+          description: The list (sale) price of one unit of this product, as a decimal string (e.g. "25.00")
+          type: string
+        unit_serving_size:
+          description: The serving size per unit, as a decimal string, measured in `unit_net_weight_serving_size_unit_type` (the same unit as `unit_net_weight`). Null when not set. When both are set, this is at most `unit_net_weight`.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        units_per_case:
+          description: The number of units of this product packed in one case, as a decimal string (e.g. "12"), or null when not set
+          type: string
+        upc:
+          description: The UPC barcode of this product, or null when not set
+          type: string
+        updated_datetime:
+          description: The datetime this product was last updated at
+          type: string
+        vendor:
+          $ref: '#/components/schemas/CompanyCompact'
+        wholesale_unit_price:
+          description: The wholesale unit price of this product, as a JSON number (e.g. 12.5) rather than a decimal string — unlike `unit_price`. Null when not set.
+          type: number
+      required:
+      - quantity_reserved
+      - quantity_available
+      - quantity_active_by_location
+      - quantity_active
+      - custom_data
+      - inventory_tracking_method
+      - unit_price
+      - is_featured
+      - is_active
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - sku
+      - name
+      - id
+      title: Product
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    BillOfMaterials:
+      description: A product's bill of materials (recipe of inputs and additional costs)
+      properties:
+        costs:
+          description: The additional (non-material) costs this recipe applies, ordered oldest first. Empty when none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsCost'
+          type: array
+        description:
+          description: Free-text description of this bill of materials, or null when none was entered
+          type: string
+        dynamic_inputs:
+          description: The inputs that select products by attribute (category, strain, tag, and so on) rather than naming a specific product. Empty when this recipe has none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsDynamicInput'
+          type: array
+        id:
+          description: ID for this bill of materials
+          type: string
+        name:
+          description: Human readable name for this bill of materials
+          type: string
+        product_inputs:
+          description: The inputs that name a specific product to consume. Empty when this recipe has none. See `dynamic_inputs` for inputs that select products by attribute instead.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsProductInput'
+          type: array
+      required:
+      - costs
+      - dynamic_inputs
+      - product_inputs
+      - name
+      - id
+      title: BillOfMaterials
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    BillOfMaterialsDynamicInput:
+      description: A dynamic input of a bill of materials. It selects products by attribute rather than naming a specific product. Each attribute list holds the entities matched by that criterion, or is empty when the criterion is not used.
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product_categories:
+          description: The product categories this input matches on, or empty when it does not match on category. A product must match every non-empty criterion.
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        product_groups:
+          description: The product groups this input matches on, or empty when it does not match on group.
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        product_subcategories:
+          description: The product subcategories this input matches on, or empty when it does not match on subcategory.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        quantity:
+          description: How much this recipe consumes of whatever product matches, as a decimal string (e.g. "2.5").
+          type: string
+        strains:
+          description: The strains this input matches on, or empty when it does not match on strain.
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        tags:
+          description: The tags this input matches on, or empty when it does not match on tag.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - tags
+      - strains
+      - product_groups
+      - product_subcategories
+      - product_categories
+      - quantity
+      - id
+      title: BillOfMaterialsDynamicInput
+      type: object
+    ProductResponse:
+      description: A single Product
+      properties:
+        data:
+          $ref: '#/components/schemas/Product'
+      title: Product Response
+      type: object
+    Products:
+      description: A collection of Products
+      properties:
+        data:
+          description: Products
+          items:
+            $ref: '#/components/schemas/Product'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Products
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ProductTagRef:
+      description: A tag associated with a product
+      properties:
+        id:
+          description: ID for this tag
+          type: string
+        name:
+          description: The name of this tag
+          type: string
+      required:
+      - name
+      - id
+      title: ProductTagRef
+      type: object
+    ProductGroupCompact:
+      description: A named grouping of products, defined per company (e.g. a brand line or product family).
+      properties:
+        id:
+          description: ID for this product group
+          type: string
+        name:
+          description: The name of this product group
+          type: string
+      required:
+      - name
+      - id
+      title: ProductGroupCompact
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    QuantityActiveByLocation:
+      description: Active on-hand quantity of an entity held at a single location.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        quantity:
+          description: Active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity
+      - location
+      title: QuantityActiveByLocation
+      type: object
+    BillOfMaterialsResponse:
+      description: A product's bill of materials
+      properties:
+        data:
+          $ref: '#/components/schemas/BillOfMaterials'
+      title: Bill of Materials Response
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    BillOfMaterialsCostType:
+      description: The cost type applied by a bill-of-materials cost
+      properties:
+        cost_per_unit:
+          description: The cost per unit, as a decimal string (e.g. "5.00"). Present only when the caller has the `costs_permissions_view_cost_types_cost_per_unit` permission; the field is omitted otherwise.
+          type: string
+        id:
+          description: ID for this cost type
+          type: string
+        name:
+          description: Human readable name for this cost type
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - name
+      - id
+      title: BillOfMaterialsCostType
+      type: object
+    PackagesWithActiveQuantityByLocation:
+      description: A location and the product's packages that hold active quantity there.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        packages:
+          description: The product's packages held at this location that have active quantity, ordered by id.
+          items:
+            $ref: '#/components/schemas/Package'
+          type: array
+      required:
+      - packages
+      - location
+      title: PackagesWithActiveQuantityByLocation
+      type: object
+    Package:
+      description: A specific, compliance-tracked quantity of a product identified by a unique tag (e.g. a Metrc package). This is the physical unit of inventory for package-tracked products. This is the compact reference; see PackageFull for all fields.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+      required:
+      - distru_status
+      - quantity_active
+      - quantity
+      - location_id
+      - license_id
+      - id
+      title: Package
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    BatchCompactWithQuantityActive:
+      description: A compact [batch](#model-batch) reference plus its active on-hand quantity at the location it is nested under.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        quantity_active:
+          description: The batch's active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity_active
+      - name
+      - id
+      title: BatchCompactWithQuantityActive
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

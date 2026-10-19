@@ -1,0 +1,370 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Product Subcategory API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: ProductSubcategory
+paths:
+  /public/v1/product-subcategories:
+    get:
+      description: 'List product subcategories for the authenticated company, oldest first (ascending creation order).
+
+
+        A subcategory is a second-level classification beneath a product category; products point at a subcategory to place them in the catalog taxonomy. Only subcategories whose parent category belongs to your company and is not deleted are returned.
+
+
+        Optionally narrow the list to one parent category with `?category_id=` (exact match on the parent category id).
+
+
+        Results are paginated. When more rows remain, the response''s `next_page` field holds the URL of the following page; it is null on the last page.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductSubcategoryController.index
+      parameters:
+      - description: Restrict the result to specific product subcategories by ID (the same ID returned as each subcategory's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Return only subcategories whose parent product category id matches this value exactly. Omit to return every subcategory across all of your categories.
+        in: query
+        name: category_id
+        required: false
+        example: ?category_id=b1c2d3e4-5f60-4a7b-8c9d-0e1f2a3b4c5d
+        schema:
+          type: string
+      - description: 'Filter to product subcategories by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to product subcategories by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of product subcategories
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductSubcategories'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get product subcategories
+      tags:
+      - ProductSubcategory
+    post:
+      description: 'Create or update one product subcategory. Omit `id` to create; pass the `id` of an existing subcategory to update it. The URL and body shape are the same for both — a create returns 201, an update returns 200.
+
+
+        On create, both `name` and `product_category_id` are required, and the parent category must belong to your company. `name` must be unique within its parent category, compared case-insensitively (so "Flower" and "flower" collide), and may not contain restricted special characters.
+
+
+        The parent category is fixed at creation: `product_category_id` cannot be changed on update. Sending a different value on update is rejected; omit it (or send the same value) to keep it. To reclassify products under a different category, reassign the products themselves rather than re-parenting the subcategory.
+
+
+        Subcategories are a Distru-internal catalog taxonomy. Creating or renaming one reshapes how products are classified (via each product''s subcategory) and feeds menus, price tiers, and retailer mapping, but it does not move inventory and is not synced to Metrc or BioTrack.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductSubcategoryController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the subcategory to update. Omit to create a new subcategory; when present, the matching subcategory owned by your company is updated and the response status is 200 instead of 201.
+                name:
+                  type: string
+                  description: 'Name of the subcategory. Required on create; on update, omit it to leave the current name unchanged. Must be unique within its parent category, compared case-insensitively ("Flower" and "flower" are treated as the same, and the colliding create/rename is rejected with a 400). May contain letters, digits, spaces, underscores, and the characters `~ # - $ / | % & '' ( ) .`; any other special character is rejected.'
+                product_category_id:
+                  type: string
+                  description: ID of the parent product category this subcategory belongs to; the category must be owned by your company. Required on create and fixed thereafter — it cannot be changed on update. On update, omit it or send the same value to keep it; a different value is rejected.
+              required:
+              - name
+              - product_category_id
+        required: true
+      responses:
+        '200':
+          description: The updated product subcategory
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductSubcategoryResponse'
+        '201':
+          description: The created product subcategory
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductSubcategoryResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a product subcategory
+      tags:
+      - ProductSubcategory
+  /public/v1/product-subcategories/{id}:
+    delete:
+      description: 'Permanently delete the product subcategory. Unlike product categories (which are soft deleted and recoverable), subcategories are hard deleted: the record is removed and cannot be restored.
+
+
+        Deleting a subcategory does not delete its products. Any product currently assigned to it keeps existing but has its subcategory cleared (it becomes uncategorized at the subcategory level). Any price tiers scoped to this subcategory are cleaned up as part of the delete. Inventory and compliance (Metrc / BioTrack) are unaffected.
+
+
+        Returns 204 on success and 404 if no subcategory with that id exists beneath a live product category owned by your company.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductSubcategoryController.delete
+      parameters:
+      - description: The product subcategory id, as returned in the `id` field of any subcategory response.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a product subcategory
+      tags:
+      - ProductSubcategory
+    get:
+      description: 'Fetch a single product subcategory by its id. Returns 404 if no subcategory with that id exists beneath a live product category owned by your company.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductSubcategoryController.show
+      parameters:
+      - description: The product subcategory id, as returned in the `id` field of any subcategory response.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single product subcategory
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductSubcategoryResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a product subcategory
+      tags:
+      - ProductSubcategory
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ProductSubcategories:
+      description: A collection of product subcategories
+      properties:
+        data:
+          description: Product Subcategories
+          items:
+            $ref: '#/components/schemas/ProductSubcategory'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Product Subcategories
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    ProductSubcategory:
+      description: A product subcategory
+      properties:
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        id:
+          description: ID for this product subcategory. Use it as the `id` for the fetch, upsert, and delete endpoints.
+          type: string
+        inserted_datetime:
+          description: When the product subcategory was created, as a UTC ISO-8601 timestamp (e.g. `"2026-08-20T14:30:00Z"`). Always present.
+          type: string
+        name:
+          description: The name of the subcategory. Always present; unique within its parent category (case-insensitive).
+          type: string
+        updated_datetime:
+          description: When the product subcategory was last updated, as a UTC ISO-8601 timestamp. Equal to `inserted_datetime` until the subcategory is first edited. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - category
+      - name
+      - id
+      title: ProductSubcategory
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    ProductSubcategoryResponse:
+      description: A single product subcategory
+      properties:
+        data:
+          $ref: '#/components/schemas/ProductSubcategory'
+      title: Product Subcategory Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

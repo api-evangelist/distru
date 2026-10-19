@@ -1,0 +1,246 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Cultivation Transaction History API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: CultivationTransactionHistory
+paths:
+  /public/v1/reports/cultivation-transaction-history:
+    get:
+      description: 'Read-only report. Returns one row per cultivation transaction over the reported date range, covering the full plant lifecycle: plant batch creations, adjustments and splits, growth phase changes, plant moves, destructions, additive applications, teardowns, harvests, waste, and packaging. Each row carries the transaction''s date, strain, batch name, plant tag(s), product name, package label(s), type, the related entity (teardown or harvest) and its status, the signed amount and unit, and the transaction''s description. Rows reflect the same plant events tracked in the state traceability system (Metrc); this endpoint only reads them and changes nothing.
+
+
+        Rows are sorted most-recent-first by transaction date. When no date filter is provided, the report defaults to the last 30 days. The `datetime`, `transaction_type`, `strain`, `plant_batch_ids`, and `license_ids` filters combine with AND — each narrows the result — while multiple values within `plant_batch_ids` or `license_ids` are OR''d. With no `license_ids` filter the report spans every license on your company.
+
+
+        Every value is returned as it appears in the report''s CSV export, with numeric cells (amount, total cost) returned as strings with the currency and comma formatting stripped, so amounts match the rest of the API. Two columns are not normalized the way the rest of the public API is: `type` is a human-readable display string (e.g. `Move Plant(s)`), not a SCREAMING_CASE enum token, and the `transaction_type` filter accepts those same human-readable names; `related_entity_status` is the underlying teardown/harvest workflow status passed straight through (`PREPARING`, `PENDING`, or `COMPLETED`) rather than remapped through the public API''s enum layer. The `total_cost` column is present only for API keys whose user can view costs; for everyone else the key is omitted from every row and from `meta.columns`. Report-level information (the resolved date range and the column definitions actually present) is returned under `meta`.
+
+
+        Each row also carries `product_id` after `product_name`, so a row can be followed to the product endpoints without a lookup. The CSV export leaves this ID column out.
+
+
+        Required permission: `reports_permissions_cultivation_transaction_history` (and, for the `total_cost` column, permission to view costs).'
+      operationId: DistruPublic.V1.Report.CultivationTransactionHistoryController.index
+      parameters:
+      - description: 'Restricts rows to transactions whose date falls in the given range. Value is a comma-separated `after,before` pair of ISO8601 timestamps, both bounds inclusive. Either side may be left empty for an open-ended range: `2026-01-01T00:00:00Z,` returns everything on or after that instant, and `,2026-02-01T00:00:00Z` everything on or before it. Omit entirely to default to the last 30 days. The resolved range is echoed in `meta.date_range`.'
+        in: query
+        name: datetime
+        required: false
+        example: ?datetime=2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Restricts rows to a single cultivation transaction type. Accepts one of the human-readable type names (not a SCREAMING_CASE token) listed in `enum`. Omit to include every type. Each row's `type` field uses these same names; a Growth Phase Change row additionally appends the transition (e.g. `Growth Phase Change (Immature → Vegetative)`), but filter on the bare name shown here.
+        in: query
+        name: transaction_type
+        required: false
+        schema:
+          type: string
+          enum:
+          - Plant Batch Creation
+          - Plant Batch Adjustment
+          - Split Plant Batch
+          - Destroy Plant
+          - Move Plant(s)
+          - Growth Phase Change
+          - Additive Application
+          - Package Plant Batch
+          - Plant Added to Teardown
+          - Harvest Created from Teardown
+          - Record Waste (Harvest)
+          - Create Package from Harvest
+      - description: Restricts rows to an exact strain name — a whole-string, case-sensitive match, not a substring search. Omit to include all strains. Matches the value shown in each row's `strain` field.
+        in: query
+        name: strain
+        required: false
+        example: ?strain=Blue Dream
+        schema:
+          type: string
+      - description: Restricts rows to transactions involving the given plant batches (plant groups), including the downstream teardown, harvest, waste, and packaging rows derived from them. Each value is a Distru plant batch ID; malformed IDs are ignored. Omit to include all batches. Multiple IDs are OR'd (a row tied to any listed batch is included) and this filter is AND'd with the others.
+        in: query
+        name: plant_batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restricts rows to transactions recorded under the given Distru license IDs. Each ID is matched against the licenses on your company; IDs outside your company are ignored. Omit (or leave empty) to include every license on your company. Multiple IDs are OR'd and this filter is AND'd with the others.
+        in: query
+        name: license_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: The Cultivation Transaction History report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CultivationTransactionHistoryReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Cultivation Transaction History report
+      tags:
+      - CultivationTransactionHistory
+components:
+  schemas:
+    CultivationTransactionHistoryReportRow:
+      description: 'A single row of the Cultivation Transaction History report (one cultivation transaction). Values mirror the report''s CSV export. `type` is a human-readable display string (e.g. `Move Plant(s)`), not a SCREAMING_CASE enum token; `related_entity_status` is the underlying teardown workflow status (`PREPARING`, `PENDING`, or `COMPLETED`) passed through as stored rather than remapped through the public API''s enum layer. The `total_cost` key is present only for API keys whose user can view costs, and is omitted entirely otherwise.
+
+        '
+      properties:
+        amount:
+          description: The signed transaction amount. Positive for gains, negative for downward adjustments (e.g. plants removed via a Plant Batch Adjustment or Split Plant Batch). Additive applications distribute the applied quantity across their sibling rows so the amounts sum to the total applied. Expressed in `unit`.
+          type: string
+        batch_name:
+          description: The plant batch (plant group) name, or null for rows not tied to a specific batch.
+          type: string
+        date:
+          description: The transaction date, formatted `MM/DD/YYYY` in the company's timezone (not an ISO8601 timestamp). Always present.
+          type: string
+        description:
+          description: The transaction's free-text description, or null when none was recorded.
+          type: string
+        package_label_s:
+          description: Comma-separated Metrc package compliance label(s) tied to the transaction, or null when no package is involved.
+          type: string
+        plant_tag_s:
+          description: Comma-separated Metrc plant tag(s) involved, ordered by tag. Null for Plant Batch Creation rows and for any row with no individual plant tags.
+          type: string
+        product_id:
+          description: The ID of the product `product_name` names — the `id` [GET /public/v1/products](#get-products) returns — or null when none applies or the row merges products that share that name.
+          type: string
+        product_name:
+          description: The product name associated with the transaction, or null when none applies.
+          type: string
+        related_entity:
+          description: The name of the teardown or harvest this transaction belongs to, or null for transaction types with no related entity. For harvest-created-from-teardown rows this is the harvest name, falling back to the teardown name.
+          type: string
+        related_entity_status:
+          description: The workflow status of the related teardown — one of `PREPARING`, `PENDING`, or `COMPLETED` — passed through as stored rather than remapped through the public API's enum layer. Populated only for teardown-backed rows (a teardown itself, or a Harvest Created from Teardown). Null when there is no related entity, and also null for harvest-only rows such as Create Package from Harvest, whose `related_entity` names the harvest but which carry no teardown status.
+          type: string
+        strain:
+          description: The strain name of the plant batch, or null for rows not tied to a strain (e.g. some harvest- or teardown-level rows).
+          type: string
+        total_cost:
+          description: The transaction's total cost, in the company's currency. Present only for API keys whose user can view costs (the key is omitted for everyone else — check `meta.columns`). May be null when no cost is associated with the transaction.
+          type: string
+        type:
+          description: The transaction's display type, e.g. `Move Plant(s)`, `Destroy Plant`, `Package Plant Batch`, or `Record Waste (Harvest)`. Growth phase changes append the transition, e.g. `Growth Phase Change (Immature → Vegetative)`. Human-readable names (not SCREAMING_CASE tokens); the same values the `transaction_type` filter accepts. Always present.
+          type: string
+        unit:
+          description: The unit the `amount` is expressed in (e.g. `Unit` for whole-plant counts, or a product/harvest unit-type name such as `Grams`). May be null when no unit type applies.
+          type: string
+      required:
+      - type
+      - date
+      title: CultivationTransactionHistoryReportRow
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    CultivationTransactionHistoryReportColumn:
+      properties:
+        key:
+          description: The machine key for this column; identical to the corresponding property name in each `data` row (e.g. `batch_name`, `total_cost`).
+          type: string
+        label:
+          description: The human-readable column header (e.g. `Batch Name`, `Total Cost`).
+          type: string
+      required:
+      - label
+      - key
+      title: CultivationTransactionHistoryReportColumn
+      type: object
+    CultivationTransactionHistoryReport:
+      description: The Cultivation Transaction History report
+      properties:
+        data:
+          description: The report rows, one per cultivation transaction, sorted most-recent-first by transaction date. Empty when no transactions match the filters.
+          items:
+            $ref: '#/components/schemas/CultivationTransactionHistoryReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/CultivationTransactionHistoryReportMeta'
+      required:
+      - meta
+      - data
+      title: CultivationTransactionHistoryReport
+      type: object
+    CultivationTransactionHistoryReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The ordered column definitions present in this response. Each entry's `key` matches a property name in every `data` row; the set reflects the caller's permissions — the `total_cost` column appears only when the user can view costs.
+          items:
+            $ref: '#/components/schemas/CultivationTransactionHistoryReportColumn'
+          type: array
+        date_range:
+          description: The human-readable date range the report covers, derived from the `datetime` filter (or the default last-30-days window when it was omitted). Mirrors the range applied to the rows. Always present — a range is always resolved, even when `datetime` is omitted.
+          type: string
+        report:
+          description: The report identifier, always `cultivation_transaction_history`.
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: CultivationTransactionHistoryReportMeta
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

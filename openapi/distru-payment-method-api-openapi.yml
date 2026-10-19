@@ -1,0 +1,267 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Payment Method API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Payment Method
+paths:
+  /public/v1/payment-methods:
+    get:
+      description: 'List the payment methods configured for your company. A payment method
+
+        is how money changes hands on a payment — its `type` is one of CASH, CHECK, CREDIT_CARD,
+
+        BANK_REMITTANCE, or BANK_TRANSFER, and each method has a company-chosen `name` on top of that
+
+        type. Use this to resolve the payment method a payment references, or to discover the set of
+
+        methods available when recording payments.
+
+
+        Payment methods can be linked to a QuickBooks Online payment method; when they are, the response''s
+
+        `qb_payment_method_id` holds the QuickBooks Online identifier the method is mapped to (null when it
+
+        isn''t mapped).
+
+
+        This endpoint does not paginate: it returns every matching payment method in a single `data` array,
+
+        and `next_page` is always null. Results are scoped to your company only.
+
+
+        Note: this endpoint returns eventually consistent data — a create, edit, or delete can take up to
+
+        1 second to be reflected here.
+
+
+        Required permission: `settings_permissions_payment_methods`.'
+      operationId: DistruPublic.V1.PaymentMethodController.index
+      parameters:
+      - description: Restrict the result to specific payment methods by ID (the same ID returned as each payment method's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Controls whether soft-deleted payment methods are included. `no` (the default) returns only active, non-deleted methods; `only` returns exclusively soft-deleted methods (those with a non-null `deleted_at`); `include` returns both together. Soft-deleted methods are hidden from new use but stay attached to the historical payments that already referenced them, so `only`/`include` are how you resolve those older references. Values are lowercase. Example: `?deleted=include`.'
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: 'Filter to payment methods by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to payment methods by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of payment methods
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PaymentMethods'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get payment methods
+      tags:
+      - Payment Method
+  /public/v1/payment-methods/{id}:
+    get:
+      description: 'Fetch a single payment method by its ID. Use this to resolve the method a
+
+        payment references, or to read one method''s current `name`, `type`, `active` flag, and QuickBooks
+
+        Online mapping (`qb_payment_method_id`).
+
+
+        Returns 404 if no payment method with that ID exists within your company — the lookup is scoped to
+
+        your company, so an ID belonging to another company reads as not found. A soft-deleted method is
+
+        still returned here (with its `deleted_at` set); deletion hides a method from new use but does not
+
+        remove it.
+
+
+        Required permission: `settings_permissions_payment_methods`.'
+      operationId: DistruPublic.V1.PaymentMethodController.show
+      parameters:
+      - description: The payment method's ID — the id string returned in the `id` field of the list and fetch responses. Required. An ID that belongs to another company, or does not exist, returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single payment method
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PaymentMethodResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a payment method
+      tags:
+      - Payment Method
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    PaymentMethods:
+      description: A collection of Payment Methods
+      properties:
+        data:
+          description: Payment Methods
+          items:
+            $ref: '#/components/schemas/PaymentMethod'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Payment Methods
+      type: object
+    PaymentMethodResponse:
+      description: A single Payment Method
+      properties:
+        data:
+          $ref: '#/components/schemas/PaymentMethod'
+      title: Payment Method Response
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    PaymentMethod:
+      description: A way payments are made or received (e.g. Cash, Check, Credit Card, Bank Transfer).
+      properties:
+        active:
+          description: True when this payment method is active and can be selected on new payments. Defaults to false.
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this payment method was soft-deleted, or null when it has not been deleted
+          type: string
+        id:
+          description: ID for this payment method
+          type: string
+        inserted_datetime:
+          description: The datetime this payment method was created at
+          type: string
+        name:
+          description: Name of the payment method (e.g. "Cash")
+          type: string
+        qb_payment_method_id:
+          description: The ID of the matching payment method in QuickBooks Online, or null when this payment method is not mapped to one
+          type: string
+        type:
+          description: The payment method type (SCREAMING_CASE). One of CASH, CHECK, CREDIT_CARD, BANK_REMITTANCE, or BANK_TRANSFER.
+          enum:
+          - CASH
+          - CHECK
+          - CREDIT_CARD
+          - BANK_REMITTANCE
+          - BANK_TRANSFER
+          type: string
+        updated_datetime:
+          description: The datetime this payment method was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - active
+      - type
+      - name
+      - id
+      title: PaymentMethod
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

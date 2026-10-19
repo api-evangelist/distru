@@ -1,0 +1,199 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Product Image API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: ProductImage
+paths:
+  /public/v1/product-images:
+    post:
+      description: 'Uploads one image file and adds it to a product in the slot given by `rank`. Send the request as `multipart/form-data`. The image is stored and resized on upload, which takes a few seconds; the response''s `url` is immediately downloadable.
+
+
+        A product has 4 image slots, `rank` 0 to 3, and the image with the lowest rank is the product''s primary image. Read the product with GET /public/v1/products/{id} to find a free slot (a product with no images has all four free). Uploading into a taken slot is rejected with a 400, so it is safe to retry an upload that timed out: if the first attempt landed, the retry fails instead of adding a duplicate. A product that already has 4 images takes no more until one is deleted with DELETE /public/v1/product-images/{id}.
+
+
+        The file must be a JPEG, PNG or GIF of at most 10 MB; the type is read from the file''s contents, not its name. Convert WebP or HEIC images first.
+
+
+        The upload updates the product''s `updated_datetime` and sends a product update webhook. It does not touch inventory or push anything to Metrc or BioTrack.
+
+
+        Required permission: `products_permissions_edit` (plus access to the product under team restrictions).'
+      operationId: DistruPublic.V1.ProductImageController.insert
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  description: 'The image file: a JPEG, PNG or GIF of at most 10 MB. Required and must be non-empty.'
+                  type: string
+                  format: binary
+                product_id:
+                  description: ID of the product to add the image to. An ID that doesn't exist for your company returns 404.
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                  type: string
+                rank:
+                  description: The image's slot, 0 to 3; 0 is the primary image. Must be free on the product.
+                  type: integer
+              required:
+              - file
+              - product_id
+              - rank
+        required: true
+      responses:
+        '201':
+          description: Image uploaded
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductImageResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: The upload timed out; nothing was saved, so retry it
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upload a product image
+      tags:
+      - ProductImage
+  /public/v1/product-images/{id}:
+    delete:
+      description: 'Deletes one image from its product. The image''s slot becomes free; the other images keep their ranks. When your company requires every product to have a photo, deleting a product''s last image is rejected with a 400; upload the replacement first.
+
+
+        The delete updates the product''s `updated_datetime` and sends a product update webhook.
+
+
+        Required permission: `products_permissions_edit` (plus access to the product under team restrictions).'
+      operationId: DistruPublic.V1.ProductImageController.delete
+      parameters:
+      - description: ID of the image, as listed in the product's `images`. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a product image
+      tags:
+      - ProductImage
+components:
+  schemas:
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    ProductImageResponse:
+      description: A single product image wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Image'
+      title: Product Image Response
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

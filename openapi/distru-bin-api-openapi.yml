@@ -1,0 +1,348 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Bin API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: BIN
+paths:
+  /public/v1/bins:
+    get:
+      description: 'List the bins belonging to the authenticated company, sorted oldest-first (by creation time).
+
+
+        A bin is a named sub-location used by bin inventory tracking — packages, batches, plants, plant groups and assembly outputs are associated to a bin to record where within a location they physically sit. Bins only exist for companies that have bin inventory tracking enabled, so this list is empty for companies that do not.
+
+
+        Results are paginated; follow `next_page` in the response envelope to page forward, or stop when it is null.
+
+
+        Required permission: `settings_permissions_bins`.'
+      operationId: DistruPublic.V1.BinController.index
+      parameters:
+      - description: Restrict the result to specific bins by ID (the same ID returned as each bin's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Case-insensitive substring filter on the bin name — returns every bin whose name contains this text anywhere. Omit to return all bins. Example: `?search=cooler` matches "Walk-in Cooler" and "Cooler 2".'
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+      - description: 'Filter to bins by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to bins by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of bins
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Bins'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get bins
+      tags:
+      - BIN
+    post:
+      description: 'Create or update a single bin. Pass `id` to update the matching bin; omit `id` to create a new one. A create responds 201 with the new bin; an update responds 200 with the updated bin. Both responses carry the full bin, including its server-assigned `id` and timestamps.
+
+
+        A bin is a named sub-location used by bin inventory tracking — packages, batches, plants, plant groups and assembly outputs are associated to a bin to record where within a location they physically sit. This endpoint only names and renames the bin itself; it never moves, creates, or consumes inventory, and it does not change which packages, batches or plants are associated to a bin. Renaming a bin is reflected everywhere that bin is already referenced.
+
+
+        Names are unique per company, case-insensitively — `Cooler` and `cooler` collide — and cannot contain commas. A create or update that would collide with an existing name, or that includes a comma, is rejected with a 400 and a human-readable message.
+
+
+        Bins only exist for companies that have bin inventory tracking enabled; if it is disabled the request is rejected. Updates are scoped to your company — an `id` for a bin you do not own is treated as not found.
+
+
+        Required permission: `settings_permissions_bins`.'
+      operationId: DistruPublic.V1.BinController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: The bin's ID. Provide it to update that bin (only `name` can change); omit it to create a new bin. An ID for a bin outside your company returns 404.
+                name:
+                  type: string
+                  description: The bin's name. Required on both create and update. Must be unique within your company (compared case-insensitively) and cannot contain a comma; violating either returns a 400. This is the only editable field on update.
+              required:
+              - name
+        required: true
+      responses:
+        '200':
+          description: The updated bin
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BinResponse'
+        '201':
+          description: The created bin
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BinResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a bin
+      tags:
+      - BIN
+  /public/v1/bins/{id}:
+    delete:
+      description: 'Permanently delete a bin. This is a hard delete — the bin is gone for good and cannot be recovered; there is no soft-delete or undo.
+
+
+        Deleting a bin also detaches it from everything associated to it: any packages, batches, plants, plant groups and assembly outputs that referenced this bin are unbinned. Those records, and their inventory, are not deleted — they simply no longer point to any bin. Nothing about inventory quantities, packages, or compliance changes; only the bin association is removed.
+
+
+        Returns 404 if no bin with that ID belongs to your company (the lookup is company-scoped), and 204 with no body on success.
+
+
+        Bins only exist for companies that have bin inventory tracking enabled; if it is disabled the request is rejected.
+
+
+        Required permission: `settings_permissions_bins`.'
+      operationId: DistruPublic.V1.BinController.delete
+      parameters:
+      - description: The bin's ID.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a bin
+      tags:
+      - BIN
+    get:
+      description: 'Fetch a single bin by ID.
+
+
+        Returns 404 if no bin with that ID belongs to the authenticated company — the lookup is scoped to your company, so an ID from another company is indistinguishable from one that does not exist.
+
+
+        Required permission: `settings_permissions_bins`.'
+      operationId: DistruPublic.V1.BinController.show
+      parameters:
+      - description: The bin's ID.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single bin
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BinResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a bin
+      tags:
+      - BIN
+components:
+  schemas:
+    Bins:
+      description: A collection of bins
+      properties:
+        data:
+          description: Bins
+          items:
+            $ref: '#/components/schemas/Bin'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Bins
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Bin:
+      description: A bin used to track where inventory is physically stored
+      properties:
+        id:
+          description: ID for this bin
+          type: string
+        inserted_datetime:
+          description: When the bin was created (UTC ISO-8601)
+          type: string
+        name:
+          description: The name of the bin
+          type: string
+        updated_datetime:
+          description: When the bin was last updated (UTC ISO-8601)
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Bin
+      type: object
+    BinResponse:
+      description: A single bin
+      properties:
+        data:
+          $ref: '#/components/schemas/Bin'
+      title: Bin Response
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

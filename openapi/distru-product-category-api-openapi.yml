@@ -1,0 +1,395 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Product Category API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Product Category
+paths:
+  /public/v1/product-categories:
+    get:
+      description: 'List the product categories belonging to the authenticated company, oldest-first by creation
+
+        time. Soft-deleted categories are excluded, and results are scoped to your company only. Each
+
+        entry also carries its subcategories.
+
+
+        Results are paged: the response returns a fixed-size page plus a `next_page` URL, which is null
+
+        on the last page.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductCategoryController.index
+      parameters:
+      - description: Restrict the result to specific product categories by ID (the same ID returned as each category's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to product categories by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to product categories by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of product categories
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductCategories'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get product categories
+      tags:
+      - Product Category
+    post:
+      description: 'Create or update a single product category. Include the `id` of an existing category to update
+
+        it in place; omit `id` to create a new one. A create returns 201, an update returns 200. Updates
+
+        are sparse — only the fields you send change, and omitted fields keep their current value.
+
+
+        `name` must be unique within your company. A name currently held by a soft-deleted category is
+
+        also rejected, so restore or rename that deleted category first. Names are trimmed of surrounding
+
+        whitespace and may not contain special characters.
+
+
+        `official_product_category_id` maps the category to Distru''s system-defined official category
+
+        list and is required when creating. Once a category maps to a non-null official category that
+
+        mapping is locked: on update, omit it or resend the same value — sending a different value is
+
+        rejected. The one exception is a category that is currently unmapped (null), which can happen
+
+        for categories created before this mapping existed: you may set its mapping on an update, but
+
+        not change it afterward. This mapping also drives how the category is synced to your connected
+
+        point-of-sale integrations (Blaze, Dutchie, Treez), so treat it as permanent once chosen.
+
+
+        Subcategories are not editable through this endpoint; manage them with the product subcategory
+
+        endpoints. Existing products keep their category assignment.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductCategoryController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the category to update. When present, that category is updated in place; when absent, a new category is created.
+                name:
+                  type: string
+                  description: The category's display name. Must be unique within your company (a name held by a soft-deleted category is also rejected). Trimmed of surrounding whitespace; special characters are not allowed. Required when creating; on update, omit to leave the current name unchanged.
+                official_product_category_id:
+                  type: string
+                  description: 'ID of the official (Distru system-defined) category this maps to; list valid IDs with `GET /public/v1/official-product-categories`. Required when creating. Once a category holds a non-null mapping it is locked — on update omit it or resend the same value, since a different value is rejected. A category that is currently unmapped (null) is the one exception: you may set its mapping on an update, but not change it afterward. This mapping drives how the category syncs to your point-of-sale integrations (Blaze, Dutchie, Treez). This is an external-facing string ID, not a numeric one.'
+              required:
+              - name
+              - official_product_category_id
+        required: true
+      responses:
+        '200':
+          description: The updated product category
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductCategoryResponse'
+        '201':
+          description: The created product category
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductCategoryResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a product category
+      tags:
+      - Product Category
+  /public/v1/product-categories/{id}:
+    delete:
+      description: 'Soft-delete the product category: it stops appearing in list and fetch responses, while the row
+
+        is retained. Returns 404 if the category does not exist for your company or is already deleted.
+
+
+        Deleting also removes this category — and each of its subcategories — from any
+
+        price tier filters that referenced them, so those price tiers stop scoping by
+
+        the removed category. The deleted category''s name stays reserved: it cannot be reused by a new
+
+        category until the deleted one is renamed.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductCategoryController.delete
+      parameters:
+      - description: ID of the product category to delete, as returned in a category's `id` field.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a product category
+      tags:
+      - Product Category
+    get:
+      description: 'Fetch a single product category by ID, including its subcategories. Scoped to your company:
+
+        returns 404 if no category with that ID exists for your company or if it has been soft-deleted.
+
+
+        Required permission: `settings_permissions_product_categories`.'
+      operationId: DistruPublic.V1.ProductCategoryController.show
+      parameters:
+      - description: ID of the product category, as returned in a category's `id` field.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single product category
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProductCategoryResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a product category
+      tags:
+      - Product Category
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ProductCategoryResponse:
+      description: A single product category
+      properties:
+        data:
+          $ref: '#/components/schemas/ProductCategory'
+      title: Product Category Response
+      type: object
+    ProductCategories:
+      description: A collection of product categories
+      properties:
+        data:
+          description: Product Categories
+          items:
+            $ref: '#/components/schemas/ProductCategory'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Product Categories
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    ProductCategory:
+      description: A product category
+      properties:
+        id:
+          description: The product category's ID.
+          type: string
+        inserted_datetime:
+          description: When the product category was created (UTC ISO-8601).
+          type: string
+        name:
+          description: The category's display name. Unique within the company.
+          type: string
+        official_product_category_id:
+          description: ID of the official product category this maps to (Distru's standard, system-defined category list; see `GET /public/v1/official-product-categories`), or null if the category has not been mapped to one. A non-null mapping is locked and cannot be changed once set. This is an external-facing string ID, not a numeric one.
+          type: string
+        subcategories:
+          description: The subcategories that belong to this category, each as `id` and `name`. Always present; an empty array when the category has no subcategories.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        updated_datetime:
+          description: When the product category was last updated (UTC ISO-8601). Equals `inserted_datetime` until the category is first edited.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - subcategories
+      - name
+      - id
+      title: ProductCategory
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

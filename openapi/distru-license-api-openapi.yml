@@ -1,0 +1,418 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru License API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: License
+paths:
+  /public/v1/licenses:
+    get:
+      description: 'Returns the paginated list of your own company''s licenses, oldest first (ascending creation date). A license identifies your company to the state and its compliance system, and appears throughout the rest of the API: locations link to a license, and packages, transfers, and cultivation records are all scoped to one. Unlike the compact license object nested in other resources, this endpoint returns the full license detail, including the health of the license''s Metrc sync in both directions:
+
+
+        • `metrc_pull_status` reports the **pull** side — how fresh each cache of data Distru reads from Metrc is (packages, transfers, items, and so on), and whether a backfill is currently re-reading historical data.
+
+        • `metrc_push_status` reports the **push** side — the queue of changes Distru writes to Metrc for this license: how many changes are waiting, how many have permanently failed, when a change last succeeded, and the details of the oldest change that has not completed yet.
+
+
+        Both objects are populated only for licenses whose `compliance_type` is `METRC`, and are null otherwise.
+
+
+        Each license also carries its `intake_location` — the location that POST /public/v1/packages/import delivers imported inventory to when an entry omits its `location_id`, as configured on the license in Distru. Null when not configured. It is returned only here, not on the compact license nested in other resources.
+
+
+        Use these two objects to alert on sync problems before they surface as stale or rejected data: a failed activity blocks the queue behind it, an old `oldest_incomplete_activity` means the queue is stalled, and an old cache timestamp means data read from Metrc may be out of date. Note that Distru only pulls from Metrc while the company''s users are active in Distru, so an old cache timestamp can also simply mean nobody has been using Distru recently.
+
+
+        Filter the result set by `ids`, `active`, `compliance_type`, and `license_number` (exact match); when several are supplied a license must satisfy all of them to be returned (AND). Results are scoped to your own company; you never see another tenant''s licenses, and licenses that belong to your partner companies are not included.
+
+
+        Results are paginated: read the top-level `next_page` URL to fetch the following page, and stop when it is null. Page size is fixed by the server and is not client-controllable.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `licenses_permissions_view`.'
+      operationId: DistruPublic.V1.LicenseController.index
+      parameters:
+      - description: When `true`, returns only active licenses; when `false`, only inactive ones. Omit the param to return both.
+        in: query
+        name: active
+        required: false
+        schema:
+          type: boolean
+      - description: Filter by the compliance system the license syncs with. `METRC` and `BIOTRACK` licenses sync with their state system; `NONE` licenses exist only in Distru and carry no sync health. Omit the param to return all licenses.
+        in: query
+        name: compliance_type
+        required: false
+        schema:
+          type: string
+          enum:
+          - METRC
+          - BIOTRACK
+          - NONE
+      - description: Restrict the result to specific licenses by ID (the same ID returned as each license's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by the exact `license_number` as issued by the state (case-sensitive exact match, e.g. `C11-0000001-LIC`). Send a single value, not a list.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of licenses
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LicenseDetails'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get licenses
+      tags:
+      - License
+  /public/v1/licenses/{id}:
+    get:
+      description: 'Returns a single license by its ID, including the Metrc sync health objects described on the list endpoint: `metrc_pull_status` (freshness of the data Distru pulls from Metrc) and `metrc_push_status` (the queue of changes Distru pushes to Metrc). Both are null unless `compliance_type` is `METRC`. Also returns the license''s `intake_location` — the default destination of POST /public/v1/packages/import — described on the list endpoint. Use this to resolve a license referenced elsewhere (for example the `license_id` on a location) into its full detail, or to poll one license''s sync health.
+
+
+        Lookups are scoped to your own company: an ID that does not exist, or that belongs to another company, returns `404` — the two cases are indistinguishable.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `licenses_permissions_view`.'
+      operationId: DistruPublic.V1.LicenseController.show
+      parameters:
+      - description: The license's Distru ID, as returned in the `id` field of a license response. License numbers and IDs from external systems such as Metrc are not accepted here.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single license
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LicenseDetailResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a license
+      tags:
+      - License
+components:
+  schemas:
+    LicenseDetails:
+      description: A collection of licenses
+      properties:
+        data:
+          description: License Details
+          items:
+            $ref: '#/components/schemas/LicenseDetail'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: License Details
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    MetrcCacheTimestamps:
+      description: How far each of Distru's per-license caches of Metrc data has caught up. Each field is the ISO 8601 datetime up to which that kind of data has been fetched from Metrc, or null when that cache has never been synced (for example, a kind of data the license's facility type does not use). While the company's users are active in Distru these advance every few minutes; a timestamp that stops advancing means reads from Metrc are failing, or simply that nobody has been using Distru (pulls run only while users are active).
+      properties:
+        harvests:
+          description: How far the harvests cache has caught up, or null when never synced
+          type: string
+        items:
+          description: How far the items cache has caught up, or null when never synced
+          type: string
+        locations:
+          description: How far the Metrc locations (rooms) cache has caught up, or null when never synced
+          type: string
+        packages:
+          description: How far the packages cache has caught up, or null when never synced
+          type: string
+        plant_additives:
+          description: How far the plant additives cache has caught up, or null when never synced
+          type: string
+        plant_batches:
+          description: How far the plant batches cache has caught up, or null when never synced
+          type: string
+        plants:
+          description: How far the plants cache has caught up, or null when never synced
+          type: string
+        processing_jobs:
+          description: How far the processing jobs cache has caught up, or null when never synced
+          type: string
+        sales_receipts:
+          description: How far the sales receipts cache has caught up, or null when never synced
+          type: string
+        strains:
+          description: How far the strains cache has caught up, or null when never synced
+          type: string
+        transfers:
+          description: How far the transfers cache has caught up, or null when never synced
+          type: string
+      title: Metrc Cache Timestamps
+      type: object
+    LicenseDetail:
+      description: 'A cannabis license held by your company, identifying it to the state and its compliance system. Extends the compact [license](#model-license) nested in other resources with the health of the license''s Metrc sync in both directions: `metrc_pull_status` for the data Distru pulls from Metrc, and `metrc_push_status` for the changes Distru pushes to Metrc. Returned only by the license endpoints.'
+      properties:
+        active:
+          description: Whether this license is currently active
+          type: boolean
+        compliance_type:
+          description: The compliance system this license syncs with. `METRC` and `BIOTRACK` licenses sync with their state system; a `NONE` license exists only in Distru. Sync health is exposed only for `METRC` licenses — `metrc_pull_status` and `metrc_push_status` are null for every other compliance type.
+          enum:
+          - METRC
+          - BIOTRACK
+          - NONE
+          type: string
+        expiry_datetime:
+          description: ISO 8601 datetime this license expires (e.g. "2026-08-20T00:00:00Z")
+          type: string
+        id:
+          description: ID for this license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this license was created at
+          type: string
+        intake_location:
+          $ref: '#/components/schemas/LocationCompact'
+        issue_datetime:
+          description: ISO 8601 datetime this license was issued, or null when not set
+          type: string
+        license_number:
+          description: License number
+          example: C11-1234567890
+          type: string
+        license_type:
+          description: The license type as configured in Distru. A state-specific free-form value, e.g. "Distributor" or "Type 11 Distributor-Transport"
+          type: string
+        metrc_pull_status:
+          $ref: '#/components/schemas/MetrcPullStatus'
+        metrc_push_status:
+          $ref: '#/components/schemas/MetrcPushStatus'
+        updated_datetime:
+          description: ISO 8601 datetime this license was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - expiry_datetime
+      - compliance_type
+      - active
+      - license_type
+      - license_number
+      - id
+      title: License Detail
+      type: object
+    MetrcPullStatus:
+      description: The health of the data Distru pulls from Metrc for one license. Distru keeps a cache per kind of Metrc data; each timestamp says how far that cache has caught up. An old timestamp means data read from Metrc — package quantities, incoming transfers, and so on — may be out of date in Distru and in this API, either because pulls are failing or because none of the company's users have been active in Distru (Distru only pulls from Metrc while users are active).
+      properties:
+        caches_updated_up_until:
+          $ref: '#/components/schemas/MetrcCacheTimestamps'
+        has_in_progress_backfills:
+          description: True while Distru is re-reading historical data from Metrc for this license. While a backfill runs, data for this license may be temporarily incomplete — hold off on reconciliation until it turns false.
+          type: boolean
+      required:
+      - has_in_progress_backfills
+      - caches_updated_up_until
+      title: Metrc Pull Status
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    IncompleteMetrcActivity:
+      description: 'One queued change that has not finished writing to Metrc. The error fields describe the most recent attempt: they are null while the activity progresses cleanly, and populated while it is retrying or after it has failed.'
+      properties:
+        error:
+          description: Human-readable message from the most recent failed attempt, or null when the last attempt did not fail. For `EXTERNAL_VALIDATION` errors this is Metrc's own message (e.g. "This tag does not exist in this current Facility.").
+          type: string
+        error_count:
+          description: The number of consecutive failed attempts to write this activity. Zero while the activity progresses cleanly. Failed attempts are retried automatically, so a small transient count can recover on its own.
+          type: integer
+        error_type:
+          description: What kind of failure the most recent failed attempt was, or null when the last attempt did not fail. `EXTERNAL_VALIDATION` means Metrc rejected the change — fix the data. `EXTERNAL_FAILURE` means Metrc was unavailable or errored — retries usually recover once it stabilizes. `INTERNAL` means Distru could not build the change — contact support.
+          enum:
+          - INTERNAL
+          - EXTERNAL_VALIDATION
+          - EXTERNAL_FAILURE
+          type: string
+        last_attempt_datetime:
+          description: ISO 8601 datetime the activity was last worked on — the most recent attempt to write it, or its most recent status change
+          type: string
+        queued_datetime:
+          description: ISO 8601 datetime the activity was queued. The further in the past, the longer this license's queue has been stuck.
+          type: string
+        status:
+          description: How far the activity has progressed. `PENDING` and `PRECONDITIONS_VERIFIED` mean it has not been written yet; `CHANGE_MADE` means Metrc accepted the change and Distru is finalizing it; `FAILED` means it permanently failed after exhausting retries and requires manual attention. `COMPLETED` never appears here — a completed activity is no longer incomplete.
+          enum:
+          - PENDING
+          - PRECONDITIONS_VERIFIED
+          - CHANGE_MADE
+          - FAILED
+          type: string
+        title:
+          description: Human-readable summary of the change, as shown in the Distru web app (e.g. "Create package 1A4000000000000000000001")
+          type: string
+        type:
+          description: The kind of change being written, e.g. `CREATE_PACKAGE`, `ADJUST_PACKAGE`, or `HARVEST_PLANTS`
+          type: string
+      required:
+      - error_count
+      - last_attempt_datetime
+      - queued_datetime
+      - status
+      - type
+      - title
+      title: Incomplete Metrc Activity
+      type: object
+    LicenseDetailResponse:
+      description: A single license wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/LicenseDetail'
+      title: License Detail Response
+      type: object
+    MetrcPushStatus:
+      description: 'The health of the changes Distru pushes to Metrc for one license. Each change — creating a package, adjusting a quantity, recording a harvest — is queued as an activity and written in order, so one failing activity blocks the queue behind it. Use this object to alert on a blocked or stalled queue: a non-zero `failed_count` needs attention, and an `oldest_incomplete_activity` whose `queued_datetime` is old means changes are not reaching Metrc.'
+      properties:
+        failed_count:
+          description: The number of activities that permanently failed after exhausting retries. A failed activity blocks dependent changes from syncing and requires manual attention; anything above zero is unhealthy.
+          type: integer
+        last_completed_activity_datetime:
+          description: ISO 8601 datetime a change last finished writing to Metrc for this license, or null when no activity has ever completed. A recent value confirms the license can currently write to Metrc.
+          type: string
+        oldest_incomplete_activity:
+          $ref: '#/components/schemas/IncompleteMetrcActivity'
+        queued_count:
+          description: The number of activities currently waiting to be written to Metrc. A busy license normally holds a small, fast-moving queue; the count alone does not indicate a problem — compare `oldest_incomplete_activity.queued_datetime` against the current time to detect a stall.
+          type: integer
+      required:
+      - failed_count
+      - queued_count
+      title: Metrc Push Status
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

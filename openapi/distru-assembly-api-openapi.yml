@@ -1,0 +1,2526 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Assembly API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Assembly
+paths:
+  /public/v1/assemblies:
+    get:
+      description: 'Get a page of assemblies, each with its full outputs, inputs, and costs, ordered oldest to newest
+
+        by their last modified date. All filters below are ANDed together, and results are paginated.
+
+
+        Because the order is by last modified date, an assembly that is modified while you are paging moves
+
+        to the end of the order and can appear again on a later page — walking the pages is safe as long as
+
+        you treat a repeated ID as the same assembly. No assembly is ever skipped this way.
+
+
+        Nested `input_*` and `output_*` filters match against an assembly''s inputs and outputs. When you
+
+        combine several filters for the same side, a single line must satisfy all of them: e.g.
+
+        `input_product_ids` + `input_batch_ids` keeps only assemblies that have one input matching both.
+
+        Input and output filters combine across sides too — an assembly must have a matching input AND a
+
+        matching output to be returned.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate
+
+        in responses — an assembly you just created or updated (including via the upsert or split-package
+
+        endpoints) may not appear here for up to a second.
+
+
+        Required permission: `assemblies_permissions_view`. Results are scoped to your company and further
+
+        filtered to only the assemblies the authenticated user''s team restrictions allow them to see, so a
+
+        restricted key may see fewer rows than exist.'
+      operationId: DistruPublic.V1.AssemblyController.index
+      parameters:
+      - description: Restrict the result to specific assemblies by ID (the same ID returned as each assembly's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter by the datetime an assembly was completed, as an inclusive `after,before` range of ISO 8601 timestamps. Either side may be left blank: `2022-07-10T00:00:00Z,` returns everything completed on or after that instant, `,2022-07-10T00:00:00Z` everything completed on or before it, and `2022-07-01T00:00:00Z,2022-07-31T00:00:00Z` the closed interval between the two. Only COMPLETED assemblies have a completion datetime, so any value here implicitly excludes PENDING assemblies.'
+        in: query
+        name: completion_datetime
+        required: false
+        example: ?completion_datetime=2022-07-01T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: 'Filter to assemblies that originated a given way, matching exactly one value. • `MANUALLY_CREATED` — built by hand in Distru or via the upsert endpoint (the only source this API can modify). • `SALES_ORDER` — generated to fulfill a sales order. • `SPLIT_PACKAGE` — produced by splitting a Metrc package (including via the split-package endpoint). • `LAB_TESTING` — created to pull a test sample. Note: this attribute is unreliable for assemblies created before September 2020, which may report `MANUALLY_CREATED` regardless of their true origin.'
+        in: query
+        name: creation_source
+        required: false
+        schema:
+          type: string
+          enum:
+          - MANUALLY_CREATED
+          - SALES_ORDER
+          - SPLIT_PACKAGE
+          - LAB_TESTING
+      - description: Filter to assemblies tied to the license with this exact license number within your company (exact match, not a substring). Assemblies on non-compliance (NONE) licenses have no license number and are excluded when this is set.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000123-LIC
+        schema:
+          type: string
+      - description: Filter by assembly status, matching exactly one value. • `PENDING` — still in progress; ingredient inventory is claimed but not yet consumed and the assembly can still be edited or deleted. • `COMPLETED` — finished; inputs are consumed and outputs produced into inventory, and the assembly is frozen.
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - COMPLETED
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=assembly` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      - description: Filter by when the assembly was created, as an inclusive `after,before` range of ISO 8601 timestamps. Either side may be left blank to make the range open-ended.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-01T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by when the assembly was last modified, as an inclusive `after,before` range of ISO 8601 timestamps. Either side may be left blank to make the range open-ended.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-01T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Restrict to assemblies owned by any of these user IDs (matched against each assembly's `owner_id`). Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies tied to any of these license IDs. This is the exact-ID counterpart to `license_number`; both may be combined (ANDed). Assemblies on non-compliance (NONE) licenses have no license and are excluded when this is set. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: license_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input of any of these product IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input drawn from any of these package IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_package_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input drawn from any of these batch IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input package carrying any of these Metrc compliance labels (case-sensitive exact match per value). Repeat the bracketed key per label. At most 200.
+        in: query
+        name: input_package_compliance_labels
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input package whose Distru batch number is any of these (case-sensitive exact match per value). Repeat the bracketed key per value. At most 200.
+        in: query
+        name: input_package_batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input batch whose batch number is any of these (case-sensitive exact match per value). Repeat the bracketed key per value. At most 200.
+        in: query
+        name: input_batch_batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product belongs to any of these category IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product belongs to any of these subcategory IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product SKU is any of these (case-insensitive exact match per value). Repeat the bracketed key per SKU. At most 200.
+        in: query
+        name: input_product_skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product belongs to any of these product group IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product belongs to any of these brand IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product is tied to any of these vendor (company relationship) IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product carries any of these tag IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an input whose product belongs to any of these strain IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: input_product_strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output of any of these product IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output produced into any of these package IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_package_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output produced into any of these batch IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output package carrying any of these Metrc compliance labels (case-sensitive exact match per value). Repeat the bracketed key per label. At most 200.
+        in: query
+        name: output_package_compliance_labels
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output package whose Distru batch number is any of these (case-sensitive exact match per value). Repeat the bracketed key per value. At most 200.
+        in: query
+        name: output_package_batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output batch whose batch number is any of these (case-sensitive exact match per value). Repeat the bracketed key per value. At most 200.
+        in: query
+        name: output_batch_batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product belongs to any of these category IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product belongs to any of these subcategory IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product SKU is any of these (case-insensitive exact match per value). Repeat the bracketed key per SKU. At most 200.
+        in: query
+        name: output_product_skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product belongs to any of these product group IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product belongs to any of these brand IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product is tied to any of these vendor (company relationship) IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product carries any of these tag IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to assemblies with an output whose product belongs to any of these strain IDs. Repeat the bracketed key per ID. At most 200. Unknown IDs match nothing; an empty list is no filter.
+        in: query
+        name: output_product_strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: A list of assemblies
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Assemblies'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get assemblies
+      tags:
+      - Assembly
+    post:
+      description: 'Create, update, or delete an assembly and its outputs, inputs, and costs in a single request. Every row — the assembly and each nested output, input, and cost — carries a required `action` of
+
+        `CREATE`, `UPDATE`, or `DELETE`. `UPDATE` and `DELETE` must include the row''s `id`; `CREATE` omits
+
+        it. `DELETE` on the assembly removes it along with all of its outputs, inputs, and costs. Updates
+
+        are sparse: only the fields you send are changed. A nested row (output, input, or cost) you leave
+
+        out entirely is left untouched — omission never deletes it; removing one always requires sending it
+
+        with `action` `DELETE`. The whole request is applied atomically: if any row is rejected, none of the
+
+        changes are saved. How this moves inventory: while the assembly is `PENDING`, each fulfilled input (`status` `PENDING`
+
+        or `COMPLETED`) claims specific on-hand inventory from its batch or package, and each `DRAFT` input
+
+        reserves product-level quantity without committing a specific lot. Completing an output consumes its
+
+        inputs and produces the output into inventory at its `location_id` — as a batch for batch-/product-
+
+        tracked outputs, or as a new package for package-tracked (Metrc) outputs. Completing the whole
+
+        assembly requires all of its outputs to be completed. How this moves compliance: on a Metrc license, completing a package-tracked output (or a Metrc
+
+        processing job) is pushed to Metrc as a side effect after the request commits. A 2xx therefore means
+
+        the change was saved in Distru, not that Metrc has finished syncing — the created packages'' Metrc
+
+        identifiers may still be absent and the affected packages briefly flagged as syncing. Re-fetch the
+
+        assembly with `GET /public/v1/assemblies/{id}` to observe the synced result. This endpoint supports
+
+        Metrc and non-compliance (NONE) licenses only; BioTrack is not supported. Only assemblies with `creation_source=MANUALLY_CREATED` (i.e. created via the Assembly form in
+
+        Distru or via the API) can be modified or deleted by this endpoint; system-generated assemblies
+
+        (`SALES_ORDER`, `SPLIT_PACKAGE`, `LAB_TESTING`) are rejected. Metrc processing jobs: set `metrc_processing_job.name` and `metrc_processing_job.type_id` together
+
+        to make the assembly a Metrc processing job. Both are required together, the license must be a
+
+        Metrc license with processing-job capability, `type_id` must be the Metrc ID of an existing Metrc
+
+        processing job type, and `name` must be non-empty and not already used by a processing job in Metrc. Once set, `name` and `type_id` are permanent — they
+
+        cannot be changed on a later update; only `notes` and `waste` stay editable. `metrc_processing_job.id`
+
+        in the response is the job''s Metrc-assigned ID (set by Metrc once Distru creates the job there); it
+
+        is read-only and null until then. Completing a processing job (setting `status` to `COMPLETED`) requires
+
+        `notes`. `waste` is what Distru reports to Metrc when the job is finished (each quantity sent with
+
+        its unit name); record it while the assembly is still `PENDING` — at the latest in the same request
+
+        that completes it. Once the assembly is `COMPLETED` the waste fields are read-only. Completed assemblies: once an assembly''s `status` is `COMPLETED`, the only assembly-level fields
+
+        you can still change are `description`, `custom_data`, `estimated_work_hours`,
+
+        `estimated_work_minutes`, and `owner_id`; every other assembly field is read-only, and the assembly
+
+        can be neither un-completed nor deleted. Its outputs and inputs are frozen — they cannot be edited
+
+        or deleted. Costs behave differently: an existing cost on a completed output cannot be edited or
+
+        deleted, but you can still add new costs to that output. Completing an assembly requires all of its
+
+        outputs to be completed. For a Metrc processing job, packages (inputs) cannot be added or removed
+
+        once any output is completed; to delete such an assembly, finish the job in Metrc and Distru removes
+
+        it automatically about 30 minutes later.'
+      operationId: DistruPublic.V1.AssemblyController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertAssemblyRequest'
+        description: The assembly to create, update or delete
+        required: true
+      responses:
+        '200':
+          description: The updated assembly
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AssemblyResponse'
+        '201':
+          description: The created assembly
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AssemblyResponse'
+        '204':
+          description: The assembly was deleted
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert an assembly
+      tags:
+      - Assembly
+  /public/v1/assemblies/create_test_sample:
+    post:
+      description: 'Pull a quantity from an existing Metrc package into a new test sample package, ready to be
+
+        sent to a testing lab.
+
+
+        Creates one already-completed assembly with a single input (the quantity drawn from the
+
+        source package) and a single test sample output — the assembly renders with
+
+        `creation_source: LAB_TESTING` and its output with `is_test_sample: true`. The drawn quantity is consumed from the
+
+        source package''s inventory immediately, and the sample package is produced into inventory at
+
+        `location_id`. On success the sample is queued for creation in Metrc as a testing package and
+
+        synced asynchronously — the Metrc package identifiers are not present in the immediate
+
+        response, and the source and sample packages are briefly flagged as syncing. Poll
+
+        `GET /public/v1/assemblies/{id}` to observe the synced result.
+
+
+        Metrc licenses only, and the license''s Metrc facility must be allowed to create test sample
+
+        packages. The whole operation is atomic: if anything is rejected, nothing is changed.
+
+
+        Required permission: `assemblies_permissions_create`, and assembly visibility other than
+
+        "Restrict access" on your teams (admins are always allowed).'
+      operationId: DistruPublic.V1.AssemblyController.create_test_sample
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTestSampleRequest'
+        description: The source package and the test sample to create from it
+        required: true
+      responses:
+        '201':
+          description: The created assembly
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AssemblyResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create a test sample
+      tags:
+      - Assembly
+  /public/v1/assemblies/split_package:
+    post:
+      description: 'Split a single Metrc source package into multiple output packages.
+
+
+        Creates one assembly containing every input and output. On success each output package is
+
+        queued for creation in Metrc and synced asynchronously — the Metrc package identifiers are
+
+        not present in the immediate response, and the source and output packages are briefly flagged
+
+        as syncing.
+
+
+        Metrc licenses only. Up to 300 outputs per request. The whole split is applied atomically:
+
+        if any output is rejected, none are created.
+
+
+        Required permission: `assemblies_permissions_create`, and assembly visibility other than
+
+        "Restrict access" on your teams (admins are always allowed).'
+      operationId: DistruPublic.V1.AssemblyController.split_package
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SplitPackageRequest'
+        description: The source package and outputs to create
+        required: true
+      responses:
+        '201':
+          description: The created assembly
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AssemblyResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Split a package
+      tags:
+      - Assembly
+  /public/v1/assemblies/{id}:
+    delete:
+      description: 'Deletes an assembly. This is a hard delete: the assembly is permanently removed together with all of its outputs, inputs, costs, and bin links — it disappears from `GET /public/v1/assemblies`, `GET /public/v1/assemblies/{id}` returns 404 for it, and it cannot be recovered through the API. This is the same operation as `POST /public/v1/assemblies` with `action` `DELETE`. Responds 204 with no body on success, or 404 if no assembly with that `id` exists in your company (including one that belongs to another company), or 403 if your team restrictions hide it. Metrc and non-compliance (NONE) licenses only; BioTrack is not supported.
+
+
+        Some assemblies cannot be deleted; each of these is refused with a 400 and nothing is changed:
+
+
+        • An assembly with any COMPLETED output — which includes every COMPLETED assembly (completing an assembly requires all of its outputs to be completed). The inventory a completed output produced stays; there is no way to un-complete or delete such an assembly through the API.
+
+        • A Metrc processing job assembly whose job has been adjusted in Metrc, or that has completed outputs. Finish the processing job in Metrc instead — Distru deletes the assembly automatically about 30 minutes later.
+
+        • A system-generated assembly (`creation_source` SALES_ORDER, SPLIT_PACKAGE, or LAB_TESTING) — only MANUALLY_CREATED assemblies can be deleted through the API.
+
+        • A BioTrack assembly.
+
+        • An assembly another request is mutating at that same moment (transient — retry).
+
+
+        Inventory: the quantities the assembly''s PENDING or COMPLETED inputs had claimed, and the product-level quantities its DRAFT inputs had reserved, are released back to available inventory. An input package this assembly had fully consumed (finished) is reactivated, and unfinished in Metrc as well.
+
+
+        Other effects, all in one atomic call: tasks tied to the assembly are deleted; batches linked to it and files attached to it are detached but kept. If the assembly created a Metrc processing job (and that job was never adjusted in Metrc), the job is deleted in Metrc as a side effect after the request commits (that sync is eventual — observe it in Metrc, not in the 204).
+
+
+        Required permission: `assemblies_permissions_delete`.'
+      operationId: DistruPublic.V1.AssemblyController.delete
+      parameters:
+      - description: ID of the assembly to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your company returns 404, and one your team restrictions hide returns 403.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete an assembly
+      tags:
+      - Assembly
+    get:
+      description: 'Get a single assembly by ID, with its full outputs, inputs, and costs.
+
+
+        Like the list endpoint, this reflects eventually consistent data — an assembly you just created or
+
+        updated may take up to a second to reflect its latest state here. Returns 404 if no assembly with
+
+        that ID exists in your company, and 403 if your team restrictions hide it.
+
+
+        Required permission: `assemblies_permissions_view`.'
+      operationId: DistruPublic.V1.AssemblyController.show
+      parameters:
+      - description: The ID of the assembly to fetch.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single assembly
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AssemblyResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get an assembly
+      tags:
+      - Assembly
+  /public/v1/assemblies/{id}/pdf:
+    post:
+      description: 'Generate the work order PDF for a single assembly — the same printable production sheet listing
+
+        its outputs, inputs, and costs that Distru generates in the UI — and download it directly, get a
+
+        signed link to it, or email it (see `format`). This is a read-only operation: it neither changes
+
+        the assembly nor touches inventory or compliance.
+
+
+        The same permissions that govern downloading this PDF in the Distru web app apply to this endpoint; when `format` is `email`, the web app''s permission for emailing it applies instead (documents the web app cannot email keep the download permission).
+
+
+        `format` selects how the generated PDF is delivered and has three modes: `binary` returns the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` returns a JSON envelope `{"data": {"url": ..., "expires_datetime": ...}}` with a temporary signed download URL; `email` sends the PDF to the addresses in `email_addresses` and returns a JSON envelope `{"data": {"emailed_to": [...]}}`. `format` is required, but for backward compatibility omitting it defaults to `binary`.
+
+
+        All PDF download endpoints share a single, combined rate limit for your account: 20 requests per minute and 1000 per day in total across every PDF endpoint (not per endpoint). Requests over the limit return 429 with a Retry-After header, and only successful downloads count toward it.'
+      operationId: DistruPublic.V1.AssemblyController.download_pdf
+      parameters:
+      - description: The ID of the assembly whose work order PDF you want.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/DistruPublic.V1.AssemblyController.download_pdfBody'
+      responses:
+        '200':
+          description: 'When `format` is `binary` (or omitted), the raw PDF file (`Content-Type: application/pdf`). When `format` is `url`, a JSON body with a temporary signed download URL; when `format` is `email`, a JSON body listing the addresses the PDF was emailed to (see the PdfResponse schema).'
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/PdfResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's shared PDF download rate limit (20/minute, 1000/day across all PDF endpoints) was exceeded. Retry after the period in the Retry-After header.
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Generate a work order PDF
+      tags:
+      - Assembly
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    UpsertAssemblyMetrcProcessingJob:
+      description: The Metrc processing job details for an assembly
+      properties:
+        name:
+          description: The Metrc processing job name. Required together with `type_id`; must be non-empty and not already used by a processing job in Metrc. Permanent once set — cannot be changed on a later update.
+          type: string
+        notes:
+          description: The Metrc processing job notes. Required to complete (status COMPLETED) a job. Editable after the job is created.
+          type: string
+        type_id:
+          description: The Metrc ID of an existing Metrc processing job type. Required together with `name`. Permanent once set — cannot be changed on a later update.
+          type: integer
+        waste:
+          $ref: '#/components/schemas/UpsertAssemblyMetrcProcessingJobWaste'
+      title: Upsert Assembly Metrc Processing Job
+      type: object
+    BinCompact:
+      description: Minimal details about a bin, as nested on other records
+      properties:
+        id:
+          description: ID for this bin
+          type: string
+        name:
+          description: The name of the bin
+          type: string
+      required:
+      - name
+      - id
+      title: BinCompact
+      type: object
+    BillOfMaterialsProductInput:
+      description: A specific product consumed by a bill of materials
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: How much of the product this recipe consumes, in the product's unit, as a decimal string (e.g. "2.5").
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsProductInput
+      type: object
+    UpsertAssemblyMetrcProcessingJobWaste:
+      description: Waste reported to Metrc when finishing a Metrc processing job. Each quantity must be sent with its unit name. Submit it while the assembly is still PENDING (at the latest in the request that sets status to COMPLETED); it is read-only once the assembly is COMPLETED.
+      properties:
+        count_quantity:
+          description: Count-based waste. Required together with `count_unit_name`.
+          type: number
+        count_unit_name:
+          description: The Metrc unit name for `count_quantity`, e.g. "Each".
+          type: string
+        volume_quantity:
+          description: Volume-based waste. Required together with `volume_unit_name`.
+          type: number
+        volume_unit_name:
+          description: The Metrc unit name for `volume_quantity`, e.g. "Milliliters".
+          type: string
+        weight_quantity:
+          description: Weight-based waste. Required together with `weight_unit_name`.
+          type: number
+        weight_unit_name:
+          description: The Metrc unit name for `weight_quantity`, e.g. "Grams".
+          type: string
+      title: Upsert Assembly Metrc Processing Job Waste
+      type: object
+    BillOfMaterialsCost:
+      description: An additional cost applied by a bill of materials
+      properties:
+        cost_type:
+          $ref: '#/components/schemas/BillOfMaterialsCostType'
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies, as a decimal string (e.g. "3"). Multiply by the cost type's `cost_per_unit` to get the line total.
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsCost
+      type: object
+    AssemblyMetrcProcessingJobWaste:
+      description: Waste recorded when a Metrc processing job is finished
+      properties:
+        count_quantity:
+          description: Count-based waste, as a decimal string (e.g. "5"). Reported to Metrc as TotalCountWaste. Null when no count waste was recorded.
+          type: string
+        count_unit_name:
+          description: The Metrc unit name for `count_quantity` (e.g. "Each"), or null when `count_quantity` is null
+          type: string
+        volume_quantity:
+          description: Volume-based waste, as a decimal string (e.g. "10.5"). Reported to Metrc as TotalVolumeWaste. Null when no volume waste was recorded.
+          type: string
+        volume_unit_name:
+          description: The Metrc unit name for `volume_quantity` (e.g. "Milliliters"), or null when `volume_quantity` is null
+          type: string
+        weight_quantity:
+          description: Weight-based waste, as a decimal string (e.g. "2.75"). Reported to Metrc as TotalWeightWaste. Null when no weight waste was recorded.
+          type: string
+        weight_unit_name:
+          description: The Metrc unit name for `weight_quantity` (e.g. "Grams"), or null when `weight_quantity` is null
+          type: string
+      title: Assembly Metrc Processing Job Waste
+      type: object
+    CompactMenu:
+      description: A lightweight reference to a DistruCommerce menu — the online catalog a buyer browses to place an order — carrying just its id and name. Where it appears on a sales order, it is the menu that order was placed through. Use the id to fetch the full menu from the menus endpoint.
+      properties:
+        id:
+          description: ID of the menu
+          type: string
+        name:
+          description: Display name of the menu
+          type: string
+      required:
+      - name
+      - id
+      title: CompactMenu
+      type: object
+    SplitPackageOutput:
+      description: A single output package produced by the split
+      properties:
+        batch_number:
+          description: Distru batch number stored on the output package.
+          type: string
+        bin_ids:
+          description: Bins to store the output package in (requires bin inventory tracking enabled for the company). Optional; omit or send an empty array to assign no bins.
+          items:
+            type: string
+          type: array
+        compliance_label:
+          description: The Metrc tag for the new package. Must be an available tag in the source package's license.
+          type: string
+        copy_custom_data_from_input:
+          description: When true, copies the source package's custom field values onto the output package.
+          type: boolean
+        costs:
+          description: Costs to apply to the output package. Optional.
+          items:
+            $ref: '#/components/schemas/CostEntryInput'
+          type: array
+        expiration_date:
+          description: Expiration date reported to Metrc, e.g. "2027-08-19".
+          type: string
+        input_compliance_quantity:
+          description: Amount drawn from the source package, in the source package's compliance unit. Must be > 0.
+          type: number
+        location_id:
+          description: The output location ID. Must be in the same Metrc license as the source package.
+          type: string
+        metrc_item_id:
+          description: The Metrc item id for the output. Required unless use_same_item is true, and must be omitted when it is. Must exist in the source package's Metrc license.
+          type: integer
+        metrc_notes:
+          description: Notes sent to Metrc as the output package's note when it is created (max 255 characters).
+          type: string
+        metrc_production_batch_number:
+          description: When set, flags the output as a Metrc production batch with this batch number.
+          type: string
+        output_compliance_quantity:
+          description: Size of the new package, in the output package's compliance unit (the source unit when use_same_item is true, otherwise the unit of metrc_item_id). Must be > 0.
+          type: number
+        package_date:
+          description: The output package's packaged date. Defaults to today when omitted.
+          type: string
+        product_id:
+          description: The output product ID. Must be package-tracked.
+          type: string
+        use_same_item:
+          description: When true, the output package reuses the source package's Metrc item and metrc_item_id must be omitted.
+          type: boolean
+      required:
+      - compliance_label
+      - location_id
+      - product_id
+      - output_compliance_quantity
+      - input_compliance_quantity
+      title: Split Package Output
+      type: object
+    AssemblyInput:
+      description: An ingredient consumed by an assembly — the inventory used up to produce an output, and its cost.
+      properties:
+        batch:
+          $ref: '#/components/schemas/Batch'
+        compliance_quantity:
+          description: The quantity of this input expressed in the package's unit type, as reported to the state compliance system, as a decimal string. Null when this input is not package-tracked.
+          type: string
+        cost_per_unit:
+          description: Actual cost per unit — `total_cost_actual` divided by this input's quantity (in its product's unit).
+          type: string
+        cost_per_unit_default:
+          description: Default (standard) cost per unit — `total_cost_default` divided by this input's quantity (in its product's unit).
+          type: string
+        id:
+          description: ID for this assembly input
+          type: string
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        package:
+          $ref: '#/components/schemas/Package'
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: The quantity of this input in its product's unit, as a decimal string (e.g. "25").
+          type: string
+        status:
+          description: The status of this input. One of DRAFT (not yet fulfilled with a batch or package), PENDING (fulfilled and waiting to be consumed), or COMPLETED (consumed once the assembly was completed).
+          type: string
+        total_cost_actual:
+          description: Total actual cost of the inventory consumed by this input. Distru traces the components that produced the consumed inventory and sums the real costs incurred along that chain — for example the price paid when a component was purchased, assembly costs, and costs added by stock adjustments, among others. This cost propagates to the output the input feeds.
+          type: string
+        total_cost_default:
+          description: Total default (standard) cost of this input. Traced the same way as `total_cost_actual`, but each component is valued at its product's configured unit cost (the product's `unit_cost`) instead of its real cost.
+          type: string
+      required:
+      - quantity
+      - status
+      - id
+      title: AssemblyInput
+      type: object
+    Product:
+      description: A sellable or trackable item in your catalog — its name, pricing, category, unit of measure, and how its inventory is tracked (see `inventory_tracking_method`).
+      properties:
+        batches_with_active_quantity_by_location:
+          description: The product's batches that hold active quantity, grouped by location. Present only when the request passes `include_batches_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not batch-tracked or holds no active batches.
+          items:
+            $ref: '#/components/schemas/BatchesWithActiveQuantityByLocation'
+          type: array
+        bill_of_materials:
+          $ref: '#/components/schemas/BillOfMaterials'
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this product
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime the product was soft-deleted at, or null when the product has not been deleted
+          type: string
+        description:
+          description: Plain-text description of this product, or null when none was entered. Always null together with `description_markdown` and non-null together with it — one is never set without the other.
+          type: string
+        description_markdown:
+          description: The same description in Markdown. Null when `description` is null; populated whenever `description` is populated.
+          type: string
+        external_name:
+          description: Customer-facing name shown on DistruCommerce menus and the Order Tracker, or null when none is set (it does not fall back to `name`)
+          type: string
+        gross_weight:
+          description: The gross weight of one unit including packaging, as a decimal string, measured in `gross_weight_unit_type`. Null when not set; it is always set together with `gross_weight_unit_type` and null together with it.
+          type: string
+        gross_weight_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        id:
+          description: ID for this product
+          type: string
+        images:
+          description: 'The images associated with this product, in display order: by `rank`, lowest first (the first is the primary image), then by id. Images with no rank come last. Empty array when the product has no images.'
+          items:
+            $ref: '#/components/schemas/Image'
+          type: array
+        inserted_datetime:
+          description: The datetime this product was created at
+          type: string
+        inventory_tracking_method:
+          description: 'How this product''s inventory is tracked. One of: `BATCH` (grouped into batches sharing traits such as expiration dates and test results), `PACKAGE` (inventory is defined by packages), `PRODUCT` (ungrouped; inventory exists directly on the product).'
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+          type: string
+        is_active:
+          description: True when the product is active. False when it has been marked inactive (archived), which hides it from most product pickers.
+          type: boolean
+        is_featured:
+          description: True when the product is flagged as featured
+          type: boolean
+        leaflink_product_id:
+          description: The LeafLink product ID this product is synced to, or null if not synced
+          type: integer
+        menu_visibility:
+          description: 'Which menus this product is shown in. One of `DO_NOT_INCLUDE`, `INCLUDE_IN_ALL`, `INCLUDE_IN_SELECT` (same values accepted by the upsert endpoint); defaults to `DO_NOT_INCLUDE`. The `menus` field below lists the specific menus the product belongs to — this is how you see which menus when the value is `INCLUDE_IN_SELECT`. Setting `INCLUDE_IN_ALL` adds the product to every menu, and a menu created later gets it too, except a copy of a menu it isn''t on, or a new (not copied) menu made by a user who can''t see the product: read `menus` for where it really is.'
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+          type: string
+        menus:
+          description: 'Menus this product is on, ordered by menu creation time then id (includes inactive menus). Follows `menu_visibility`: the chosen menus for `INCLUDE_IN_SELECT`, every menu but the exceptions listed under `menu_visibility` for `INCLUDE_IN_ALL`, and usually none for `DO_NOT_INCLUDE`. A change made by a team-restricted user never removes the product from menus that user can''t see, so those stay listed.'
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        msrp:
+          description: Manufacturer's suggested retail price, as a decimal string (e.g. "19.99"), or null when not set
+          type: string
+        name:
+          description: Human readable name for this product
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packages_with_active_quantity_by_location:
+          description: The product's packages that hold active quantity, grouped by location. Present only when the request passes `include_packages_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not package-tracked or holds no active packages.
+          items:
+            $ref: '#/components/schemas/PackagesWithActiveQuantityByLocation'
+          type: array
+        product_group:
+          $ref: '#/components/schemas/ProductGroupCompact'
+        quantity_active:
+          description: Total active on-hand quantity of this product across all locations, as a decimal string (e.g. "100"). Sums the product's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the product has no active stock. Reserved stock is still physically on-hand, so it is included here; subtract `quantity_reserved` to get `quantity_available`. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The product's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the product has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        quantity_available:
+          description: Active on-hand quantity minus reserved quantity, as a decimal string (e.g. "100"). Equals `quantity_active` − `quantity_reserved` — what is on-hand and not already spoken for by unfulfilled sales orders or draft assemblies. Can be negative when more is reserved than is on-hand at a location. "0" when the product has no active stock and nothing reserved.
+          type: string
+        quantity_available_threshold_max:
+          description: 'Over-stock alert threshold: Distru flags the product when its available quantity rises above this value. Decimal string, or null when no over-stock alert is configured. When both thresholds are set, this is strictly greater than `quantity_available_threshold_min`.'
+          type: string
+        quantity_available_threshold_min:
+          description: 'Low-stock alert threshold: Distru flags the product when its available quantity drops below this value. Decimal string, or null when no low-stock alert is configured. When both thresholds are set, this is strictly less than `quantity_available_threshold_max`.'
+          type: string
+        quantity_reserved:
+          description: 'Total quantity of this product currently reserved across all locations, as a decimal string (e.g. "100"). Reserved quantity is a soft hold tracked separately from on-hand stock (`quantity_active`): it rises as unfulfilled sales order items and draft assembly inputs are created, and falls as they are deleted or fulfilled. "0" when nothing is reserved.'
+          type: string
+        sku:
+          description: The stock keeping unit (SKU) configured for this product
+          type: string
+        strain:
+          $ref: '#/components/schemas/Strain'
+        subcategory:
+          $ref: '#/components/schemas/ProductSubcategoryCompact'
+        tags:
+          description: The tags associated with this product. Empty array when the product has no tags.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        tasks:
+          description: 'The tasks linked to this product that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total_cannabinoid_unit:
+          description: The unit `total_thc` and `total_cbd` are measured in — one of MG (milligrams per unit) or PERCENT (percent by weight). Null when neither potency value is set.
+          type: string
+        total_cbd:
+          description: Total CBD potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        total_thc:
+          description: Total THC potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        treez_wholesale_price:
+          description: The Treez wholesale price of this product, as a decimal string, or null when not set
+          type: string
+        unit_cost:
+          description: The cost (purchase price) of one unit of this product, as a decimal string, or null when not set
+          type: string
+        unit_net_weight:
+          description: The net contents of one unit of this product (weight, volume, or count of the contents), as a decimal string, measured in `unit_net_weight_serving_size_unit_type`. Null when not set.
+          type: string
+        unit_net_weight_serving_size_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        unit_price:
+          description: The list (sale) price of one unit of this product, as a decimal string (e.g. "25.00")
+          type: string
+        unit_serving_size:
+          description: The serving size per unit, as a decimal string, measured in `unit_net_weight_serving_size_unit_type` (the same unit as `unit_net_weight`). Null when not set. When both are set, this is at most `unit_net_weight`.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        units_per_case:
+          description: The number of units of this product packed in one case, as a decimal string (e.g. "12"), or null when not set
+          type: string
+        upc:
+          description: The UPC barcode of this product, or null when not set
+          type: string
+        updated_datetime:
+          description: The datetime this product was last updated at
+          type: string
+        vendor:
+          $ref: '#/components/schemas/CompanyCompact'
+        wholesale_unit_price:
+          description: The wholesale unit price of this product, as a JSON number (e.g. 12.5) rather than a decimal string — unlike `unit_price`. Null when not set.
+          type: number
+      required:
+      - quantity_reserved
+      - quantity_available
+      - quantity_active_by_location
+      - quantity_active
+      - custom_data
+      - inventory_tracking_method
+      - unit_price
+      - is_featured
+      - is_active
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - sku
+      - name
+      - id
+      title: Product
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    UpsertAssemblyRequest:
+      description: An assembly to create, update, or delete, with its outputs, inputs, and costs
+      properties:
+        action:
+          description: CREATE, UPDATE, or DELETE. Required. DELETE removes the assembly and all of its outputs, inputs, and costs.
+          enum:
+          - CREATE
+          - UPDATE
+          - DELETE
+          type: string
+        custom_data:
+          description: 'A map of custom field IDs to their values for this assembly. Use GET /public/v1/custom-fields?parent_object=assembly to retrieve the available fields, their IDs, and their types. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options. On update this replaces the whole custom-data map, so send every field you want to keep.'
+          example:
+            '101': Some text value
+            '102': '2026-08-18T00:00:00.000-07:00'
+            '103':
+            - Option A
+            - Option B
+          type: object
+        description:
+          description: A free-text description for this assembly. Editable at any status.
+          type: string
+        estimated_start_datetime:
+          description: When this assembly is planned to start, as an ISO 8601 datetime (e.g. `2026-08-19T00:00:00Z`). Optional; omit to leave it unset.
+          type: string
+        estimated_work_hours:
+          description: The whole-hours portion of the estimated work time; must be 0 or greater. Combine with `estimated_work_minutes` for the full estimate (e.g. 1 hour 30 minutes is `estimated_work_hours` 1, `estimated_work_minutes` 30). Editable at any status.
+          type: integer
+        estimated_work_minutes:
+          description: The minutes portion of the estimated work time; must be 0 or greater. Pairs with `estimated_work_hours` (see above). Editable at any status.
+          type: integer
+        id:
+          description: The assembly to update or delete. Required for UPDATE and DELETE; omit for CREATE. An ID that doesn't exist for your company returns 404, and one your team restrictions hide returns 403.
+          type: string
+        metrc_processing_job:
+          $ref: '#/components/schemas/UpsertAssemblyMetrcProcessingJob'
+        outputs:
+          description: 'The outputs this assembly produces, each with its own inputs and costs. Sparse on update: an output you omit is left untouched; remove one by sending it with `action` `DELETE`.'
+          items:
+            $ref: '#/components/schemas/UpsertAssemblyOutput'
+          type: array
+        owner_id:
+          description: The ID of the user that owns this assembly. Optional. Editable at any status.
+          type: string
+        status:
+          description: The assembly's lifecycle state, `PENDING` or `COMPLETED` (SCREAMING_CASE). Required when creating. `PENDING` claims/reserves ingredient inventory but consumes nothing; `COMPLETED` consumes the inputs and produces the outputs into inventory, and requires every output to be COMPLETED. Creating directly as `COMPLETED` performs that consumption immediately. Once `COMPLETED` an assembly cannot be moved back to `PENDING` and only a few fields remain editable (see the endpoint description).
+          enum:
+          - PENDING
+          - COMPLETED
+          type: string
+      required:
+      - action
+      title: Upsert Assembly Request
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    UpsertAssemblyInput:
+      description: 'An ingredient consumed by the assembly to produce an output.
+
+
+        A fulfilled input (`status` `PENDING` or `COMPLETED`) draws specific on-hand inventory, and its fields depend on how the product is tracked (send only the ones listed; omit the rest):
+
+
+        - Package-tracked: `package_id` + `compliance_quantity`. The product and location are derived from the package.
+
+        - Batch-tracked: `batch_id` + `quantity` + `location_id`. The product is derived from the batch.
+
+        - Product-tracked: `product_id` + `quantity` + `location_id`.
+
+
+        A `DRAFT` input is a planned ingredient with no specific lot chosen yet — it only reserves product-level quantity. Send `product_id` + `quantity` + `location_id` and omit `batch_id`, `package_id`, and `compliance_quantity`. DRAFT is only for batch- and package-tracked products (a product-tracked product has a single implicit lot, so there is nothing to defer). When the input later moves to `PENDING`/`COMPLETED` the reservation is released and a specific batch or package is consumed. While the assembly is `PENDING` an input may be `DRAFT`, `PENDING`, or `COMPLETED`; once the assembly is `COMPLETED` every input must be `COMPLETED`.
+
+        '
+      properties:
+        action:
+          description: CREATE, UPDATE, or DELETE. Required.
+          enum:
+          - CREATE
+          - UPDATE
+          - DELETE
+          type: string
+        batch_id:
+          description: The source batch. Required for a fulfilled batch-tracked input — its product is derived from it — and must be omitted for package/product-tracked and DRAFT inputs.
+          type: string
+        compliance_quantity:
+          description: The consumed quantity in the package's compliance unit (Metrc). Required for a fulfilled package-tracked input; must be omitted otherwise (including DRAFT).
+          type: number
+        id:
+          description: The input to update or delete. Required for UPDATE and DELETE; omit for CREATE.
+          type: string
+        location_id:
+          description: The location the input is drawn from. Required for batch-tracked, product-tracked, and DRAFT inputs; omit for a package-tracked input (derived from the package).
+          type: string
+        package_id:
+          description: The source package. Required for a fulfilled package-tracked input — its product and location are derived from it — and must be omitted for batch/product-tracked and DRAFT inputs.
+          type: string
+        product_id:
+          description: The input product. Required for product-tracked and DRAFT inputs; for package/batch-tracked inputs it is derived from the package or batch, so omit it.
+          type: string
+        quantity:
+          description: The consumed quantity in the product's unit. Required for batch-tracked, product-tracked, and DRAFT inputs; omit for package-tracked inputs (use `compliance_quantity` there).
+          type: number
+        status:
+          description: PENDING, COMPLETED, or DRAFT. Required when creating. DRAFT reserves product-level inventory without picking a specific lot; PENDING/COMPLETED consume specific inventory.
+          enum:
+          - COMPLETED
+          - DRAFT
+          - PENDING
+          type: string
+      required:
+      - action
+      title: Upsert Assembly Input
+      type: object
+    BillOfMaterials:
+      description: A product's bill of materials (recipe of inputs and additional costs)
+      properties:
+        costs:
+          description: The additional (non-material) costs this recipe applies, ordered oldest first. Empty when none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsCost'
+          type: array
+        description:
+          description: Free-text description of this bill of materials, or null when none was entered
+          type: string
+        dynamic_inputs:
+          description: The inputs that select products by attribute (category, strain, tag, and so on) rather than naming a specific product. Empty when this recipe has none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsDynamicInput'
+          type: array
+        id:
+          description: ID for this bill of materials
+          type: string
+        name:
+          description: Human readable name for this bill of materials
+          type: string
+        product_inputs:
+          description: The inputs that name a specific product to consume. Empty when this recipe has none. See `dynamic_inputs` for inputs that select products by attribute instead.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsProductInput'
+          type: array
+      required:
+      - costs
+      - dynamic_inputs
+      - product_inputs
+      - name
+      - id
+      title: BillOfMaterials
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    UpsertAssemblyCost:
+      description: A cost added directly to an assembly output
+      properties:
+        action:
+          description: CREATE, UPDATE, or DELETE. Required.
+          enum:
+          - CREATE
+          - UPDATE
+          - DELETE
+          type: string
+        cost_per_unit:
+          description: The per-unit rate applied to this cost. Optional.
+          type: number
+        cost_type_id:
+          description: The cost type this cost is an instance of. Required when creating. Use GET /public/v1/cost-types to list the available cost types and their IDs.
+          type: string
+        description:
+          description: A free-text description for this cost. Optional.
+          type: string
+        id:
+          description: The cost to update or delete. Required for UPDATE and DELETE; omit for CREATE.
+          type: string
+        quantity:
+          description: The quantity of this cost; must be greater than 0. Required when creating.
+          type: number
+      required:
+      - action
+      title: Upsert Assembly Cost
+      type: object
+    BillOfMaterialsDynamicInput:
+      description: A dynamic input of a bill of materials. It selects products by attribute rather than naming a specific product. Each attribute list holds the entities matched by that criterion, or is empty when the criterion is not used.
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product_categories:
+          description: The product categories this input matches on, or empty when it does not match on category. A product must match every non-empty criterion.
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        product_groups:
+          description: The product groups this input matches on, or empty when it does not match on group.
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        product_subcategories:
+          description: The product subcategories this input matches on, or empty when it does not match on subcategory.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        quantity:
+          description: How much this recipe consumes of whatever product matches, as a decimal string (e.g. "2.5").
+          type: string
+        strains:
+          description: The strains this input matches on, or empty when it does not match on strain.
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        tags:
+          description: The tags this input matches on, or empty when it does not match on tag.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - tags
+      - strains
+      - product_groups
+      - product_subcategories
+      - product_categories
+      - quantity
+      - id
+      title: BillOfMaterialsDynamicInput
+      type: object
+    PdfResponse:
+      description: 'The JSON envelope a PDF endpoint returns for the non-binary formats: `format=url` returns `url` + `expires_datetime`, `format=email` returns `emailed_to`.'
+      properties:
+        data:
+          description: The response payload; which fields are present depends on the requested `format`.
+          properties:
+            emailed_to:
+              description: The recipient email addresses the PDF was emailed to, present only when `format=email`.
+              items:
+                type: string
+              type: array
+            expires_datetime:
+              description: ISO 8601 datetime when the signed `url` expires (e.g. "2026-08-20T00:00:00Z"), present only when `format=url`.
+              type: string
+            url:
+              description: Temporary signed URL to download the PDF, present only when `format=url`. Stops working once `expires_datetime` passes; request the endpoint again for a fresh URL.
+              type: string
+          type: object
+      title: PdfResponse
+      type: object
+    AssemblyMetrcProcessingJob:
+      description: The Metrc processing job details for an assembly
+      properties:
+        id:
+          description: The processing job's Metrc ID, assigned by Metrc when the job is created there. This is a Metrc identifier, not a Distru ID. Null until the job has been created in Metrc.
+          type: integer
+        name:
+          description: The processing job name reported to Metrc, or null when not set
+          type: string
+        notes:
+          description: Free-text notes reported to Metrc for this processing job, or null when none
+          type: string
+        type_id:
+          description: The Metrc processing job type ID selected for this job. A Metrc identifier, not a Distru ID. Null when not set.
+          type: integer
+        waste:
+          $ref: '#/components/schemas/AssemblyMetrcProcessingJobWaste'
+      title: Assembly Metrc Processing Job
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    AssemblyCost:
+      description: A cost added directly to an assembly output (e.g. labor or packaging), as shown in Distru
+      properties:
+        cost_per_unit:
+          description: The per-unit rate applied, as a decimal string (e.g. "10.50"). Null when no rate is set.
+          type: string
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this assembly cost
+          type: string
+        name:
+          description: The name of the assembly cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies. Multiply by `cost_per_unit` to get the line's total. Decimal string, e.g. "2".
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - quantity
+      - name
+      - id
+      title: AssemblyCost
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    License:
+      description: A cannabis license held by a company or tied to a location, identifying it to the state and its compliance system.
+      properties:
+        active:
+          description: Whether this license is currently active
+          type: boolean
+        expiry_datetime:
+          description: ISO 8601 datetime this license expires (e.g. "2026-08-20T00:00:00Z")
+          type: string
+        id:
+          description: ID for this license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this license was created at
+          type: string
+        issue_datetime:
+          description: ISO 8601 datetime this license was issued, or null when not set
+          type: string
+        license_number:
+          description: License number
+          example: C11-1234567890
+          type: string
+        license_type:
+          description: The license type as configured in Distru. A state-specific free-form value, e.g. "Distributor" or "Type 11 Distributor-Transport"
+          type: string
+      required:
+      - active
+      - inserted_datetime
+      - expiry_datetime
+      - license_type
+      - license_number
+      - id
+      title: License
+      type: object
+    ProductTagRef:
+      description: A tag associated with a product
+      properties:
+        id:
+          description: ID for this tag
+          type: string
+        name:
+          description: The name of this tag
+          type: string
+      required:
+      - name
+      - id
+      title: ProductTagRef
+      type: object
+    ProductGroupCompact:
+      description: A named grouping of products, defined per company (e.g. a brand line or product family).
+      properties:
+        id:
+          description: ID for this product group
+          type: string
+        name:
+          description: The name of this product group
+          type: string
+      required:
+      - name
+      - id
+      title: ProductGroupCompact
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    Assemblies:
+      description: A collection of Assemblies
+      properties:
+        data:
+          description: Assemblies
+          items:
+            $ref: '#/components/schemas/Assembly'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Assemblies
+      type: object
+    Assembly:
+      description: A production job that turns input inventory (ingredients/components) into one or more finished output products — for example packaging bulk flower into units or producing pre-rolls.
+      properties:
+        assembly_number:
+          description: Human-readable reference number for this assembly, shown in Distru (e.g. "AS-0000001")
+          type: string
+        completion_datetime:
+          description: ISO 8601 datetime the assembly was completed at, or null until its `status` becomes COMPLETED.
+          type: string
+        compliance_type:
+          description: Which state compliance system, if any, this assembly reports to. One of METRC, BIOTRACK, or NONE.
+          type: string
+        creation_source:
+          description: 'How this assembly was created.• MANUALLY_CREATED: created by a user in Distru or via the API.• SALES_ORDER: created automatically to repackage inventory while fulfilling a sales order.• SPLIT_PACKAGE: created by splitting an existing package into smaller packages.• LAB_TESTING: created to pull a test sample for lab testing.'
+          enum:
+          - MANUALLY_CREATED
+          - SALES_ORDER
+          - SPLIT_PACKAGE
+          - LAB_TESTING
+          type: string
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this assembly
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        description:
+          description: Free-text description of this assembly, or null when none was entered
+          type: string
+        estimated_start_datetime:
+          description: ISO 8601 datetime the assembly is expected to start, or null when not set.
+          type: string
+        estimated_work_hours:
+          description: The whole-hours part of the estimated work time. Pairs with `estimated_work_minutes` (e.g. 90 minutes of work reads as `estimated_work_hours` 1, `estimated_work_minutes` 30). Null when no estimate is set.
+          type: integer
+        estimated_work_minutes:
+          description: The leftover-minutes part (0-59) of the estimated work time, on top of `estimated_work_hours` — not the total minutes. Null when no estimate is set.
+          type: integer
+        fulfilled:
+          description: True when every input across all outputs has been fulfilled with a batch or package, false otherwise. A precondition for completing the assembly.
+          type: boolean
+        id:
+          description: ID for this assembly
+          type: string
+        inserted_datetime:
+          description: The datetime this assembly was created at
+          type: string
+        license:
+          $ref: '#/components/schemas/License'
+        metrc_processing_job:
+          $ref: '#/components/schemas/AssemblyMetrcProcessingJob'
+        outputs:
+          description: The outputs for this assembly
+          items:
+            $ref: '#/components/schemas/AssemblyOutput'
+          type: array
+        owner_id:
+          description: The ID of the Distru user who owns this assembly, or null when unassigned
+          type: string
+        status:
+          description: 'Where this assembly is in its lifecycle.• PENDING: still in progress — its ingredient inventory is already claimed (each ingredient''s `active` quantity is decreased to hold it for this assembly), but its output products have not been produced into inventory yet.• COMPLETED: the assembly has been finished, consuming its claimed ingredient inventory and creating its output products; a completed assembly can no longer be deleted and only a limited set of its fields can be edited.'
+          enum:
+          - PENDING
+          - COMPLETED
+          type: string
+        tasks:
+          description: 'The tasks linked to this assembly that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: The datetime this assembly was last updated at
+          type: string
+      required:
+      - custom_data
+      - outputs
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - fulfilled
+      - status
+      - creation_source
+      - compliance_type
+      - assembly_number
+      - id
+      title: Assembly
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    AssemblyResponse:
+      description: A single assembly
+      properties:
+        data:
+          $ref: '#/components/schemas/Assembly'
+      title: Assembly Response
+      type: object
+    QuantityActiveByLocation:
+      description: Active on-hand quantity of an entity held at a single location.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        quantity:
+          description: Active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity
+      - location
+      title: QuantityActiveByLocation
+      type: object
+    UpsertAssemblyOutput:
+      description: 'An output produced by the assembly. What you send depends on how the output product''s inventory is tracked:
+
+
+        - Product-tracked (non-compliance): `product_id` + `quantity` + `location_id`. The batch is the product''s existing batch (derived — omit `batch_id`).
+
+        - Batch-tracked (non-compliance): `product_id` + `quantity` + `location_id`. Optionally set `batch_id` to use an existing batch, or omit it and a new batch is created on completion (named by `batch_number`).
+
+        - Package-tracked (Metrc): `product_id` + `location_id` (a Metrc-licensed facility) + `compliance_quantity` + `compliance_label` (the Metrc tag) + a Metrc item (`metrc_item_id` or `use_same_item=true`). Omit `batch_id` (derived from the product''s batch) and `quantity` (derived from `compliance_quantity`). Distru creates the package when the output is completed.
+
+
+        These fields apply to package-tracked (Metrc) outputs only and must be omitted otherwise: `compliance_quantity`, `compliance_label`, `metrc_item_id`, `use_same_item`, `metrc_location_id`, `metrc_notes`, `metrc_production_batch_number`, `is_trade_sample`, `is_finished_good`, `expiration_date`, `package_date`.
+
+        '
+      properties:
+        action:
+          description: CREATE, UPDATE, or DELETE. Required.
+          enum:
+          - CREATE
+          - UPDATE
+          - DELETE
+          type: string
+        batch_id:
+          description: 'The batch this output belongs to. Product-tracked and package-tracked: always omit it. Batch-tracked: optional — set it to an existing batch''s ID and the output quantity lands in that batch, or leave it blank and the output quantity lands in a new batch (named by `batch_number`).'
+          type: string
+        batch_number:
+          description: 'The Distru batch number recorded on the output (1-255 characters). Batch-tracked: names the new batch created when `batch_id` is omitted. Package-tracked: sets the created package''s Distru batch number.'
+          type: string
+        bin_ids:
+          description: 'The bins to store the output in, applied when the output is completed (requires bin inventory tracking enabled for the company). Package-tracked: sets the bins on the package Distru creates. Batch-tracked: replaces the batch''s current bin set — an empty array clears it. Not applicable to product-tracked outputs.'
+          items:
+            type: string
+          type: array
+        compliance_label:
+          description: Package-tracked (Metrc) outputs only. The Metrc tag for the created package; must be an available tag in the output's license. Required to complete the output.
+          type: string
+        compliance_quantity:
+          description: Package-tracked (Metrc) outputs only. The output quantity in the package's Metrc unit — the unit type of the package's Metrc item, which comes from `metrc_item_id` (or from the input package's item when `use_same_item=true`). `quantity` is derived from it by unit conversion. Send this when creating a package-tracked output.
+          type: number
+        copy_custom_data_from_input:
+          description: Copy custom field values from the input onto this output.
+          type: boolean
+        costs:
+          description: The costs added directly to this output.
+          items:
+            $ref: '#/components/schemas/UpsertAssemblyCost'
+          type: array
+        expiration_date:
+          description: Package-tracked (Metrc) outputs only. The expiration date reported to Metrc for the created package, e.g. "2027-08-19".
+          type: string
+        id:
+          description: The output to update or delete. Required for UPDATE and DELETE; omit for CREATE.
+          type: string
+        inputs:
+          description: The inputs consumed to produce this output.
+          items:
+            $ref: '#/components/schemas/UpsertAssemblyInput'
+          type: array
+        is_finished_good:
+          description: Package-tracked (Metrc) outputs only. When true, Distru flags the created package in Metrc as a Finished Good.
+          type: boolean
+        is_trade_sample:
+          description: Package-tracked (Metrc) outputs only. Marks the created package as a Metrc trade sample.
+          type: boolean
+        location_id:
+          description: The location the output is produced into. Required when creating.
+          type: string
+        metrc_item_id:
+          description: Package-tracked (Metrc) outputs only. The Metrc item for the created package. Provide this or `use_same_item=true` (mutually exclusive).
+          type: integer
+        metrc_location_id:
+          description: Package-tracked (Metrc) outputs only. The Metrc ID of the Metrc location the package will be created in. Only applicable if the output's Metrc license uses Metrc locations.
+          type: integer
+        metrc_notes:
+          description: Package-tracked (Metrc) outputs only. Notes sent to Metrc when the package is created (max 255 characters).
+          type: string
+        metrc_production_batch_number:
+          description: Package-tracked (Metrc) outputs only. Flags the created package in Metrc as a production batch and gives it this production batch number.
+          type: string
+        package_date:
+          description: Package-tracked (Metrc) outputs only. The packaged date reported to Metrc for the created package. Defaults to today when omitted.
+          type: string
+        product_id:
+          description: The product this output produces. Required when creating.
+          type: string
+        quantity:
+          description: The output quantity in the product's unit. Required when creating product- and batch-tracked outputs. Omit it for package-tracked outputs — send `compliance_quantity` instead and `quantity` is derived from it by unit conversion.
+          type: number
+        status:
+          description: PENDING or COMPLETED. Required when creating. On a Metrc processing-job assembly a package-tracked output may be COMPLETED (synced to Metrc) while the assembly stays PENDING; otherwise an output can only be COMPLETED together with the whole assembly.
+          enum:
+          - PENDING
+          - COMPLETED
+          type: string
+        use_same_item:
+          description: Package-tracked (Metrc) outputs only. Reuse the source input package's Metrc item instead of `metrc_item_id` (mutually exclusive with it). Valid only when the output's inputs all share the same Metrc item.
+          type: boolean
+      required:
+      - action
+      title: Upsert Assembly Output
+      type: object
+    Package:
+      description: A specific, compliance-tracked quantity of a product identified by a unique tag (e.g. a Metrc package). This is the physical unit of inventory for package-tracked products. This is the compact reference; see PackageFull for all fields.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+      required:
+      - distru_status
+      - quantity_active
+      - quantity
+      - location_id
+      - license_id
+      - id
+      title: Package
+      type: object
+    CreateTestSampleRequest:
+      description: A Metrc source package and the test sample package to create from it
+      properties:
+        batch_number:
+          description: Distru batch number stored on the sample package. When omitted, copies the source package's batch number; pass null explicitly to leave the sample without one.
+          type: string
+        compliance_label:
+          description: The Metrc tag for the sample package. Must be an available tag in the source package's license.
+          type: string
+        expiration_date:
+          description: Expiration date reported to Metrc, e.g. "2027-08-19". When omitted, copies the source package's expiration date; pass null explicitly to leave the sample without one.
+          type: string
+        input_compliance_quantity:
+          description: Amount drawn from the source package, in the source package's compliance unit. Must be > 0.
+          type: number
+        lab_test_batches:
+          description: 'The Metrc lab test batches to assign to the sample, by exact name. Valid names depend on the license and the sample item''s Metrc product category — list them with [GET /public/v1/metrc/lab-test-batches](#get-metrc-lab-test-batches), which groups them by item category and marks the ones Metrc requires. Every `required: true` batch must be included; an unknown or disallowed name is rejected. Omit entirely when the license''s facility does not use package sample lab test batches. At most 200 items.'
+          items:
+            type: string
+          type: array
+        location_id:
+          description: The location ID the sample package is produced into. Must be in the same Metrc license as the source package. Defaults to the source package's location when omitted or null.
+          type: string
+        metrc_item_id:
+          description: The Metrc item id for the sample. Required unless use_same_item is true, and must be omitted when it is. Must exist in the source package's Metrc license.
+          type: integer
+        metrc_location_id:
+          description: The Metrc ID of the Metrc location the sample package will be created in. Only applicable if the license uses Metrc locations. Defaults to the source package's Metrc location when omitted or null.
+          type: integer
+        metrc_notes:
+          description: Notes sent to Metrc as the sample package's note when it is created (max 255 characters).
+          type: string
+        output_compliance_quantity:
+          description: Size of the test sample package, in the sample's compliance unit (the source unit when use_same_item is true, otherwise the unit of metrc_item_id). Must be > 0. Defaults to input_compliance_quantity when omitted or null.
+          type: number
+        package_date:
+          description: The sample package's packaged date. Defaults to today when omitted.
+          type: string
+        product_id:
+          description: The sample's product ID. Must be package-tracked. Defaults to the source package's product when omitted or null.
+          type: string
+        source_package_id:
+          description: The package to pull the sample from. Must be package-tracked and in a Metrc license. An ID that doesn't exist for your company returns 404, and one your team restrictions hide returns 403.
+          type: string
+        use_same_item:
+          description: When true, the sample package reuses the source package's Metrc item and metrc_item_id must be omitted.
+          type: boolean
+      required:
+      - compliance_label
+      - input_compliance_quantity
+      - source_package_id
+      title: Create Test Sample Request
+      type: object
+    CostEntryInput:
+      description: A single cost to apply to a record
+      properties:
+        cost_per_unit:
+          description: Per-unit amount as a decimal (e.g. "10.00"). When omitted, the cost type's own cost per unit is used. Must be omitted for cost types with a locked cost per unit (those that don't allow inline editing) — sending it for such a type is rejected. It is only required when an inline-editable cost type has no cost per unit of its own
+          type: number
+        cost_type_id:
+          description: Required. The cost type to apply, given as its ID from GET /public/v1/cost-types. Must exist and be accessible to the authenticated company
+          type: string
+        description:
+          description: Optional free-form text stored on the cost
+          type: string
+        quantity:
+          description: Required. How many units of the cost type to apply, as a decimal (e.g. "2.5"). Must be greater than 0. The amount added to each record's cost basis is cost_per_unit × quantity
+          type: number
+      required:
+      - quantity
+      - cost_type_id
+      title: Cost Entry
+      type: object
+    SplitPackageRequest:
+      description: A Metrc source package and the output packages to split it into
+      properties:
+        outputs:
+          description: The output packages to create, between 1 and 300
+          items:
+            $ref: '#/components/schemas/SplitPackageOutput'
+          type: array
+        source_package_id:
+          description: The package to split. Must be package-tracked and in a Metrc license. An ID that doesn't exist for your company returns 404, and one your team restrictions hide returns 403.
+          type: string
+      required:
+      - outputs
+      - source_package_id
+      title: Split Package Request
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    BillOfMaterialsCostType:
+      description: The cost type applied by a bill-of-materials cost
+      properties:
+        cost_per_unit:
+          description: The cost per unit, as a decimal string (e.g. "5.00"). Present only when the caller has the `costs_permissions_view_cost_types_cost_per_unit` permission; the field is omitted otherwise.
+          type: string
+        id:
+          description: ID for this cost type
+          type: string
+        name:
+          description: Human readable name for this cost type
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - name
+      - id
+      title: BillOfMaterialsCostType
+      type: object
+    PackagesWithActiveQuantityByLocation:
+      description: A location and the product's packages that hold active quantity there.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        packages:
+          description: The product's packages held at this location that have active quantity, ordered by id.
+          items:
+            $ref: '#/components/schemas/Package'
+          type: array
+      required:
+      - packages
+      - location
+      title: PackagesWithActiveQuantityByLocation
+      type: object
+    BatchesWithActiveQuantityByLocation:
+      description: A location and the product's batches that hold active quantity there.
+      properties:
+        batches:
+          description: The product's batches with active quantity at this location, each carrying its active quantity there, ordered by id.
+          items:
+            $ref: '#/components/schemas/BatchCompactWithQuantityActive'
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+      required:
+      - batches
+      - location
+      title: BatchesWithActiveQuantityByLocation
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    BatchCompactWithQuantityActive:
+      description: A compact [batch](#model-batch) reference plus its active on-hand quantity at the location it is nested under.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        quantity_active:
+          description: The batch's active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity_active
+      - name
+      - id
+      title: BatchCompactWithQuantityActive
+      type: object
+    Batch:
+      description: A lot of a product — a group of inventory that shares traits such as a harvest/production run, expiration date, and lab results. Used for batch-tracked products. This is the compact reference; see BatchFull for all fields.
+      properties:
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+      required:
+      - name
+      - id
+      title: Batch
+      type: object
+    AssemblyOutput:
+      description: A finished product produced by an assembly, along with the quantity made and its cost.
+      properties:
+        batch:
+          $ref: '#/components/schemas/Batch'
+        batch_number:
+          description: The batch number for this output, or null when none is set
+          type: string
+        bins:
+          description: The bins this output's package is stored in. Empty when the output is not stored in any bin (including when it is not package-tracked).
+          items:
+            $ref: '#/components/schemas/BinCompact'
+          type: array
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (the Metrc package tag or BioTrack barcode). Null when this output has no compliance tag.
+          type: string
+        compliance_quantity:
+          description: The quantity of this output expressed in the package's unit type, as reported to the state compliance system, as a decimal string. Null when this output is not package-tracked.
+          type: string
+        copy_custom_data_from_input:
+          description: True when this output copies its custom field values from its input rather than carrying its own.
+          type: boolean
+        cost_per_unit:
+          description: Actual cost per unit — `total_cost_actual` divided by this output's quantity (in its product's unit).
+          type: string
+        cost_per_unit_default:
+          description: Default (standard) cost per unit — `total_cost_default` divided by this output's quantity (in its product's unit).
+          type: string
+        costs:
+          description: The costs added directly to this assembly output (e.g. labor or packaging), on top of the material cost carried over from its inputs
+          items:
+            $ref: '#/components/schemas/AssemblyCost'
+          type: array
+        expiration_date:
+          description: The expiration date for this output (e.g. "2026-08-20"), or null when none is set
+          type: string
+        id:
+          description: ID for this assembly output
+          type: string
+        inputs:
+          description: The inputs (source inventory) consumed to produce this output. Their cost propagates to this output and is reflected in its actual cost fields (`total_cost_actual` and `cost_per_unit`).
+          items:
+            $ref: '#/components/schemas/AssemblyInput'
+          type: array
+        is_donation:
+          description: True when this output is marked as a donation.
+          type: boolean
+        is_finished_good:
+          description: True if this output is a finished, sellable product (rather than an intermediate/work-in-progress item). Only applies to Metrc-tracked outputs.
+          type: boolean
+        is_production_batch:
+          description: True if this output is a new production lot created by the assembly (rather than adding to existing inventory). Only applies to Metrc-tracked outputs.
+          type: boolean
+        is_test_sample:
+          description: True when this output is a test sample.
+          type: boolean
+        is_trade_sample:
+          description: True when this output is a trade sample.
+          type: boolean
+        lab_test_batches:
+          description: The Metrc lab test batch names assigned to this output when it was created as a test sample (the `lab_test_batches` sent to POST `/public/v1/assemblies/create_test_sample`); null when the output is not a test sample or none were assigned.
+          items:
+            type: string
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        metrc_item_id:
+          description: The Metrc item id for this output. A Metrc identifier, not a Distru ID. Null when not applicable.
+          type: integer
+        metrc_location_id:
+          description: The Metrc location id for this output. A Metrc identifier, not a Distru ID. Null when not applicable.
+          type: integer
+        metrc_notes:
+          description: Notes recorded on this output that are sent to Metrc as the package's note when the package is created. Null when none.
+          type: string
+        metrc_production_batch_number:
+          description: The Metrc production batch number, set only when this output is a production batch (see `is_production_batch`); otherwise null.
+          type: string
+        package:
+          $ref: '#/components/schemas/Package'
+        package_date:
+          description: The date this output's package was created (e.g. "2026-08-20"), or null when not set
+          type: string
+        package_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: The quantity of this output in its product's unit, as a decimal string (e.g. "100").
+          type: string
+        status:
+          description: The status of this output. One of PENDING (not yet produced into inventory) or COMPLETED (produced, once the assembly is completed).
+          type: string
+        total_cost_actual:
+          description: Total actual cost of this output. Distru traces the inputs and components consumed to produce it and sums the real costs incurred along that chain — for example the price paid when a component was purchased, assembly costs, and costs added by stock adjustments, among others — plus the costs added directly on this output (see `costs`).
+          type: string
+        total_cost_default:
+          description: Total default (standard) cost of this output. Traced the same way as `total_cost_actual`, but each input/component is valued at its product's configured unit cost (the product's `unit_cost`) instead of its real cost.
+          type: string
+        use_same_item:
+          description: True when this output reuses the source package's Metrc item rather than mapping to a new one.
+          type: boolean
+      required:
+      - inputs
+      - costs
+      - bins
+      - is_finished_good
+      - is_production_batch
+      - is_trade_sample
+      - is_test_sample
+      - is_donation
+      - use_same_item
+      - status
+      - quantity
+      - id
+      title: AssemblyOutput
+      type: object
+  requestBodies:
+    DistruPublic.V1.AssemblyController.download_pdfBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              format:
+                enum:
+                - binary
+                - url
+                - email
+                type: string
+                description: 'How the generated PDF is delivered. One of `binary` — the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` — a JSON body with a short-lived signed download URL (see the [PdfResponse](#model-pdfresponse) response); or `email` — emails the PDF to the addresses in `email_addresses` and returns a JSON body listing who it was emailed to. Required, but omitting it defaults to `binary` for backward compatibility.'
+              email_addresses:
+                items:
+                  type: string
+                type: array
+                description: Recipient email addresses, used only when `format` is `email` (required in that case, ignored otherwise). An entry may hold several comma-separated addresses; spaces, blank entries and repeats are dropped, and `emailed_to` lists the addresses actually emailed. At least one address is required and every address must be valid, otherwise the request is rejected with a 400. At most 200 addresses may be given, counted after that cleanup.
+            required:
+            - format
+      required: true
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

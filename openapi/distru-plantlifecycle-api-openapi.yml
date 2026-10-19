@@ -1,0 +1,231 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Plant Lifecycle API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: PlantLifecycle
+paths:
+  /public/v1/reports/plant-lifecycle:
+    get:
+      description: 'Returns one row per plant batch (plant group) whose creation date falls in the reported range, summarizing its lifecycle: the batch name, creation date, strain, and the counts of plants started, promoted to vegetative, destroyed, and harvested. Each row also carries the promotion-to-veg date, first and last harvest dates, the durations spent as a batch, from veg to last harvest, and over the total lifecycle (in days), and the names of the harvests the batch produced. Use this to reconcile cultivation throughput and (with the cost permission) per-stage plant costs against what the state traceability system recorded.
+
+
+        Scope of what is included — this report is Metrc-only. A batch appears only when all of the following hold: it sits on an active Metrc license, and that license''s facility is one that can track vegetative plants. BioTrack and non-compliance batches are never returned, and neither are batches on licenses whose facility skips the vegetative stage (there plants move straight from immature to flowering, so the veg-based metrics here would be meaningless). The report is not paginated — every matching batch is returned in a single response.
+
+
+        Date range and filters — the `datetime` filter matches the batch creation (planted) date. When it is omitted, the report defaults to batches created in the last 30 days. An optional `strain` filter narrows to batches whose Metrc strain name contains the given text (case-insensitive substring).
+
+
+        Reading the values — every cell is returned as it appears in the report''s CSV export: date cells are `MM/DD/YYYY` strings, and count and cost cells are numeric strings (the raw amount with any currency formatting stripped, e.g. `"1234.56"`), matching the rest of the API where all amounts are strings. A leading-zero numeric value is kept as its display string so significant zeros are not lost. Several fields are null when the batch has not reached the relevant stage: `promoted_to_veg_date`, `days_veg_to_last_harvest`, the harvest dates, and `harvest_name_s` are null until a batch is promoted to veg or harvested. `days_as_batch` counts from creation to the veg-promotion date, or to today when the batch has not yet been promoted (so it keeps growing for still-un-promoted batches), and is therefore always present.
+
+
+        Cost columns — `total_cost_batch_stage`, `total_cost_veg_to_last_harvest`, `destroyed_plant_cost`, and `total_lifecycle_cost` require permission to view costs. For a caller without that permission these keys are omitted from every row entirely (not returned as null), and the corresponding column definitions are dropped from `meta.columns`. When present, each cost can still be null for a batch that has no recorded cost, and `total_lifecycle_cost` is the sum of the other three (null only when all three are null).
+
+
+        Report-level information (the resolved human-readable date range and the ordered column definitions) is returned under `meta`.
+
+
+        Required permission: `reports_permissions_plant_lifecycle`.'
+      operationId: DistruPublic.V1.Report.PlantLifecycleController.index
+      parameters:
+      - description: Restricts the report to plant batches whose creation (planted) date falls in this range. The value is a comma-separated ISO8601 range formatted as `<start>,<end>`, and both bounds are inclusive. Leave either side empty for an open-ended range — `,2026-02-01T00:00:00Z` returns every batch created on or before that instant, and `2026-01-01T00:00:00Z,` every batch created on or after it. When omitted, the report defaults to batches created in the last 30 days.
+        in: query
+        name: datetime
+        required: false
+        example: ?datetime=2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Restricts the report to batches whose strain name contains this text (case-insensitive substring match against the batch's Metrc strain name). Omit or leave empty to include every strain.
+        in: query
+        name: strain
+        required: false
+        example: ?strain=Blue
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The Plant Lifecycle report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PlantLifecycleReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Plant Lifecycle report
+      tags:
+      - PlantLifecycle
+components:
+  schemas:
+    PlantLifecycleReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The ordered column definitions for the rows in `data`, matching the keys present on each row. The four cost columns are dropped from this list for a caller without permission to view costs.
+          items:
+            $ref: '#/components/schemas/PlantLifecycleReportColumn'
+          type: array
+        date_range:
+          description: The resolved reporting window as a human-readable string (e.g. `Last 30 Days` or an explicit date range). Null when no date filter was applied and none could be resolved.
+          type: string
+        report:
+          description: The report identifier — always `plant_lifecycle`.
+          type: string
+      required:
+      - columns
+      - report
+      title: PlantLifecycleReportMeta
+      type: object
+    PlantLifecycleReportRow:
+      description: 'A single row of the Plant Lifecycle report (one plant batch). The four cost keys (`total_cost_batch_stage`, `total_cost_veg_to_last_harvest`, `destroyed_plant_cost`, `total_lifecycle_cost`) are present only for a caller with permission to view costs; for anyone else they are omitted from the row entirely (not returned as null).
+
+        '
+      properties:
+        batch_creation_date:
+          description: The date the batch was created (planted), formatted `MM/DD/YYYY` (e.g. `01/15/2026`). Always present — this is the date the `datetime` filter matches on.
+          type: string
+        days_as_batch:
+          description: Whole days from the batch creation date to its veg-promotion date, or to today when the batch has not been promoted yet (so it keeps increasing for a still-un-promoted batch). Always present.
+          type: string
+        days_veg_to_last_harvest:
+          description: Whole days from the veg-promotion date to the last harvest date. Null until the batch has both been promoted to veg and harvested.
+          type: string
+        destroyed_plant_cost:
+          description: Cost of the batch's destroyed plants, as a plain decimal amount. Present only with cost-view permission; null for a batch with no recorded cost.
+          type: string
+        first_harvest_date:
+          description: The date of the batch's earliest harvest, formatted `MM/DD/YYYY`. Null when the batch has no harvest yet.
+          type: string
+        harvest_name_s:
+          description: Comma-separated, alphabetically-ordered list of the distinct harvest names this batch produced (e.g. `Harvest A, Harvest B`). Null when the batch has no harvests.
+          type: string
+        last_harvest_date:
+          description: The date of the batch's most recent harvest, formatted `MM/DD/YYYY`. Null when the batch has no harvest yet.
+          type: string
+        plant_batch_name:
+          description: The plant batch name.
+          type: string
+        plants_destroyed:
+          description: Count of the batch's plants that have been destroyed. `0` when none.
+          type: string
+        plants_harvested:
+          description: Count of the batch's plants that have been harvested or packaged. `0` when none.
+          type: string
+        plants_promoted_to_veg:
+          description: Count of the batch's plants that have entered the vegetative stage. `0` when none.
+          type: string
+        plants_started:
+          description: Count of plants ever started in this batch (its non-removed plants). `0` when none.
+          type: string
+        promoted_to_veg_date:
+          description: The date the batch's first plant entered the vegetative stage, formatted `MM/DD/YYYY`. Null when the batch has not yet been promoted to veg.
+          type: string
+        strain:
+          description: The batch's Metrc strain name. Always present — this report covers only Metrc-licensed plant batches, which always carry a strain.
+          type: string
+        total_cost_batch_stage:
+          description: Cost accrued while the batch was in the batch stage, as a plain decimal amount. Present only with cost-view permission; null for a batch with no recorded cost.
+          type: string
+        total_cost_veg_to_last_harvest:
+          description: Cost accrued from veg promotion to the last harvest, as a plain decimal amount. Present only with cost-view permission; null for a batch with no recorded cost.
+          type: string
+        total_lifecycle_cost:
+          description: Sum of `total_cost_batch_stage`, `total_cost_veg_to_last_harvest`, and `destroyed_plant_cost`, as a plain decimal amount. Present only with cost-view permission; null when all three components are null.
+          type: string
+        total_lifecycle_days:
+          description: Total whole days across the lifecycle — `days_as_batch` plus `days_veg_to_last_harvest`, or just `days_as_batch` when the veg-to-harvest span is still null. Always present.
+          type: string
+      required:
+      - total_lifecycle_days
+      - days_as_batch
+      - plants_harvested
+      - plants_destroyed
+      - plants_promoted_to_veg
+      - plants_started
+      - strain
+      - batch_creation_date
+      - plant_batch_name
+      title: PlantLifecycleReportRow
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    PlantLifecycleReport:
+      description: The Plant Lifecycle report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/PlantLifecycleReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/PlantLifecycleReportMeta'
+      required:
+      - meta
+      - data
+      title: PlantLifecycleReport
+      type: object
+    PlantLifecycleReportColumn:
+      properties:
+        key:
+          description: The key under which this column's value appears in each data row (e.g. `plant_batch_name`).
+          type: string
+        label:
+          description: The human-readable column heading (e.g. `Plant Batch Name`).
+          type: string
+      required:
+      - label
+      - key
+      title: PlantLifecycleReportColumn
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

@@ -1,0 +1,471 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Charge Preset API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: ChargePreset
+paths:
+  /public/v1/charge-presets:
+    get:
+      description: 'List charge presets for the authenticated company. A charge preset is a reusable,
+
+        company-scoped template for a charge or discount line on a sales order, purchase, or invoice.
+
+        Applying a preset copies its name, type, and amount onto the order''s charge line; the line then
+
+        keeps those values on its own, so editing or deleting the preset never changes charges already
+
+        applied — only future applications. A charge applied from a preset references it via the
+
+        charge''s `charge_preset` field.
+
+
+        Results are scoped to your company and ordered oldest-first by creation time. Deleted presets
+
+        are excluded. The response is paginated — follow the `next_page` URL to page through the full
+
+        set.
+
+
+        Required permission: any of `settings_permissions_charge_presets`, or create/edit permission
+
+        for orders, purchases, or invoices.'
+      operationId: DistruPublic.V1.ChargePresetController.index
+      parameters:
+      - description: Restrict the result to specific charge presets by ID (the same ID returned as each preset's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given. A malformed ID is rejected with a 400.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to charge presets by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to charge presets by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of charge presets
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ChargePresets'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get charge presets
+      tags:
+      - ChargePreset
+    post:
+      description: 'Create or update a single charge preset. This is one endpoint for both operations: omit `id`
+
+        to create a new preset (responds 201), or pass the `id` of an existing preset to update it
+
+        (responds 200). The URL and request shape are identical either way.
+
+
+        On create, `name`, `type`, `unit_type`, and the amount field matching `unit_type` (`percent`
+
+        for PERCENT, `price` for PRICE) are required. On update the body is sparse — only the fields
+
+        you send are changed, and any field you omit keeps its current value. Exactly one amount field
+
+        may be set at a time: to switch a preset from PERCENT to PRICE, send the new `unit_type` and
+
+        `price` together with `percent` as null (and vice versa). `name` must be unique within your
+
+        company (case-insensitive) among non-deleted presets, and may only contain letters, numbers,
+
+        underscores, and spaces.
+
+
+        A preset stores its amount as a positive number for both types; when a DISCOUNT preset is
+
+        applied to an order, the resulting charge line carries the negated amount. Changing a preset
+
+        never rewrites charge lines already applied from it — each line keeps the values copied at
+
+        apply time. It only affects future applications, and, when `allow_inline_edits` is false,
+
+        which amounts new lines referencing the preset are allowed to carry.
+
+
+        This endpoint writes only the preset itself. It does not touch inventory and never syncs to
+
+        Metrc or BioTrack.
+
+
+        Required permission: `settings_permissions_charge_presets`.'
+      operationId: DistruPublic.V1.ChargePresetController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of an existing charge preset to update. Omit to create a new preset. When given, the matching preset in your company is updated in place; the update is sparse, so only the other fields you send are changed. An ID that doesn't exist for your company returns 404.
+                name:
+                  type: string
+                  description: Display name of the preset (e.g. "Delivery Fee"). Required on create. Must be unique within your company (case-insensitive) among non-deleted presets, and may only contain letters, numbers, underscores, and spaces. Charges applied from the preset copy this name and keep it even if the preset is later renamed. On update, omit to leave unchanged.
+                type:
+                  enum:
+                  - CHARGE
+                  - DISCOUNT
+                  type: string
+                  description: 'Whether an applied line adds to or subtracts from the order total.• CHARGE: adds to the total (e.g. a delivery fee).• DISCOUNT: subtracts from the total; the applied charge line carries the preset''s amount negated. Required on create. On update, omit to leave unchanged.'
+                unit_type:
+                  enum:
+                  - PERCENT
+                  - PRICE
+                  type: string
+                  description: 'How the preset''s amount is expressed.• PRICE: a flat money amount, carried in `price`.• PERCENT: a percentage of the order subtotal, carried in `percent`. Required on create. The matching amount field must be set and the other must be null; when changing `unit_type` on update, send the new amount field and null the old one in the same request.'
+                percent:
+                  type: string
+                  description: The percentage amount as a positive decimal string greater than 0 and less than 100 (e.g. "10" for 10%), with up to 4 decimal places. Required when `unit_type` is PERCENT; must be null (or omitted) when it is PRICE. Stored positive even for DISCOUNT presets.
+                price:
+                  type: string
+                  description: The flat money amount as a positive decimal string (e.g. "25.00"). Required when `unit_type` is PRICE; must be null (or omitted) when it is PERCENT. Stored positive even for DISCOUNT presets.
+                allow_inline_edits:
+                  type: boolean
+                  description: When true, a charge line applied from this preset may carry a different amount or unit type than the preset (the user applying it needs the preset-charge permission for that document type). When false, applied lines are locked to the preset's exact amount. An applied line's name and type always stay locked to the preset either way. Defaults to false when omitted on create. On update, omit to leave unchanged.
+                auto_apply_tags_on_sales_orders:
+                  type: boolean
+                  description: 'When true, this preset is automatically added to a sales order when a product carrying one of the preset''s `tags` is on it — both in the Distru order form and when an order is created through [POST /public/v1/orders](#upsert-an-order). Auto-apply runs on create only: adding items to an existing order later never adds new preset charges. Defaults to true when omitted on create. On update, omit to leave unchanged.'
+                auto_apply_tags_on_purchase_orders:
+                  type: boolean
+                  description: Same as `auto_apply_tags_on_sales_orders`, but for purchase orders (the Distru purchase form and [POST /public/v1/purchases](#upsert-a-purchase-order)). Defaults to true when omitted on create. On update, omit to leave unchanged.
+                tags:
+                  items:
+                    type: string
+                  type: array
+                  description: 'Tag IDs that trigger the auto-apply behavior — call GET /public/v1/tags to list valid IDs. When sent, the list replaces the preset''s complete tag set: any tag left out is removed, and an empty array clears all tags. Omit to leave the current tags unchanged. Defaults to no tags on create. At most 200 IDs may be given.'
+              required:
+              - name
+              - type
+              - unit_type
+        required: true
+      responses:
+        '200':
+          description: The updated charge preset
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ChargePresetResponse'
+        '201':
+          description: The created charge preset
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ChargePresetResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a charge preset
+      tags:
+      - ChargePreset
+  /public/v1/charge-presets/{id}:
+    delete:
+      description: 'Delete a charge preset. This is a hard delete: the preset is permanently removed, not archived,
+
+        and cannot be recovered. Returns 204 on success, or 404 if no preset with that ID exists in
+
+        your company — a preset that was already deleted also reads as 404.
+
+
+        Charges already applied from the preset keep their name, type, and amount, but their reference
+
+        to it is severed: their `charge_preset` field reads null from then on. No inventory is affected
+
+        and nothing is synced to Metrc or BioTrack. The preset''s name is freed for a new preset to
+
+        reuse.
+
+
+        Required permission: `settings_permissions_charge_presets`.'
+      operationId: DistruPublic.V1.ChargePresetController.delete
+      parameters:
+      - description: ID of the charge preset to delete. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a charge preset
+      tags:
+      - ChargePreset
+    get:
+      description: 'Get a single charge preset by ID. Returns 404 if no preset with that ID exists in your company
+
+        or if it has been deleted.
+
+
+        Required permission: any of `settings_permissions_charge_presets`, or create/edit permission
+
+        for orders, purchases, or invoices.'
+      operationId: DistruPublic.V1.ChargePresetController.show
+      parameters:
+      - description: ID of the charge preset to fetch. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single charge preset
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ChargePresetResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a charge preset
+      tags:
+      - ChargePreset
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Tag:
+      description: A tag
+      properties:
+        id:
+          description: ID for this tag.
+          type: string
+        name:
+          description: The tag's display name. May be null when the tag was created without one.
+          type: string
+      required:
+      - id
+      title: Tag
+      type: object
+    ChargePreset:
+      description: A reusable, company-scoped template for a charge or discount line on a sales order, purchase, or invoice. Applying a preset copies its name, type, and amount onto the document's charge line; the line keeps those values on its own, so later edits to the preset never change charges already applied.
+      properties:
+        allow_inline_edits:
+          description: Whether a charge line applied from this preset may carry a different amount or unit type than the preset. When false, applied lines are locked to the preset's exact amount. Name and type always stay locked to the preset. Always present.
+          type: boolean
+        auto_apply_tags_on_purchase_orders:
+          description: Same as `auto_apply_tags_on_sales_orders`, but for purchase orders (the Distru purchase form and [POST /public/v1/purchases](#upsert-a-purchase-order)). Always present.
+          type: boolean
+        auto_apply_tags_on_sales_orders:
+          description: Whether this preset is automatically added to a sales order containing a product with a matching tag — both in the Distru order form and when an order is created through [POST /public/v1/orders](#upsert-an-order) (create only; later item changes never add preset charges). Always present.
+          type: boolean
+        id:
+          description: ID of this charge preset. Stable across renames; use it as the `id` for the fetch, upsert, and delete endpoints. Also returned as `charge_preset.id` on charges applied from this preset.
+          type: string
+        inserted_datetime:
+          description: When the charge preset was created, as a UTC ISO-8601 timestamp (e.g. `"2026-08-20T14:30:00Z"`). Always present.
+          type: string
+        name:
+          description: Display name of the preset. Unique within your company (case-insensitive) among non-deleted presets. Copied onto each charge line applied from the preset. Always present.
+          type: string
+        percent:
+          description: The percentage amount as a positive decimal string (e.g. "10" for 10%). Present when `unit_type` is PERCENT, null when it is PRICE. Positive even for DISCOUNT presets — the sign is applied when the preset lands on an order.
+          type: string
+        price:
+          description: The flat money amount as a positive decimal string (e.g. "25.00"). Present when `unit_type` is PRICE, null when it is PERCENT. Positive even for DISCOUNT presets — the sign is applied when the preset lands on an order.
+          type: string
+        tags:
+          description: The tags that trigger the auto-apply behavior. Empty when the preset has no tags. Always present.
+          items:
+            $ref: '#/components/schemas/Tag'
+          type: array
+        type:
+          description: 'Whether an applied line adds to or subtracts from the order total (SCREAMING_CASE).• CHARGE: adds to the total.• DISCOUNT: subtracts from the total; the applied line carries the amount negated. Always present.'
+          enum:
+          - CHARGE
+          - DISCOUNT
+          type: string
+        unit_type:
+          description: 'How the preset''s amount is expressed (SCREAMING_CASE).• PRICE: a flat money amount, carried in `price`.• PERCENT: a percentage of the order subtotal, carried in `percent`. Always present.'
+          enum:
+          - PERCENT
+          - PRICE
+          type: string
+        updated_datetime:
+          description: When the charge preset was last modified, as a UTC ISO-8601 timestamp. Equal to `inserted_datetime` until the preset is first updated. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - tags
+      - auto_apply_tags_on_purchase_orders
+      - auto_apply_tags_on_sales_orders
+      - allow_inline_edits
+      - unit_type
+      - type
+      - name
+      - id
+      title: ChargePreset
+      type: object
+    ChargePresetResponse:
+      description: A single charge preset
+      properties:
+        data:
+          $ref: '#/components/schemas/ChargePreset'
+      title: Charge Preset Response
+      type: object
+    ChargePresets:
+      description: A collection of charge presets
+      properties:
+        data:
+          description: Charge Presets
+          items:
+            $ref: '#/components/schemas/ChargePreset'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Charge Presets
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

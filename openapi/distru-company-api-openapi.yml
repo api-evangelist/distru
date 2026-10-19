@@ -1,0 +1,1172 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Company API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Company
+paths:
+  /public/v1/companies:
+    get:
+      description: 'List the companies in your CRM (each entry is your relationship with another company), ordered oldest-first by creation date. Filter by name or legal business name, business category, relationship type, group, owner, license number, US state or city, QuickBooks Online / LeafLink links, outstanding balance, custom fields, creation and last-modified datetimes, and whether soft-deleted entries are included.
+
+
+        This is a read-only listing served from a replica, so it returns eventually consistent data — a create or update made through the API can take up to 1 second to appear here.
+
+
+        Required permission: `companies_permissions_view`. Results are scoped to your own account and further limited to the companies the authenticated user can see under their team restrictions, so this may return fewer entries than exist on the account.'
+      operationId: DistruPublic.V1.CompanyController.index
+      parameters:
+      - description: Restrict the result to specific companies by ID (the same ID returned as each company's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by the company's business category, matching exactly one value verbatim. Note these values are Title Case, not the SCREAMING_CASE used by other enums in this API — the same casing the `category` response field returns. `Retail - Affiliated` and `Retail - Unaffiliated` only ever match companies in a Michigan CRM; see the `category` field on [POST /public/v1/companies](#upsert-a-company) for which values apply to your state.
+        in: query
+        name: category
+        required: false
+        schema:
+          type: string
+          enum:
+          - Cultivator
+          - Delivery
+          - Dispensary
+          - Distributor
+          - Lab
+          - Manufacturer
+          - Microbusiness
+          - Other
+          - Retail
+          - Retail - Affiliated
+          - Retail - Unaffiliated
+      - description: Filter by the datetime each company was created. A comma-separated, inclusive ISO8601 range written as `after,before`; omit either side to leave that bound open. `?inserted_datetime=2022-07-10T00:00:00Z,` returns entries created on or after that instant, `?inserted_datetime=,2022-07-10T00:00:00Z` returns entries created on or before it, and supplying both bounds restricts to the range between them.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Controls whether soft-deleted companies are returned. `no` (the default when omitted) returns only non-deleted entries, `only` returns only soft-deleted entries, and `include` returns both. A soft-deleted entry keeps a non-null `deleted_at` in the response.
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Filter by the datetime each company was last modified. Same comma-separated, inclusive `after,before` ISO8601 range format as `inserted_datetime`. `?updated_datetime=,2022-07-10T00:00:00Z` returns entries last modified on or before that instant.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by company name, matching a case-insensitive substring of each company's display `name`. `?name=acme` matches “Acme Dispensary”. For exact, multi-value matching use `names` instead.
+        in: query
+        name: name
+        required: false
+        example: ?name=acme
+        schema:
+          type: string
+      - description: Restrict to companies whose display `name` exactly matches one of the given values (case-insensitive). Repeat the bracketed key once per name. An empty list is treated as no filter. At most 200 names may be given.
+        in: query
+        name: names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by the company's registered legal business name (distinct from its display `name`), matching a case-insensitive substring of each company's `legal_business_name`.
+        in: query
+        name: legal_business_name
+        required: false
+        example: ?legal_business_name=acme%20llc
+        schema:
+          type: string
+      - description: Filter to companies that hold a license with this exact number, matched against the license numbers under each company's `licenses`. Case-insensitive and surrounding whitespace is ignored.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000123-LIC
+        schema:
+          type: string
+      - description: Restrict to companies assigned any of these relationship types, matched against each company's `relationship_type.id`. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: relationship_type_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to companies in any of these groups, matched against each company's `group.id`. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: company_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to companies owned by any of these Distru users, matched against each company's `owner_id`. Repeat the bracketed key once per ID. Unknown IDs match nothing; an empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to companies that have a location in any of these US states, given as two-letter state codes and matched against the `state` of each company's `locations`. Repeat the bracketed key once per code. At most 200 codes may be given.
+        in: query
+        name: states
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - AK
+            - AL
+            - AR
+            - AZ
+            - CA
+            - CO
+            - CT
+            - DC
+            - DE
+            - FL
+            - GA
+            - GU
+            - HI
+            - IA
+            - ID
+            - IL
+            - IN
+            - KS
+            - KY
+            - LA
+            - MA
+            - MD
+            - ME
+            - MI
+            - MN
+            - MO
+            - MS
+            - MT
+            - NC
+            - ND
+            - NE
+            - NH
+            - NJ
+            - NM
+            - NV
+            - NY
+            - OH
+            - OK
+            - OR
+            - PA
+            - PR
+            - RI
+            - SC
+            - SD
+            - TN
+            - TX
+            - UT
+            - VA
+            - VI
+            - VT
+            - WA
+            - WI
+            - WV
+            - WY
+            type: string
+      - description: Restrict to companies that have a location whose city matches this case-insensitive substring, matched against the `city` of each company's `locations`.
+        in: query
+        name: city
+        required: false
+        example: ?city=beverly
+        schema:
+          type: string
+      - description: Restrict to companies linked to any of these LeafLink customer IDs, matched exactly against each company's `leaflink_customer_id`. Repeat the bracketed key once per ID. An empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: leaflink_customer_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Restrict to companies linked to any of these QuickBooks Online customer IDs, matched exactly against each company's `qb_customer_id`. Repeat the bracketed key once per ID. An empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: qb_customer_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to companies linked to any of these QuickBooks Online vendor IDs, matched exactly against each company's `qb_vendor_id`. Repeat the bracketed key once per ID. An empty list is treated as no filter. At most 200 IDs.
+        in: query
+        name: qb_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: When `true`, returns only companies whose computed `outstanding_balance` is greater than 0 (they owe you money). When `false`, returns only companies with an outstanding balance of 0 or less, including those with a credit balance. Omit to include all.
+        in: query
+        name: has_outstanding_balance
+        required: false
+        schema:
+          type: boolean
+      - description: Filter by each company's computed `outstanding_balance`. A comma-separated, inclusive `min,max` decimal range; omit either side to leave that bound open. `?outstanding_balance=100,` returns companies owing at least 100, `?outstanding_balance=,500` at most 500, and both bounds restricts to the range between them.
+        in: query
+        name: outstanding_balance
+        required: false
+        example: ?outstanding_balance=100,500
+        schema:
+          type: string
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=company` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      responses:
+        '200':
+          description: A list of companies
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Companies'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get companies
+      tags:
+      - Company
+    post:
+      description: 'Create or update one company in your CRM through a single endpoint. Omit `id` to create; pass an existing company `id` to update that entry. The response is the same object returned by `GET /public/v1/companies/{id}`, with status 201 on create and 200 on update.
+
+
+        A company here is your relationship with another business plus the underlying business record. The two are written together: `name`, `category`, `legal_business_name`, `default_email`, `phone_number`, `website`, `default_sales_order_notes`, and `default_purchase_order_notes` describe the business itself, while the emails, `owner_id`, `group_id`, `relationship_type_id`, `default_payment_term_id`, `outstanding_balance_threshold`, and `custom_data` describe your relationship with it. On create both records are created in one call; on update both are amended in place — no second company is created.
+
+
+        Updates are sparse: only the fields you send change, and any field you omit keeps its current value. Sending `custom_data`, however, replaces the entire custom-field map — any custom field not present in the map you send is cleared, so send the full set you want to keep. Required custom fields are enforced on both create and update, so a create or update that leaves a required custom field unset is rejected. Renaming a company also updates its public menu URLs, so previously shared menu links for that company change.
+
+
+        This endpoint does not touch inventory and has no state-traceability (Metrc/BioTrack) effect — companies are CRM records only. A few response fields are read-only and cannot be set here: the computed `outstanding_balance`, `leaflink_brand_id`, and the nested `licenses` and `locations` — manage a company''s licenses with POST /public/v1/companies/{id}/licenses and its locations with POST /public/v1/companies/{id}/locations instead.
+
+
+        You can link this company to your QuickBooks Online and LeafLink records through `qb_customer_id`, `qb_vendor_id`, and `leaflink_customer_id`. These run the same checks and side effects as the in-app mapping screens: the id must exist in your synced QuickBooks Online / LeafLink data, each may be linked to only one company on your account, and linking a `leaflink_customer_id` reassigns that customer''s existing LeafLink orders to this company. Send an explicit `null` to unlink; omit the field to leave the current link unchanged. The link runs in the same transaction as the rest of the upsert, so if it is rejected the whole request is rolled back and nothing is persisted.
+
+
+        Validation is all-or-nothing: if any field is rejected the whole upsert fails and nothing is persisted; errors come back as a `400` with an `errors` array. Referencing an `id` that does not exist on your account returns `404`, and one your team restrictions hide returns `403`.
+
+
+        Required permission: `companies_permissions_create` to create; `companies_permissions_edit`, plus access to the company under team restrictions, to update. Setting `qb_customer_id` or `qb_vendor_id` additionally requires `settings_permissions_quickbooks`; setting `leaflink_customer_id` additionally requires `companies_permissions_update_leaflink_data`.'
+      operationId: DistruPublic.V1.CompanyController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the company to update. When present, that company is updated and its business record amended in place; when absent, a new company and its underlying business record are created together. Must reference a company on your account (otherwise the request returns 404) that you can access under team restrictions (otherwise 403).
+                name:
+                  type: string
+                  description: Display name of the company. Required on create; left as-is when omitted on update. Must be at least one character and cannot contain special characters. Must be unique among the active companies on your account, on both create and update — a duplicate name is rejected. Renaming an existing company also rewrites its public menu URLs, so previously shared menu links for that company change.
+                category:
+                  type: string
+                  description: 'Business category for the company, returned verbatim in the response''s `category` field (note these are Title Case, not the SCREAMING_CASE used by other enums in this API). Optional; left as-is when omitted on update. The allowed values depend on the US state of YOUR company (the CRM company inherits it): • Every state accepts `Dispensary`, `Delivery`, `Cultivator`, `Manufacturer`, `Distributor`, `Microbusiness`, `Lab`, and `Other`. • Outside Michigan, `Retail` is also accepted. `Retail - Affiliated` and `Retail - Unaffiliated` are rejected with a 400 whose message names your state (e.g. `This category is not available for California companies`). • In Michigan, `Retail - Affiliated` and `Retail - Unaffiliated` replace `Retail`. Sending `Retail` for a Michigan company is rejected with a 400 unless the company already has `Retail` saved, in which case it is kept until you change it. Any value outside these sets is rejected with a 400 `is invalid`.'
+                legal_business_name:
+                  type: string
+                  description: The company's registered legal business name, distinct from its display `name`. Left as-is when omitted on update.
+                default_email:
+                  type: string
+                  description: Primary email address for the company. Must be a valid email address when provided. Left as-is when omitted on update.
+                phone_number:
+                  type: string
+                  description: Phone number for the company. Free-text; not format-validated. Left as-is when omitted on update.
+                website:
+                  type: string
+                  description: Website URL for the company. Left as-is when omitted on update.
+                default_sales_order_notes:
+                  type: string
+                  description: Notes pre-filled onto new sales orders created for this company. Left as-is when omitted on update.
+                default_purchase_order_notes:
+                  type: string
+                  description: Notes pre-filled onto new purchase orders created for this company. Left as-is when omitted on update.
+                invoice_email:
+                  type: string
+                  description: Email address that invoices for this company are sent to. Left as-is when omitted on update.
+                sales_order_email:
+                  type: string
+                  description: Email address that sales orders for this company are sent to. Left as-is when omitted on update.
+                purchase_order_email:
+                  type: string
+                  description: Email address that purchase orders for this company are sent to. Left as-is when omitted on update.
+                order_shipment_email:
+                  type: string
+                  description: Email address that order shipment notifications for this company are sent to. Left as-is when omitted on update.
+                relationship_type_id:
+                  type: string
+                  description: ID of the relationship type to assign to this company (surfaces as the `relationship_type` object in responses). Left as-is when omitted on update.
+                group_id:
+                  type: string
+                  description: ID of the group to assign to this company (surfaces as the `group` object in responses). Left as-is when omitted on update.
+                owner_id:
+                  type: string
+                  description: ID of the user who owns this company. Must be a user visible to the authenticated user under their team restrictions, otherwise the request is rejected. Left as-is when omitted on update.
+                default_payment_term_id:
+                  type: string
+                  description: ID of the payment term applied by default to this company. Use `GET /public/v1/payment-terms` to look up available payment term IDs. Left as-is when omitted on update.
+                outstanding_balance_threshold:
+                  type: integer
+                  description: Outstanding-balance (unpaid invoice total) at which Distru starts showing warnings and sending alerts for this company. A positive integer in your account's currency major unit (e.g. whole dollars), compared directly against the company's outstanding balance. When null, the account-wide default threshold applies; when set, it supersedes that default. Left as-is when omitted on update.
+                qb_customer_id:
+                  type: string
+                  description: Links this company to a QuickBooks Online customer. Must be a customer id present in your synced QuickBooks Online data, and each customer may be linked to only one company on your account. Left as-is when omitted; send null to unlink. Requires the `settings_permissions_quickbooks` permission.
+                qb_vendor_id:
+                  type: string
+                  description: Links this company to a QuickBooks Online vendor. Must be a vendor id present in your synced QuickBooks Online data, and each vendor may be linked to only one company on your account. Left as-is when omitted; send null to unlink. Requires the `settings_permissions_quickbooks` permission.
+                leaflink_customer_id:
+                  type: integer
+                  description: Links this company to a LeafLink customer. Must be a customer id present in your synced LeafLink data, and each customer may be linked to only one company on your account. Linking also reassigns that customer's existing LeafLink orders to this company. Cannot be set on a company that represents your own business. Left as-is when omitted; send null to unlink (existing orders keep their current company). Requires the `companies_permissions_update_leaflink_data` permission.
+                custom_data:
+                  type: object
+                  description: 'A map of custom field IDs to their values. Use `GET /public/v1/custom-fields?parent_object=company` to retrieve available custom fields, their IDs, and their types. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options. This replaces the whole custom-field map — any field you omit from the map is cleared, so send every value you want to keep. Fields configured as required must be present with a value or the request is rejected.'
+      responses:
+        '200':
+          description: An updated company relationship
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyResponse'
+        '201':
+          description: A new company relationship
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a company
+      tags:
+      - Company
+  /public/v1/companies/{id}:
+    delete:
+      description: 'Deletes a company from your CRM. This is a soft delete: the company stops appearing in `GET /public/v1/companies` by default (pass the `deleted` filter as `include` or `only` to still see it) and this endpoint returns 404 for it, but the record is retained — `GET /public/v1/companies/{id}` keeps resolving it with a non-null `deleted_at`, and anything that already references the company (a sales order, purchase, invoice, or credit) keeps its reference and continues to render it. The delete cannot be undone through the API; recreating the company via upsert produces a new company with a new `id`. Responds 204 with no body on success, 404 if no non-deleted company with that `id` exists on your account (including one that was already deleted or belongs to another account), or 403 if your team restrictions hide it.
+
+
+        The delete cascades to the company''s dependent CRM data, all in one atomic call: the products this company vendors and those products'' batches are soft-deleted, and its contacts are soft-deleted. The company''s credits are NOT deleted: they keep their applications to invoices and stay readable through the credit endpoints. Existing sales orders, purchases, and invoices for the company are also NOT deleted, and no reference ever blocks the delete. The one entry that can never be deleted is the company that represents your own business; attempting it returns a 400. No inventory is created, consumed, or released, and nothing is synced to Metrc or BioTrack. A successful delete records a `delete` entry in the company''s activity log and notifies the relevant users.
+
+
+        Required permission: `companies_permissions_delete`.'
+      operationId: DistruPublic.V1.CompanyController.delete
+      parameters:
+      - description: ID of the company to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your account (or was already deleted) returns 404, and one your team restrictions hide returns 403.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a company
+      tags:
+      - Company
+    get:
+      description: 'Fetch one company from your CRM by its ID, including its underlying business record, owner, group, relationship type, payment term, custom fields, licenses, locations, and computed outstanding balance.
+
+
+        Returns 404 if no company with that ID exists on your account, and 403 if your team restrictions hide it. A soft-deleted company is still returned here, with a non-null `deleted_at`. This read is served from a replica and is eventually consistent — a create or update made through the API can take up to 1 second to be reflected.
+
+
+        Required permission: `companies_permissions_view`.'
+      operationId: DistruPublic.V1.CompanyController.show
+      parameters:
+      - description: ID of the company to fetch.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single company
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CompanyResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a company
+      tags:
+      - Company
+  /public/v1/companies/{id}/licenses:
+    post:
+      description: 'Upsert a single license held by one of the companies in your CRM — one POST handles both create and update. Include an existing license `id` in the body to update that license, or omit `id` to create a new one. The create path returns 201 and the update path returns 200; either way the response body is the license. The license also appears in the company''s `licenses` array on the company endpoints, and the company can be found by its licenses via the `license_number` filter of GET /public/v1/companies; it is not returned by GET /public/v1/licenses, which lists only your own company''s licenses.
+
+
+        This endpoint only manages the licenses of your partner companies: the `{id}` in the path must be a company in your CRM other than your own company. Your own company''s licenses cannot be created or modified through the API — contact Distru support to change those. Licenses created here exist only in Distru (their `compliance_type` is `NONE`): writing one does not move inventory and does not sync to Metrc or BioTrack.
+
+
+        Updates are sparse: only the fields you send are changed, any field you omit keeps its current value, and sending `null` for a nullable field clears it.
+
+
+        Required permission: `licenses_permissions_create` to create a license, `licenses_permissions_edit` to update an existing one.'
+      operationId: DistruPublic.V1.CompanyController.upsert_license
+      parameters:
+      - description: ID of the company (as returned by [GET /public/v1/companies](#get-companies)) that holds the license. Must be a company in your CRM other than your own company; an ID that doesn't exist for your company returns 404, and one your team restrictions hide returns 403.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the license. Provide it to update that license — it must belong to the company in the path, otherwise the request returns 404. Omit it to create a new license.
+                license_number:
+                  type: string
+                  description: License number as issued by the state (e.g. `C11-0000001-LIC`). Required on create. Surrounding whitespace is trimmed, and the number must be unique among the company's licenses. Cannot be set to `null`.
+                license_type:
+                  type: string
+                  description: Type of the license. Required on create. Must be one of the values valid for your company's US state — call [GET /public/v1/license-types](#get-license-types) for the exact strings, which are also listed on that endpoint's documentation. Any other value is rejected with a 400. Cannot be set to `null`.
+                active:
+                  type: boolean
+                  description: Whether the license is currently active. Defaults to `true` when omitted on create. Cannot be set to `null`.
+                expiry_datetime:
+                  type: string
+                  description: ISO 8601 datetime the license expires (e.g. `2030-01-01T00:00:00Z`). Required on create. Cannot be set to `null`.
+                issue_datetime:
+                  type: string
+                  description: ISO 8601 datetime the license was issued, or `null` to clear it. Optional.
+      responses:
+        '200':
+          description: An updated license
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LicenseResponse'
+        '201':
+          description: A new license
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LicenseResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a company's license
+      tags:
+      - Company
+  /public/v1/companies/{id}/locations:
+    post:
+      description: 'Upsert a single location of one of the companies in your CRM — one POST handles both create and update. Include an existing location `id` in the body to update that location, or omit `id` to create a new one. The create path returns 201 and the update path returns 200; either way the response body is the full location, including its geocoded `latitude`/`longitude`. The location also appears in the company''s `locations` array on the company endpoints; it is not returned by GET /public/v1/locations, which lists only your own company''s locations.
+
+
+        This endpoint only manages the locations of your partner companies: the `{id}` in the path must be a company in your CRM other than your own company. To manage your own company''s locations, use POST /public/v1/locations instead.
+
+
+        `latitude` and `longitude` cannot be sent — they are derived by geocoding the address, because Distru uses these coordinates to generate directions for transfer templates and to optimize delivery routes. Since those features require coordinates, an address that cannot be geocoded is rejected: nothing is saved and the request returns 400 (correct the address fields and retry). If the geocoding service itself is temporarily unavailable the request returns 503 — the address may be fine; retry later. Previously geocoded addresses resolve without contacting the geocoding service.
+
+
+        Updates are sparse: only the fields you send are changed, any field you omit keeps its current value, and sending `null` for a nullable field clears it (a required field rejects `null` with a 400). Changing any address field re-geocodes the location and refreshes its coordinates.
+
+
+        Required permission: `companies_permissions_create` to create a location, `companies_permissions_edit` to update an existing one.'
+      operationId: DistruPublic.V1.CompanyController.upsert_location
+      parameters:
+      - description: ID of the company (as returned by [GET /public/v1/companies](#get-companies)) the location belongs to. Must be a company in your CRM other than your own company; an ID that doesn't exist for your company returns 404, and one your team restrictions hide returns 403.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the location. Provide it to update that location — it must belong to the company in the path and not be soft-deleted, otherwise the request returns 404. Omit it to create a new location.
+                name:
+                  type: string
+                  description: Display name of the location. Required on create; cannot be set to `null`. Characters with diacritics are replaced with their closest ASCII equivalent (e.g. `Española` becomes `Espanola`).
+                street_address:
+                  type: string
+                  description: Street address (e.g. `1234 Mission St`). Required on create; cannot be set to `null`. Part of the geocoded address.
+                apt:
+                  type: string
+                  description: Apartment, suite, or unit within the street address, or `null` to clear it. Optional.
+                city:
+                  type: string
+                  description: City of the address. Required on create; cannot be set to `null`.
+                state:
+                  type: string
+                  description: State or region of the address. Required on create; cannot be set to `null`. When `country` is `US`, must be a two-letter US state abbreviation (e.g. `CA`).
+                zip:
+                  type: string
+                  description: Postal code of the address. Required on create; cannot be set to `null`. When `country` is `US`, must be a valid ZIP code (`#####` or `#####-####`) whose prefix matches the state.
+                country:
+                  type: string
+                  description: Country of the address as an ISO 3166-1 alpha-2 code (e.g. `US`). Required on create; cannot be set to `null`. Official country names and common spellings are normalized to their code (e.g. `United States` becomes `US`).
+                license_id:
+                  type: string
+                  description: ID of a [license](#model-license) held by the same company, linking the location to that license, or `null` to unlink. Optional. A license that doesn't belong to the company in the path is rejected with a 400. Manage the company's licenses via [POST /public/v1/companies/{id}/licenses](#upsert-a-companys-license).
+      responses:
+        '200':
+          description: An updated location
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '201':
+          description: A new location
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: The geocoding service is temporarily unavailable — retry later
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a company's location
+      tags:
+      - Company
+components:
+  schemas:
+    PaymentTerm:
+      description: The agreed timeframe a customer has to pay — for example "Net 30" means payment is due 30 days after the invoice.
+      properties:
+        days:
+          description: Number of days after the invoice date until payment is due. 0 means due the same day.
+          type: integer
+        id:
+          description: ID for this payment term
+          type: string
+        inserted_datetime:
+          description: The datetime this payment term was created at
+          type: string
+        locked:
+          description: True when this is a built-in Distru default payment term. A locked term cannot be deleted and only its `time_of_day` can be edited; an unlocked one is fully editable.
+          type: boolean
+        name:
+          description: Name of the payment term. Unique per company (case-insensitive).
+          example: Net 30
+          type: string
+        time_of_day:
+          description: Time of day on the due date that payment is due, as "HH:MM:SS" (e.g. "17:00:00"). Defaults to "17:00:00".
+          example: '17:00:00'
+          type: string
+        updated_datetime:
+          description: The datetime this payment term was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - locked
+      - time_of_day
+      - days
+      - name
+      - id
+      title: PaymentTerm
+      type: object
+    LicenseResponse:
+      description: A single license wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/License'
+      title: License Response
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    LocationResponse:
+      description: A single location wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Location'
+      title: Location Response
+      type: object
+    Company:
+      description: A business in your network — a customer, a vendor, or both. Holds contact details, locations, licenses, and the terms you deal on.
+      properties:
+        category:
+          description: The kind of cannabis business this company is (Title-Case, not SCREAMING_CASE) — one of Dispensary, Delivery, Cultivator, Manufacturer, Distributor, Microbusiness, Lab, Retail, or Other. Companies in a Michigan CRM use Retail - Affiliated or Retail - Unaffiliated instead of Retail, though a Michigan company that had Retail before the split keeps it until it is changed. Null when no category is set.
+          enum:
+          - Cultivator
+          - Delivery
+          - Dispensary
+          - Distributor
+          - Lab
+          - Manufacturer
+          - Microbusiness
+          - Other
+          - Retail
+          - Retail - Affiliated
+          - Retail - Unaffiliated
+          type: string
+        custom_data:
+          description: The custom data for this company
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        default_email:
+          description: The primary email address for this company, or null when not set
+          type: string
+        default_payment_term:
+          $ref: '#/components/schemas/PaymentTerm'
+        default_purchase_order_notes:
+          description: The default notes automatically added to purchase orders when this company is the supplier, or null when not set
+          type: string
+        default_sales_order_notes:
+          description: The default external notes automatically added to sales orders when this company is the customer, or null when not set
+          type: string
+        deleted_at:
+          description: ISO 8601 datetime this company was deleted at, or null when it is not deleted
+          type: string
+        group:
+          $ref: '#/components/schemas/CompanyGroup'
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this company was created at
+          type: string
+        invoice_email:
+          description: The email address where sales order invoices are delivered, or null when not set
+          type: string
+        leaflink_brand_id:
+          description: The LeafLink brand ID mapped to this company; only set on self-relationships (your own company), otherwise null
+          type: integer
+        leaflink_customer_id:
+          description: The LeafLink customer ID mapped to this company, or null when it is not mapped to a LeafLink customer
+          type: integer
+        legal_business_name:
+          description: The legal business name for this company. Empty string when never set.
+          type: string
+        licenses:
+          description: The licenses held by this company. Empty when the company has none.
+          items:
+            $ref: '#/components/schemas/License'
+          type: array
+        locations:
+          description: The locations belonging to this company. Empty when the company has none.
+          items:
+            $ref: '#/components/schemas/LocationCompact'
+          type: array
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        order_shipment_email:
+          description: The email address where sales order shipment packing slips are delivered, or null when not set
+          type: string
+        outstanding_balance:
+          description: The current outstanding balance for this company, as a decimal string (e.g. "150.50"). "0" when nothing is outstanding, and can be negative when the company has more unused credit than they owe. Computed as the unpaid total of all invoices on the company's non-canceled orders (invoice total minus non-voided payments), reduced by the company's remaining unused credit (active credits issued minus credit already applied). Changes to it do not update `updated_datetime`; subscribe to `COMPANY_RELATIONSHIP` webhooks to follow it.
+          type: string
+        outstanding_balance_threshold:
+          description: The balance above which this company is treated as over its credit limit; when the balance exceeds it, Distru shows a warning banner on the company's page and when selling to them. Depending on your account's settings it is compared with either `outstanding_balance` or `past_due_balance`; this API doesn't expose which. Null when no threshold is set.
+          type: integer
+        owner:
+          $ref: '#/components/schemas/User'
+        owner_id:
+          description: The ID of the Distru [user](#model-user) who is the account owner (main point of contact) for this company, or null when no owner is assigned
+          type: string
+        past_due_balance:
+          description: The part of this company's balance that is past due, as a decimal string (e.g. "150.50"); "0" when nothing is past due, never negative and never higher than `outstanding_balance`. Computed as the unpaid amount of invoices on the company's delivered or completed orders whose due date is before today in your account's timezone, reduced by the company's remaining unused credit, then capped at `outstanding_balance` (so "0" when `outstanding_balance` is 0 or negative). Invoices on orders not yet delivered don't count, and an overpaid invoice counts as 0 here; it lowers this balance only through the cap. It also changes on its own when an invoice passes its due date, within an hour after midnight in your account's timezone. Changes to it do not update `updated_datetime`; subscribe to `COMPANY_RELATIONSHIP` webhooks to follow it.
+          type: string
+        phone_number:
+          description: The phone number for this company, or null when not set
+          type: string
+        purchase_order_email:
+          description: The email address where purchase order slips are delivered, or null when not set
+          type: string
+        qb_customer_id:
+          description: The QuickBooks Online customer ID mapped to this company, or null when it is not mapped to a QuickBooks Online customer
+          type: string
+        qb_vendor_id:
+          description: The QuickBooks Online vendor ID mapped to this company, or null when it is not mapped to a QuickBooks Online vendor
+          type: string
+        relationship_type:
+          $ref: '#/components/schemas/RelationshipType'
+        sales_order_email:
+          description: The email address where sales order slips are delivered, or null when not set
+          type: string
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at. This is the later of when the trading relationship or the underlying company record was last changed, so an edit to either updates it.
+          type: string
+        website:
+          description: The website for this company, or null when not set
+          type: string
+      required:
+      - past_due_balance
+      - outstanding_balance
+      - custom_data
+      - updated_datetime
+      - name
+      - id
+      title: Company
+      type: object
+    Location:
+      description: 'A place where inventory is held. This is flexible: it can be a whole site such as a warehouse or store, or a more specific spot like a room or area within one. Has an address and optionally a license.'
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        apt:
+          description: The apartment/suite/unit of this location, or null when none was entered
+          type: string
+        city:
+          description: The city of this location
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        country:
+          description: The country of this location
+          type: string
+        deleted_at:
+          description: ISO 8601 datetime this location was deleted at, or null when it is not deleted
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this location was created at
+          type: string
+        latitude:
+          description: The latitude of this location, or null when it has not been geocoded
+          type: number
+        license:
+          $ref: '#/components/schemas/License'
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        longitude:
+          description: The longitude of this location, or null when it has not been geocoded
+          type: number
+        metrc_id:
+          description: The location's ID in Metrc. A Metrc identifier, not a Distru ID. Null when the location is not linked to Metrc.
+          type: integer
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+        state:
+          description: The state of this location
+          type: string
+        street_address:
+          description: The street address of this location
+          type: string
+        updated_datetime:
+          description: ISO 8601 datetime this location was last updated at
+          type: string
+        zip:
+          description: The postal code of this location
+          type: string
+      required:
+      - country
+      - zip
+      - state
+      - city
+      - street_address
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - address
+      - id
+      title: Location
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    License:
+      description: A cannabis license held by a company or tied to a location, identifying it to the state and its compliance system.
+      properties:
+        active:
+          description: Whether this license is currently active
+          type: boolean
+        expiry_datetime:
+          description: ISO 8601 datetime this license expires (e.g. "2026-08-20T00:00:00Z")
+          type: string
+        id:
+          description: ID for this license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this license was created at
+          type: string
+        issue_datetime:
+          description: ISO 8601 datetime this license was issued, or null when not set
+          type: string
+        license_number:
+          description: License number
+          example: C11-1234567890
+          type: string
+        license_type:
+          description: The license type as configured in Distru. A state-specific free-form value, e.g. "Distributor" or "Type 11 Distributor-Transport"
+          type: string
+      required:
+      - active
+      - inserted_datetime
+      - expiry_datetime
+      - license_type
+      - license_number
+      - id
+      title: License
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    RelationshipType:
+      description: How a company relates to your business — whether they are a customer you sell to, a vendor you buy from, or both.
+      properties:
+        id:
+          description: ID for this relationship type
+          type: string
+        name:
+          description: Name of the relationship type (e.g. Customer, Vendor)
+          type: string
+      required:
+      - name
+      - id
+      title: RelationshipType
+      type: object
+    Companies:
+      description: A collection of companies
+      properties:
+        data:
+          description: Companies
+          items:
+            $ref: '#/components/schemas/Company'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Companies
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    CompanyGroup:
+      description: A label used to group companies together (for example by territory or account tier) for organizing and reporting.
+      properties:
+        id:
+          description: ID for this company group
+          type: string
+        name:
+          description: Name of the company group
+          type: string
+      required:
+      - name
+      - id
+      title: CompanyGroup
+      type: object
+    CompanyResponse:
+      description: A single company relationship
+      properties:
+        data:
+          $ref: '#/components/schemas/Company'
+      title: Company Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

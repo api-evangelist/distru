@@ -1,0 +1,539 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Contact API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Contact
+paths:
+  /public/v1/contacts:
+    get:
+      description: 'List the contacts in your CRM, returned oldest-first by creation date. The response is a page envelope: `data` holds the contacts and `next_page` is a ready-to-call URL for the following page (null on the last page).
+
+
+        This endpoint is eventually consistent — a contact you just created or edited may take up to 1 second to appear or reflect its new values here.
+
+
+        By default only non-deleted contacts are returned; use the `deleted` filter to include or isolate soft-deleted ones. Results are further scoped to your company and to the contacts the authenticated user may see under their team restrictions, so two users at the same company can get different lists.
+
+
+        Required permission: `contacts_permissions_view`.'
+      operationId: DistruPublic.V1.ContactController.index
+      parameters:
+      - description: Restrict the result to specific contacts by ID (the same ID returned as each contact's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to contacts employed by specific companies by company ID (the same ID returned as each contact's `company.id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: company_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to contacts owned by any of these Distru users (each contact's `owner.id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to contacts by their creation datetime. The value is a comma-separated `start,end` pair of ISO8601 datetimes and either bound may be omitted: `2022-07-10T00:00:00Z,` returns contacts created on or after that instant, `,2022-07-10T00:00:00Z` returns those created on or before it, and `2022-07-10T00:00:00Z,2022-07-11T00:00:00Z` returns those created between the two (inclusive).'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Whether soft-deleted contacts are included. `no` (the default) returns only non-deleted contacts, `only` returns only soft-deleted ones, and `include` returns both. Soft-deleted contacts carry a non-null `deleted_at` in the response.
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: 'Filter to contacts by the datetime they were last modified. Same comma-separated `start,end` ISO8601 format as `inserted_datetime`, with either bound optional: `,2022-07-10T00:00:00Z` returns contacts last updated on or before that instant.'
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=contact` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      responses:
+        '200':
+          description: A list of contacts
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Contacts'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get contacts
+      tags:
+      - Contact
+    post:
+      description: 'Upsert a single contact — one POST handles both create and update. Include an existing contact `id` to update that contact, or omit `id` to create a new one. The create path returns 201 and the update path returns 200; either way the response body is the full contact.
+
+
+        Updates are sparse: only the fields you send are changed, and any field you omit keeps its current value. `custom_data` is the exception in one direction — sending it replaces the contact''s entire custom-field map (it is not merged key-by-key), so include every key you want to keep; omitting `custom_data` leaves the existing values untouched.
+
+
+        A contact is a person record in your CRM. It is linked to a company relationship (its employer) via `company_id`, to an owning Distru user via `owner_id`, and carries a name/email/phone profile plus optional driver-license details that surface on an order''s shipping manifest when this contact is named as the driver. Writing a contact does not move inventory and does not sync to Metrc or BioTrack; it does record an activity-log entry on the contact and notify the relevant users. New contacts appear in `GET /public/v1/contacts` within about a second (the list is eventually consistent).
+
+
+        Required permission: `contacts_permissions_create` to create a new contact, `contacts_permissions_edit` (plus access to the contact under your team restrictions) to update an existing one.'
+      operationId: DistruPublic.V1.ContactController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the contact. Provide it to update that contact — it must belong to your company, otherwise the request returns 404. Omit it to create a new contact.
+                first_name:
+                  type: string
+                  description: First name of the contact. Required on create; on update, omitting it leaves the current value unchanged. Must be 1-100 characters and cannot be the literal `you`/`You`. Combined with `last_name` to form the response `full_name`.
+                last_name:
+                  type: string
+                  description: Last name of the contact. When provided, must be 1-100 characters. Combined with `first_name` to form the response `full_name`.
+                title:
+                  type: string
+                  description: Job title of the contact.
+                email:
+                  type: string
+                  description: Email address of the contact. When provided, must contain an `@`.
+                phone_number:
+                  type: string
+                  description: Primary phone number of the contact.
+                work_phone_number:
+                  type: string
+                  description: Work phone number of the contact, returned as `work_phone_number`.
+                description:
+                  type: string
+                  description: Free-text note describing the contact.
+                company_id:
+                  type: string
+                  description: ID of the company relationship (the contact's employer) in your network that this contact belongs to. Must reference an existing company relationship you own. Returned as `company.id` in the response. Omit to create the contact without an employer; on update, omitting leaves the current employer unchanged.
+                driver_license_number:
+                  type: string
+                  description: Driver license number recorded on shipping manifests when this contact is assigned as the driver on an order shipment.
+                driver_license_issuing_state:
+                  type: string
+                  description: Two-letter US state or territory abbreviation (e.g. `CA`, `PR`) of the license's issuing state, recorded on shipping manifests when this contact is the driver. Must be one of the recognized US state/territory codes; any other value is rejected.
+                owner_id:
+                  type: string
+                  description: ID of the Distru user who owns this contact. Must be an existing user in your company that is assignable to you under your team restrictions. Omit on create to leave the contact without an owner; on update, omitting leaves the current owner unchanged.
+                custom_data:
+                  type: object
+                  description: 'A map of custom field IDs to their values. Use GET /public/v1/custom-fields?parent_object=contact to retrieve the available custom fields, their IDs, and their types; every key you send must be one of those IDs or the request is rejected. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options. Sending this field replaces the contact''s entire custom-field map, so include every key you want to keep; omit it to leave existing custom values unchanged.'
+              required:
+              - first_name
+        required: true
+      responses:
+        '200':
+          description: An updated contact
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ContactResponse'
+        '201':
+          description: A new contact
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ContactResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a contact
+      tags:
+      - Contact
+  /public/v1/contacts/{id}:
+    delete:
+      description: 'Deletes a contact from your CRM. This is a soft delete: the contact stops appearing in `GET /public/v1/contacts` by default (pass the `deleted` filter as `include` or `only` to still see it) and this endpoint returns 404 for it, but the record is retained — `GET /public/v1/contacts/{id}` keeps resolving it with a non-null `deleted_at`, and anything that already references the contact (an order''s sales-rep assignment, a shipping manifest that names it as driver or contact) keeps its reference and continues to render it. The delete cannot be undone through the API; recreating the contact via upsert produces a new contact with a new `id`. Responds 204 with no body on success, or 404 if no non-deleted contact with that `id` exists in your company (including one that was already deleted or belongs to another company).
+
+
+        A contact can be deleted at any time — no reference blocks it, regardless of the orders, shipping manifests, or company relationships that use it. No inventory is created, consumed, or released, and nothing is synced to Metrc or BioTrack. A successful delete records a `delete` entry in the contact''s activity log and notifies the relevant users.
+
+
+        Required permission: `contacts_permissions_delete`, plus access to the contact under your team restrictions — a contact the authenticated user cannot access returns 403.'
+      operationId: DistruPublic.V1.ContactController.delete
+      parameters:
+      - description: ID of the contact to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your company (or was already deleted) returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a contact
+      tags:
+      - Contact
+    get:
+      description: 'Fetch a single contact by its ID, including its profile, employer, owner, and custom-field values. Returns 404 if no such contact exists in your company or the authenticated user cannot see it under their team restrictions. Like the list endpoint, reads are eventually consistent — a just-written change may take up to 1 second to reflect here.
+
+
+        Required permission: `contacts_permissions_view`.'
+      operationId: DistruPublic.V1.ContactController.show
+      parameters:
+      - description: ID of the contact to fetch. Must belong to your company; returns 404 otherwise.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single contact
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ContactResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a contact
+      tags:
+      - Contact
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Contacts:
+      description: A collection of Contacts
+      properties:
+        data:
+          description: Contacts
+          items:
+            $ref: '#/components/schemas/Contact'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Contacts
+      type: object
+    ContactResponse:
+      description: A single contact
+      properties:
+        data:
+          $ref: '#/components/schemas/Contact'
+      title: Contact Response
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    Contact:
+      description: A person in Distru's CRM, optionally linked to a company. Name, title, and phone/email fields all come from the underlying profile and are individually optional.
+      properties:
+        company:
+          description: The [company](#model-company) this contact belongs to, carrying just its `id`; null when the contact is not linked to a company
+          properties:
+            id:
+              description: The ID of the [company](#model-company) this contact belongs to
+              type: string
+          type: object
+        custom_data:
+          description: The custom data for this contact
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime this contact was deleted at, or null when it is not deleted
+          type: string
+        description:
+          description: Free-text description of this contact, or null when none was entered
+          type: string
+        driver_license_issuing_state:
+          description: The state that issued the driver license used on shipping manifests, or null when not set
+          type: string
+        driver_license_number:
+          description: Driver license number used on shipping manifests, or null when not set
+          type: string
+        email:
+          description: The email address of this contact, or null when not set
+          type: string
+        first_name:
+          description: The first name of this contact, or null when not set
+          type: string
+        full_name:
+          description: The full name of this contact, or null when not set
+          type: string
+        id:
+          description: ID for this contact
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this contact was created at
+          type: string
+        last_name:
+          description: The last name of this contact, or null when not set
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        phone_number:
+          description: The phone number of this contact, or null when not set
+          type: string
+        tasks:
+          description: 'The tasks linked to this contact that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        title:
+          description: The job title of this contact, or null when not set
+          type: string
+        updated_datetime:
+          description: ISO 8601 datetime this contact was last updated at
+          type: string
+        work_phone_number:
+          description: The work phone number of this contact, or null when not set
+          type: string
+      required:
+      - custom_data
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - id
+      title: Contact
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

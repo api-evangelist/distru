@@ -1,0 +1,363 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Invoice History API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: InvoiceHistory
+paths:
+  /public/v1/reports/invoice-history:
+    get:
+      description: 'Read-only report: returns one row per invoice with its dates, sales order, customer, payment status, and monetary totals (paid, outstanding, line item subtotal, taxes, charges, discounts, and grand total) along with the per-tax, per-charge, and per-discount summary strings. This endpoint only reads — it never mutates invoices, inventory, payments, or compliance state.
+
+
+        Scope and date defaulting:
+
+
+        • Results are scoped to the company that owns the API key, and further to the invoices the key''s user is allowed to view.
+
+        • Filtering on `invoice_datetime` is optional; when you omit it the report covers the last 30 days (from the start of the day 30 days ago through the end of today, resolved in the API key user''s timezone). No other filter has a default. `due_datetime` has no implicit range.
+
+        • The resolved invoice-date window (whether you passed it or it defaulted) is echoed back as a human-readable string in `meta.date_range`.
+
+
+        Row shape and value formatting:
+
+
+        • Rows always come back ordered by invoice number, descending. This endpoint exposes no sort parameter — the order is fixed regardless of which filters (including `search`) you pass.
+
+        • Monetary cells (`paid`, `outstanding`, `line_item_subtotal`, `total_taxes`, `total_charges`, `total_discounts`, `total`) are returned as strings (currency and comma formatting stripped) so they match the rest of the API, already coalesced to `"0"` when the invoice has no matching payments/taxes/charges/discounts — they are never null.
+
+        • The summary cells (`tax_summary`, `charge_summary`, `discount_summary`) are human-readable breakdown strings and are null when the invoice has no taxes, no positive charges, or no negative charges (discounts) respectively.
+
+        • `status` is a SCREAMING_CASE payment-status token (see the values below).
+
+        • Each row also carries the IDs of the records it names — `invoice_id`, `sales_order_id`, `customer_id` and `invoice_owner_id`, each right after its name column — so a row can be followed to the invoice, order, company or user endpoints without a name lookup. The CSV export leaves these ID columns out.
+
+
+        Extra columns:
+
+
+        • Companies on a compliance integration get two additional columns — the transfer manifest number and the shipped-from license number. They are labelled by system (Metrc vs BioTrack) but carry the same data.
+
+        • Any Invoice custom fields configured for the company are appended as additional columns, keyed by a slug of the field label.
+
+
+        Because the set of columns varies by company (compliance integration and custom fields), read `meta.columns` to discover the exact keys present in each `data` row rather than hard-coding them.
+
+
+        Required permission: view the invoice history report.'
+      operationId: DistruPublic.V1.Report.InvoiceHistoryController.index
+      parameters:
+      - description: 'Filter by invoice payment status. Repeat the key to pass several values; an invoice matches if its status is any of them (OR). Values are SCREAMING_CASE: NOT_PAID, PARTIALLY_PAID, FULLY_PAID, OVER_PAID (OVER_PAID only occurs on legacy invoices). Omit to include every status.'
+        in: query
+        name: status
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - NOT_PAID
+            - PARTIALLY_PAID
+            - FULLY_PAID
+            - OVER_PAID
+            type: string
+      - description: 'Filter by the status of the sales order each invoice belongs to. Repeat the key to pass several values; matches any (OR). Values are SCREAMING_CASE: PENDING, PROCESSING, READY_TO_SHIP, DELIVERING, DELIVERED, COMPLETED, CANCELED. Omit to include orders in any status.'
+        in: query
+        name: order_status
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - PENDING
+            - PROCESSING
+            - READY_TO_SHIP
+            - DELIVERING
+            - DELIVERED
+            - COMPLETED
+            - CANCELED
+            type: string
+      - description: Filter by invoice date, as a comma-separated ISO8601 datetime range `from,to`. Either side may be left empty for an open-ended range (`2026-01-01T00:00:00Z,` = on or after that instant; `,2026-02-01T00:00:00Z` = on or before it); both sides empty is rejected. When this filter is omitted entirely the report defaults to the last 30 days, and the resolved window is reflected in `meta.date_range`.
+        in: query
+        name: invoice_datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by invoice due date, as a comma-separated ISO8601 datetime range `from,to`. Either side may be empty for an open-ended range. Unlike `invoice_datetime` this has no default — omit it to apply no due-date filter.
+        in: query
+        name: due_datetime
+        required: false
+        example: 2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by the invoice grand total, as a comma-separated `min,max` numeric range. Bounds are inclusive; omit a side to leave it unbounded.
+        in: query
+        name: total
+        required: false
+        example: 100,500
+        schema:
+          type: string
+      - description: Filter by the amount paid on the invoice, as a comma-separated `min,max` numeric range. Bounds are inclusive; omit a side to leave it unbounded.
+        in: query
+        name: paid
+        required: false
+        example: 0,100
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the invoice number. Combines with the other filters (AND); does not change the result ordering, which is always invoice number descending. Omit to skip the invoice-number search.
+        in: query
+        name: search
+        required: false
+        example: INV-1024
+        schema:
+          type: string
+      - description: Filter by customer. Each value is the Distru id of the customer's company relationship (the same id returned as the customer reference elsewhere in the API). Repeat the key to pass several; matches any (OR).
+        in: query
+        name: company_relationship_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by the license the order shipped from. Each value is a Distru license id. Repeat the key to pass several; matches any (OR).
+        in: query
+        name: shipped_from_license_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices whose line items reference any of these batches. Each value is a Distru batch id. Repeat the key to pass several; matches any (OR).
+        in: query
+        name: batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to invoices whose line items reference any of these products. Each value is a Distru product id. Repeat the key to pass several; matches any (OR).
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: The Invoice History report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/InvoiceHistoryReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Invoice History report
+      tags:
+      - InvoiceHistory
+components:
+  schemas:
+    InvoiceHistoryReport:
+      description: The Invoice History report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/InvoiceHistoryReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/InvoiceHistoryReportMeta'
+      required:
+      - meta
+      - data
+      title: InvoiceHistoryReport
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    InvoiceHistoryReportColumn:
+      properties:
+        key:
+          description: The key this column uses in each `data` row
+          type: string
+        label:
+          description: The human-readable label of the column
+          type: string
+      required:
+      - label
+      - key
+      title: InvoiceHistoryReportColumn
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    InvoiceHistoryReportRow:
+      description: 'A single row of the Invoice History report. Companies on a compliance integration and companies with Invoice custom fields will see additional keys.
+
+        '
+      properties:
+        charge_summary:
+          description: Human-readable per-charge breakdown of the positive charges. Null when the invoice has none.
+          type: string
+        customer:
+          description: The customer's company name
+          type: string
+        customer_id:
+          description: The customer's company ID — the `id` [GET /public/v1/companies](#get-companies) returns and the value `company_relationship_ids` filters on.
+          type: string
+        discount_summary:
+          description: Human-readable per-discount breakdown. Null when the invoice has no discounts.
+          type: string
+        due_date:
+          description: The invoice due date as `YYYY-MM-DD` in the API key user's timezone. Null when the invoice has no due date set.
+          type: string
+        invoice_date:
+          description: The invoice date as `YYYY-MM-DD` in the API key user's timezone. Null when the invoice has no invoice date set.
+          type: string
+        invoice_id:
+          description: The invoice's ID — the `id` [GET /public/v1/invoices](#get-invoices) returns.
+          type: string
+        invoice_number:
+          description: The invoice number. Null when the invoice has none.
+          type: string
+        invoice_owner_id:
+          description: The invoice owner's ID — the `id` [GET /public/v1/users](#get-users) returns — or `null` when the invoice has no owner.
+          type: string
+        line_item_subtotal:
+          description: Sum of the invoice's line items (quantity times unit price); `0` when there are none.
+          type: string
+        outstanding:
+          description: 'The unpaid balance: invoice total minus amount paid. Negative when overpaid.'
+          type: string
+        owner:
+          description: Full name of the invoice's owner (the assigned user). Null when the invoice has no owner.
+          type: string
+        paid:
+          description: The total amount paid on the invoice across its non-voided payments; `0` when nothing has been paid.
+          type: string
+        sales_order:
+          description: The order number of the sales order this invoice belongs to
+          type: string
+        sales_order_id:
+          description: The ID of the sales order this invoice belongs to — the `id` [GET /public/v1/orders](#get-orders) returns.
+          type: string
+        status:
+          description: 'The invoice payment status, SCREAMING_CASE: NOT_PAID, PARTIALLY_PAID, FULLY_PAID, OVER_PAID (OVER_PAID only on legacy invoices). Null on the rare invoice with no payment status set.'
+          enum:
+          - NOT_PAID
+          - PARTIALLY_PAID
+          - FULLY_PAID
+          - OVER_PAID
+          type: string
+        tax_summary:
+          description: Human-readable per-tax breakdown, e.g. `Excise Tax - $12.50, City Tax - $4.00`. Null when the invoice has no taxes.
+          type: string
+        total:
+          description: The invoice grand total
+          type: string
+        total_charges:
+          description: Sum of the invoice's positive (non-discount, non-tax) charges; `0` when none.
+          type: string
+        total_discounts:
+          description: Sum of the invoice's discounts (negative charges), expressed as a negative number; `0` when none.
+          type: string
+        total_taxes:
+          description: Sum of the invoice's taxes; `0` when none.
+          type: string
+      required:
+      - total
+      - total_discounts
+      - total_charges
+      - total_taxes
+      - line_item_subtotal
+      - outstanding
+      - paid
+      - customer_id
+      - customer
+      - sales_order_id
+      - sales_order
+      - invoice_id
+      title: InvoiceHistoryReportRow
+      type: object
+    InvoiceHistoryReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: Ordered definitions of every column in each `data` row, including the compliance and custom-field columns that vary by company. Use this to discover the exact keys present.
+          items:
+            $ref: '#/components/schemas/InvoiceHistoryReportColumn'
+          type: array
+        date_range:
+          description: Human-readable invoice-date window the report covers, reflecting either the `invoice_datetime` filter or the default last-30-days window when it was omitted.
+          type: string
+        report:
+          description: The report identifier, always `invoice_history`
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: InvoiceHistoryReportMeta
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

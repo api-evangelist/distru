@@ -1,0 +1,440 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Cost Type API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: CostType
+paths:
+  /public/v1/cost-types:
+    get:
+      description: 'List cost types for the authenticated company. A cost type is a reusable, company-scoped
+
+        category of cost accounting figure (e.g. freight, labor) with a default per-unit amount and a
+
+        unit of measure. Cost types are configuration, not transactions — they are the templates you
+
+        draw from when applying a cost to a plant, a package or batch, an assembly or breakdown output,
+
+        a purchase item, or a product. Each applied cost snapshots its own amount and quantity at apply
+
+        time, so a cost type''s values here only seed future applications and never restate historical
+
+        costs.
+
+
+        Results are scoped to your company and ordered oldest-first by creation time. Both active and
+
+        inactive cost types are returned; soft-deleted ones are excluded. The response is paginated —
+
+        follow the `next_page` URL to page through the full set.
+
+
+        Required permission: `costs_permissions_manage_cost_types`.'
+      operationId: DistruPublic.V1.CostTypeController.index
+      parameters:
+      - description: Restrict the result to specific cost types by ID (the same ID returned as each cost type's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to cost types by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to cost types by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of cost types
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CostTypes'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get cost types
+      tags:
+      - CostType
+    post:
+      description: 'Create or update a single cost type. This is one endpoint for both operations: omit `id` to
+
+        create a new cost type (responds 201), or pass the `id` of an existing cost type to update it
+
+        (responds 200). The URL and request shape are identical either way.
+
+
+        On create, `name`, `cost_per_unit`, `unit_type_id` and `allow_inline_edits` are all required.
+
+        On update the body is sparse — only the fields you send are changed, and any field you omit
+
+        keeps its current value. `unit_type_id` is immutable: once a cost type has a unit type it cannot
+
+        be reassigned, so sending a different `unit_type_id` on update is rejected. `name` must be unique
+
+        within your company, compared case-insensitively, among cost types that are both active and not
+
+        soft-deleted; inactive or deleted cost types do not reserve their name, so deactivating or
+
+        deleting a cost type frees its name for reuse. `cost_per_unit` must be non-zero (it may be
+
+        negative).
+
+
+        A cost type is configuration, not a transaction: this endpoint writes only the cost-type
+
+        template itself. It does not create, consume, reserve, or release inventory, and it never syncs
+
+        to Metrc or BioTrack — cost types have no compliance identity of their own. It also does not
+
+        touch costs already applied from this cost type: each applied cost (on a plant, a package or
+
+        batch, an assembly or breakdown output, a purchase item, or a product) snapshots its own amount
+
+        and quantity at apply time, so changing this cost type''s `cost_per_unit` or `allow_inline_edits`
+
+        affects only future applications, never historical cost records.
+
+
+        Required permission: `costs_permissions_manage_cost_types`.'
+      operationId: DistruPublic.V1.CostTypeController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of an existing cost type to update. Omit to create a new cost type. When given, the matching cost type in your company is updated in place; the update is sparse, so only the other fields you send are changed.
+                name:
+                  type: string
+                  description: Display name of the cost type (e.g. "Freight", "Labor"). Required on create. Leading and trailing whitespace is trimmed. Must be unique within your company, compared case-insensitively, among cost types that are both active and not soft-deleted; the name of a deleted or inactive cost type may be reused. On update, omit to leave unchanged.
+                description:
+                  type: string
+                  description: Optional free-text description of the cost type. Nullable — send null or omit on create to leave it empty. Leading and trailing whitespace is trimmed. On update, omit to leave the current description unchanged, or send null to clear it.
+                cost_per_unit:
+                  type: string
+                  description: 'Default cost amount per one unit of `unit_type_id`, as a decimal string (e.g. "12.50"), with up to 9 decimal places. Required on create. Must be non-zero; may be negative. This is the amount pre-filled when the cost type is applied to a record: when `allow_inline_edits` is true it can be overridden at apply time, otherwise the applied amount is locked to this value. Changing it does not rewrite costs already applied. On update, omit to leave unchanged.'
+                unit_type_id:
+                  type: string
+                  description: 'ID of the unit of measure this cost is priced per — call GET /public/v1/unit-types to list valid IDs. Required on create and immutable afterwards: once set it cannot be changed, so sending a different value on update is rejected. On update, omit (or resend the same value) to leave unchanged.'
+                active:
+                  type: boolean
+                  description: Whether the cost type is active and selectable when applying new costs. Defaults to true when omitted on create. Inactive cost types are still returned by the read endpoints. Name uniqueness only considers active cost types, so setting this to false releases the name for another active cost type to use. On update, omit to leave unchanged.
+                allow_inline_edits:
+                  type: boolean
+                  description: Required on create. When true, the per-unit amount can be overridden each time this cost type is applied to a record; when false, the applied amount is locked to this cost type's `cost_per_unit`. On update, omit to leave unchanged.
+              required:
+              - name
+              - cost_per_unit
+              - unit_type_id
+              - allow_inline_edits
+        required: true
+      responses:
+        '200':
+          description: The updated cost type
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CostTypeResponse'
+        '201':
+          description: The created cost type
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CostTypeResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a cost type
+      tags:
+      - CostType
+  /public/v1/cost-types/{id}:
+    delete:
+      description: 'Soft-delete a cost type. After deletion it is excluded from the list and fetch endpoints and can
+
+        no longer be applied to new records, but the row itself is retained. Returns 204 on success, or
+
+        404 if no cost type with that ID exists in your company — a cost type that was already deleted
+
+        also reads as 404.
+
+
+        Deleting a cost type does not remove or alter costs already applied from it: those applied cost
+
+        records snapshot their own amount and quantity, so they remain intact and unchanged. No inventory
+
+        is affected and nothing is synced to Metrc or BioTrack. Because name uniqueness only considers
+
+        active, non-deleted cost types, deleting a cost type frees its name to be reused by a new one.
+
+
+        Required permission: `costs_permissions_manage_cost_types`.'
+      operationId: DistruPublic.V1.CostTypeController.delete
+      parameters:
+      - description: ID of the cost type to delete.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a cost type
+      tags:
+      - CostType
+    get:
+      description: 'Get a single cost type by ID. Returns 404 if no cost type with that ID exists in your company or
+
+        if it has been soft-deleted. Inactive (but not deleted) cost types are still returned.
+
+
+        Required permission: `costs_permissions_manage_cost_types`.'
+      operationId: DistruPublic.V1.CostTypeController.show
+      parameters:
+      - description: ID of the cost type to fetch.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single cost type
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CostTypeResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a cost type
+      tags:
+      - CostType
+components:
+  schemas:
+    CostType:
+      description: A cost type
+      properties:
+        active:
+          description: Whether the cost type is active and selectable when applying new costs. Always present; inactive cost types are still returned by the read endpoints.
+          type: boolean
+        allow_inline_edits:
+          description: Controls whether the per-unit cost amount can be overridden when a cost of this type is applied to a record (a plant, a package or batch, an assembly or breakdown output, a purchase item, or a product). When true, the applied amount can be entered or overridden at apply time; when false, the applied amount is locked to this cost type's configured `cost_per_unit` and cannot be changed. Always present.
+          type: boolean
+        cost_per_unit:
+          description: Default cost amount per one unit of `unit_type`, as a decimal string (e.g. "12.50"). Always present and non-zero. This is the amount seeded when a cost of this type is applied; whether it can then be overridden depends on `allow_inline_edits`.
+          type: string
+        deleted_at:
+          description: When the cost type was soft-deleted, as a UTC ISO-8601 timestamp, or null if it has not been deleted. In practice always null here, since the read endpoints exclude soft-deleted cost types.
+          type: string
+        description:
+          description: Free-text description of the cost type, or null if none was set.
+          type: string
+        id:
+          description: ID of this cost type. Stable across renames; use it as the `id` for the fetch, upsert, and delete endpoints.
+          type: string
+        inserted_datetime:
+          description: When the cost type was created, as a UTC ISO-8601 timestamp (e.g. `"2026-08-20T14:30:00Z"`). Always present.
+          type: string
+        name:
+          description: Display name of the cost type. Always present and unique within your company (case-insensitive) among active, non-deleted cost types.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        updated_datetime:
+          description: When the cost type was last modified, as a UTC ISO-8601 timestamp. Equal to `inserted_datetime` until the cost type is first updated. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - unit_type
+      - allow_inline_edits
+      - active
+      - cost_per_unit
+      - name
+      - id
+      title: CostType
+      type: object
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    CostTypeResponse:
+      description: A single cost type
+      properties:
+        data:
+          $ref: '#/components/schemas/CostType'
+      title: Cost Type Response
+      type: object
+    CostTypes:
+      description: A collection of cost types
+      properties:
+        data:
+          description: Cost Types
+          items:
+            $ref: '#/components/schemas/CostType'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Cost Types
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

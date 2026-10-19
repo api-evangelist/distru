@@ -1,0 +1,1750 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Metrc API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Metrc
+paths:
+  /public/v1/metrc/items:
+    get:
+      description: 'Get the Metrc items — the item definitions Distru caches from Metrc — across your licenses, filtered by various attributes. Results are ordered by Metrc''s item id ascending and scoped to the company that owns the API key.
+
+
+        Each row mirrors an item as it exists in Metrc (name, product category, strain, unit of measure, quantity type), plus Distru''s `unit_type` resolved by matching the item''s Metrc unit of measure to one of your company''s unit types by name (null when no unit type matches that name), and the owning `license`. Items deleted in Metrc are included by default — use `is_deleted` to return only live or only deleted items.
+
+
+        This is a read-only cache: it does not create, edit, or delete items in Metrc. Data is eventually consistent — changes synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.list_items
+      parameters:
+      - description: Filter to items belonging to this license, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). Omit to return items across all of the company's licenses; a license ID that doesn't belong to your company simply returns no items.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: Filter to items belonging to the Metrc license with this license number (exact match, not a substring). A convenience alternative to `license_id`; combining the two is a 400. Unlike `license_id`, an unknown value is rejected — if your company has no Metrc license with this number the request fails with a 400.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Filter to items whose Metrc name contains this value (case-insensitive substring match against the item's `name`).
+        in: query
+        name: search
+        required: false
+        example: blue dream
+        schema:
+          type: string
+      - description: 'Filter by the item''s quantity category, matched against its Metrc quantity type: `COUNT` (count-based), `VOLUME` (volume-based), or `WEIGHT` (weight-based). Omit to return all categories.'
+        in: query
+        name: unit_type_category
+        required: false
+        example: WEIGHT
+        schema:
+          type: string
+          enum:
+          - COUNT
+          - VOLUME
+          - WEIGHT
+      - description: 'Filter to items whose Metrc product category name exactly matches one of the given values — an item matches if its `category_name` equals any listed value (OR semantics). Case-sensitive: values must match the Metrc category name verbatim. An empty list is ignored (returns items unfiltered by this parameter).'
+        in: query
+        name: category_names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by whether the item is deleted in Metrc. `true` returns only deleted items; `false` returns only live items. Omit to return both.
+        in: query
+        name: is_deleted
+        required: false
+        schema:
+          type: boolean
+      - description: Filter to items with these Metrc item identifiers — Metrc's own integer IDs (the `id` in the response), not Distru IDs. Matches an item if its Metrc ID equals any of the listed values (OR semantics). An empty list is ignored (returns items unfiltered by this parameter).
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Filter by when Distru last fetched the item from Metrc (the `fetched_datetime` in the response). Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `,2022-07-10T00:00:00Z` returns items last fetched on or before that time.
+        in: query
+        name: fetched_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of Metrc items
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcItems'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc items
+      tags:
+      - Metrc
+  /public/v1/metrc/lab-test-batches:
+    get:
+      description: 'Get the Metrc lab test batches that can be assigned to a test sample package created under the given license, grouped by Metrc item category. Lab test batches are defined by the state in Metrc and vary per license and item category; Distru caches them from Metrc, so this is a read-only view of that cache.
+
+
+        `data` is an object with one key per Metrc item category defined for the license (the `category_name` values returned by GET /public/v1/metrc/items), each holding the batches assignable to a test sample of that category. A batch not restricted to specific categories appears under every category. A category with no assignable batches maps to an empty list.
+
+
+        Use this before calling POST /public/v1/assemblies/create_test_sample: the sample''s `lab_test_batches` values must come from the `name`s listed under the sample item''s category, and every batch listed there with `required: true` must be included or the test sample is rejected.
+
+
+        The response is complete (not paginated). `data` is an empty object when the license''s Metrc facility type does not use package sample lab test batches — in that case `lab_test_batches` must be omitted when creating a test sample.
+
+
+        Data is eventually consistent — changes synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.list_lab_test_batches
+      parameters:
+      - description: The license whose lab test batches to return, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). A license ID that doesn't belong to your company simply returns an empty object. Exactly one of `license_id` or `license_number` must be given.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: 'The license whose lab test batches to return, given as its license number (exact match, not a substring). A convenience alternative to `license_id` — exactly one of the two must be given; combining them is a 400. Unlike `license_id`, an unknown value is rejected: if your company has no Metrc license with this number the request fails with a 400.'
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Metrc lab test batches grouped by item category
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcLabTestBatches'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc lab test batches
+      tags:
+      - Metrc
+  /public/v1/metrc/locations:
+    get:
+      description: 'Get the Metrc locations — the room/location definitions Distru caches from Metrc — across your licenses, filtered by various attributes. Results are ordered by Metrc''s location id ascending and scoped to the company that owns the API key.
+
+
+        Each row mirrors a location as it exists in Metrc (name, location type, and which entity kinds it may hold), plus the owning `license`. Locations deleted in Metrc are included by default — use `is_deleted` to return only live or only deleted locations.
+
+
+        This is a read-only cache: it does not create, edit, or delete locations in Metrc. Data is eventually consistent — changes synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.list_locations
+      parameters:
+      - description: Filter to locations belonging to this license, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). Omit to return locations across all of the company's licenses; a license ID that doesn't belong to your company simply returns no locations.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: Filter to locations belonging to the Metrc license with this license number (exact match, not a substring). A convenience alternative to `license_id`; combining the two is a 400. Unlike `license_id`, an unknown value is rejected — if your company has no Metrc license with this number the request fails with a 400.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Filter to locations whose Metrc name contains this value (case-insensitive substring match against the location's `name`).
+        in: query
+        name: search
+        required: false
+        example: vault
+        schema:
+          type: string
+      - description: Filter by whether the location is deleted in Metrc. `true` returns only deleted locations; `false` returns only live locations. Omit to return both.
+        in: query
+        name: is_deleted
+        required: false
+        schema:
+          type: boolean
+      - description: Filter to locations with these Metrc location identifiers — Metrc's own integer IDs (the `id` in the response), not Distru IDs. Matches a location if its Metrc ID equals any of the listed values (OR semantics). An empty list is ignored (returns locations unfiltered by this parameter). At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Filter by when Distru last fetched the location from Metrc (the `fetched_datetime` in the response). Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `,2022-07-10T00:00:00Z` returns locations last fetched on or before that time.
+        in: query
+        name: fetched_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of Metrc locations
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcLocations'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc locations
+      tags:
+      - Metrc
+  /public/v1/metrc/packages:
+    get:
+      description: 'Get the Metrc packages Distru caches from Metrc across your licenses, filtered by various attributes. Results are ordered by Metrc''s package id ascending and scoped to the company that owns the API key. Only the current version of each package is returned.
+
+
+        Each row mirrors a package as it exists in Metrc — label, quantity, item, location, testing and remediation state — plus what Distru knows around it: a derived `status` that reflects the package''s real state (Metrc''s raw active/inactive buckets don''t), the company `unit_type` matching the package''s Metrc unit of measure, the full cached Metrc `item`, and `package`, the Distru package created when this Metrc package was imported (null when it hasn''t been imported). Use `is_importable=true` to list exactly the packages you could import or receive into Distru.
+
+
+        This is a read-only cache: it does not create, move, or adjust packages in Metrc. Data is eventually consistent — changes synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.list_packages
+      parameters:
+      - description: Filter to packages belonging to this license, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). Omit to return packages across all of the company's licenses; a license ID that doesn't belong to your company simply returns no packages.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: Filter to packages belonging to the Metrc license with this license number (exact match, not a substring). A convenience alternative to `license_id`; combining the two is a 400. Unlike `license_id`, an unknown value is rejected — if your company has no Metrc license with this number the request fails with a 400.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Filter to the single package whose full 24-character Metrc tag label equals this value exactly. Case-sensitive and matched verbatim; a partial or lowercase value returns nothing. Use `search` for substring matching.
+        in: query
+        name: label
+        required: false
+        example: 1A4FF0100000022000004999
+        schema:
+          type: string
+      - description: Filter to packages whose Metrc tag label contains this value (case-insensitive substring match). Must be at least 4 characters; a shorter value is a 400. A 24-character value is matched as an exact full label.
+        in: query
+        name: search
+        required: false
+        example: 0004999
+        schema:
+          type: string
+      - description: 'Filter to packages in any of these derived statuses (multiple values are OR-ed; the same values are returned as each package''s `status`):
+
+          • `ACTIVE` — live at the facility
+
+          • `ONHOLD` — on administrative hold in Metrc
+
+          • `TRANSFERRED` — shipped away on a transfer
+
+          • `FINISHED` — zeroed out and finished
+
+          • `DISCONTINUED` — discontinued in Metrc
+
+          Omit to return every status.
+
+          '
+        in: query
+        name: statuses
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - ACTIVE
+            - DISCONTINUED
+            - FINISHED
+            - ONHOLD
+            - TRANSFERRED
+            type: string
+      - description: 'When `true`, keep only packages that can currently be imported into Distru: positive quantity, active or on hold in Metrc, not yet imported, and not marked ignore-for-import in Distru. `false` and omitted behave the same (no filter).'
+        in: query
+        name: is_importable
+        required: false
+        schema:
+          type: boolean
+      - description: Filter to packages whose Metrc item category name exactly matches one of the given values (OR semantics, case-sensitive — the `item.category_name` values returned by [GET /public/v1/metrc/items](#get-metrc-items)). An empty list is ignored. At most 200 values may be given.
+        in: query
+        name: category_names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to packages whose Metrc item name exactly matches one of the given values (OR semantics, case-sensitive). An empty list is ignored. At most 200 values may be given.
+        in: query
+        name: item_names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to packages whose Metrc strain name exactly matches one of the given values (OR semantics, case-sensitive). An empty list is ignored. At most 200 values may be given.
+        in: query
+        name: strain_names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter to packages with these Metrc package identifiers — Metrc's own integer IDs (the `id` in the response), not Distru IDs. Matches a package if its Metrc ID equals any of the listed values (OR semantics). An empty list is ignored. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Filter by when Distru last fetched the package from Metrc (the `fetched_datetime` in the response). Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `,2022-07-10T00:00:00Z` returns packages last fetched on or before that time.
+        in: query
+        name: fetched_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of Metrc packages
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcPackages'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc packages
+      tags:
+      - Metrc
+  /public/v1/metrc/packages/{label}:
+    get:
+      description: Get a single Metrc package by its full 24-character Metrc tag label — the `label` value returned in the packages list. Case-sensitive exact match. Read-only and scoped to the company that owns the API key; returns 404 if no current package with that label belongs to your company.
+      operationId: DistruPublic.V1.MetrcController.show_package
+      parameters:
+      - description: The package's full 24-character Metrc tag label, exactly as printed on the tag (case-sensitive). A label that doesn't exist for your company returns 404.
+        in: path
+        name: label
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single Metrc package
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcPackageResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a Metrc package
+      tags:
+      - Metrc
+  /public/v1/metrc/strains:
+    get:
+      description: 'Get the Metrc strains — the strain definitions Distru caches from Metrc — across your licenses, filtered by various attributes. Results are ordered by Metrc''s strain id ascending and scoped to the company that owns the API key.
+
+
+        Each row mirrors a strain as it exists in Metrc (name, genetics, testing status, THC/CBD levels, indica/sativa split), plus the owning `license`. Strains deleted in Metrc are included by default — use `is_deleted` to return only live or only deleted strains. Strain names appear on Metrc items (the `strain.name` returned by GET /public/v1/metrc/items) and are required when creating items for strain-bearing product categories.
+
+
+        This is a read-only cache: it does not create, edit, or delete strains in Metrc. Data is eventually consistent — changes synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.list_strains
+      parameters:
+      - description: Filter to strains belonging to this license, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). Omit to return strains across all of the company's licenses; a license ID that doesn't belong to your company simply returns no strains.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: Filter to strains belonging to the Metrc license with this license number (exact match, not a substring). A convenience alternative to `license_id`; combining the two is a 400. Unlike `license_id`, an unknown value is rejected — if your company has no Metrc license with this number the request fails with a 400.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Filter to strains whose Metrc name contains this value (case-insensitive substring match against the strain's `name`).
+        in: query
+        name: search
+        required: false
+        example: blue dream
+        schema:
+          type: string
+      - description: Filter by whether the strain is deleted in Metrc. `true` returns only deleted strains; `false` returns only live strains. Omit to return both.
+        in: query
+        name: is_deleted
+        required: false
+        schema:
+          type: boolean
+      - description: Filter to strains with these Metrc strain identifiers — Metrc's own integer IDs (the `id` in the response), not Distru IDs. Matches a strain if its Metrc ID equals any of the listed values (OR semantics). An empty list is ignored (returns strains unfiltered by this parameter). At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Filter by when Distru last fetched the strain from Metrc (the `fetched_datetime` in the response). Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `,2022-07-10T00:00:00Z` returns strains last fetched on or before that time.
+        in: query
+        name: fetched_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of Metrc strains
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcStrains'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc strains
+      tags:
+      - Metrc
+  /public/v1/metrc/tags:
+    get:
+      description: 'Get the Metrc tags — the unique, state-issued compliance identifiers (RFID labels) provisioned to your licenses — filtered by various attributes. Results are ordered oldest-first (by sync time into Distru) and scoped to the company that owns the API key.
+
+
+        This is a read-only view of tags already synced into Distru from Metrc; it does not order, provision, or reserve tags. Each tag is either a `PACKAGE` tag (retail/wholesale package labels) or a `PLANT` tag, and reports via `is_assigned` whether it has been attached to a package or plant yet.
+
+
+        Data is eventually consistent — a tag newly synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.index
+      parameters:
+      - description: Restrict the result to specific tags by ID (the same ID returned as each tag's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by tag kind. `PACKAGE` covers retail/wholesale package labels; `PLANT` covers plant tags. Omit to return both kinds.
+        in: query
+        name: kind
+        required: false
+        example: PACKAGE
+        schema:
+          type: string
+          enum:
+          - PACKAGE
+          - PLANT
+      - description: Filter to tags provisioned to this license, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). Omit to return tags across all of the company's licenses; a license ID that doesn't belong to your company simply returns no tags.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: Filter to tags provisioned to the Metrc license with this license number (exact match, not a substring). A convenience alternative to `license_id`; combining the two is a 400. Unlike `license_id`, an unknown value is rejected — if your company has no Metrc license with this number the request fails with a 400.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Filter by whether the tag is currently attached to a package or plant. `true` returns only assigned tags; `false` returns only unassigned (still-available) tags. Omit to return both.
+        in: query
+        name: is_assigned
+        required: false
+        schema:
+          type: boolean
+      - description: Filter to the single tag whose full 24-character label equals this value exactly. Labels are uppercase hex (`A-F`, `0-9`). Unlike `search`, this value is matched verbatim and is not uppercased or stripped, so pass the exact uppercase label; a lowercase or partial value returns nothing. Use `search` instead for substring or fuzzy matching.
+        in: query
+        name: tag
+        required: false
+        example: 1A4FF0100000022000004999
+        schema:
+          type: string
+      - description: Filter to tags whose label contains this value (case-insensitive substring match). The value is uppercased and stripped of any character outside `A-F`/`0-9` before matching, so only its hex portion is used; a value that reduces to 24 characters is matched as an exact full label. If nothing remains after stripping, the filter is ignored.
+        in: query
+        name: search
+        required: false
+        example: 0004999
+        schema:
+          type: string
+      - description: Filter by when the tag was created in Distru. Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `2022-07-10T00:00:00Z,` returns tags created on or after that time.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Filter by when the tag was last modified in Distru. Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `,2022-07-10T00:00:00Z` returns tags last modified on or before that time.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of Metrc tags
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcTags'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc tags
+      tags:
+      - Metrc
+  /public/v1/metrc/tags/{id}:
+    get:
+      description: Get a single Metrc tag by its Distru ID — the `id` value returned in the tags list (a Distru resource ID, not the raw tag label). Read-only and scoped to the company that owns the API key; returns 404 if no tag with that ID belongs to your company.
+      operationId: DistruPublic.V1.MetrcController.show
+      parameters:
+      - description: The Distru ID of the tag, as returned in the `id` field of the tags list (not the Metrc tag label).
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single Metrc tag
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcTagResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a Metrc tag
+      tags:
+      - Metrc
+  /public/v1/metrc/transfers:
+    get:
+      description: 'Get the Metrc transfers Distru caches from Metrc across your licenses, filtered by various attributes. Results are ordered by Metrc''s transfer id ascending and scoped to the company that owns the API key. Only the current version of each transfer is returned. An internal transfer between two of your licenses appears twice — an `OUTGOING` row on the shipping license and an `INCOMING` row on the receiving one.
+
+
+        Each row mirrors a transfer''s manifest-level facts as they exist in Metrc — shipper, transporter, shipment type — and its `deliveries` with their packages in manifest order, plus what Distru knows around it: `is_importable` (with `importable_details` explaining why not), and the Distru `order` or `purchase` created when the transfer was imported (null when it hasn''t been).
+
+
+        This is a read-only cache: it does not create or accept transfers in Metrc. Data is eventually consistent — changes synced from Metrc can take up to ~1 second to appear here.'
+      operationId: DistruPublic.V1.MetrcController.list_transfers
+      parameters:
+      - description: Filter to transfers belonging to this license, given as a Distru license resource ID (as returned by the licenses endpoint — not a Metrc or state license number). Omit to return transfers across all of the company's licenses; a license ID that doesn't belong to your company simply returns no transfers.
+        in: query
+        name: license_id
+        required: false
+        example: b1f4c2a0-9c3e-4d2b-8f1a-2e5c6d7a8b9c
+        schema:
+          type: string
+      - description: Filter to transfers belonging to the Metrc license with this license number (exact match, not a substring). A convenience alternative to `license_id`; combining the two is a 400. Unlike `license_id`, an unknown value is rejected — if your company has no Metrc license with this number the request fails with a 400.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: 'Filter by the transfer''s direction relative to the owning license: `INCOMING` (shipped to it) or `OUTGOING` (shipped from it). Omit to return both.'
+        in: query
+        name: direction
+        required: false
+        example: INCOMING
+        schema:
+          type: string
+          enum:
+          - INCOMING
+          - OUTGOING
+      - description: 'When `true`, keep only transfers that can currently be imported into Distru: flagged importable by Metrc''s package states, not yet imported, and not marked ignore-for-import in Distru. `false` and omitted behave the same (no filter).'
+        in: query
+        name: is_importable
+        required: false
+        schema:
+          type: boolean
+      - description: 'Filter by the transfer''s `import_status`:
+
+          • `IMPORTED` — imported into Distru as a sales order (outgoing), a purchase (incoming), or a stock transfer
+
+          • `IGNORED` — not imported and marked ignore-for-import in Distru
+
+          • `UNIMPORTED` — neither imported nor ignored, whether or not it is importable
+
+          Omit to return every status. Combine `UNIMPORTED` with `is_importable=true` to keep only the transfers that can be imported now.
+
+          '
+        in: query
+        name: import_status
+        required: false
+        example: UNIMPORTED
+        schema:
+          type: string
+          enum:
+          - IGNORED
+          - IMPORTED
+          - UNIMPORTED
+      - description: Filter to the single transfer whose manifest number equals this value exactly. Use `search` for substring matching.
+        in: query
+        name: manifest_number
+        required: false
+        example: '0000012345'
+        schema:
+          type: string
+      - description: Filter to transfers with these Metrc transfer identifiers — Metrc's own integer IDs (the `id` in the response), not Distru IDs. Matches a transfer if its Metrc ID equals any of the listed values (OR semantics). An empty list is ignored. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - description: Filter to transfers carrying the package with this Metrc package identifier — Metrc's own integer id, the same `id` returned by [GET /public/v1/metrc/packages](#get-metrc-packages) and by each delivery package in the response.
+        in: query
+        name: metrc_package_id
+        required: false
+        schema:
+          type: integer
+      - description: Filter to transfers carrying the package with this full 24-character Metrc tag label (case-sensitive exact match).
+        in: query
+        name: package_label
+        required: false
+        example: 1A4FF0100000022000004999
+        schema:
+          type: string
+      - description: Filter to transfers whose manifest number contains this value (case-insensitive substring match). Must be at least 4 characters; a shorter value is a 400.
+        in: query
+        name: search
+        required: false
+        example: '1234'
+        schema:
+          type: string
+      - description: Filter to transfers whose shipper license number or any delivery's recipient license number contains this value (case-insensitive substring match). Must be at least 4 characters; a shorter value is a 400. Unlike `license_number`, which picks the license a transfer belongs to, this matches the facilities on the manifest.
+        in: query
+        name: search_license_number
+        required: false
+        example: ?search_license_number=C11-0000
+        schema:
+          type: string
+      - description: Filter by when Distru last fetched the transfer from Metrc (the `fetched_datetime` in the response). Accepts a comma-separated `from,to` range (ISO-8601 UTC); either side may be omitted, e.g. `,2022-07-10T00:00:00Z` returns transfers last fetched on or before that time.
+        in: query
+        name: fetched_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of Metrc transfers
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcTransfers'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get Metrc transfers
+      tags:
+      - Metrc
+  /public/v1/metrc/transfers/{manifest_number}:
+    get:
+      description: 'Get a single Metrc transfer by its manifest number — the `manifest_number` value returned in the transfers list. Read-only and scoped to the company that owns the API key; returns 404 if no current transfer with that manifest number belongs to your company.
+
+
+        An internal transfer between two of your licenses is cached both as an outgoing and an incoming row under the same manifest number; this endpoint returns the outgoing row (the one with full delivery data). Use the list endpoint with `manifest_number` and `direction` filters to read a specific side.'
+      operationId: DistruPublic.V1.MetrcController.show_transfer
+      parameters:
+      - description: The transfer's Metrc manifest number. A manifest number that doesn't exist for your company returns 404.
+        in: path
+        name: manifest_number
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single Metrc transfer
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MetrcTransferResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a Metrc transfer
+      tags:
+      - Metrc
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    MetrcTransferDelivery:
+      description: 'One delivery of a Metrc transfer: a recipient facility and the packages shipped to it.'
+      properties:
+        actual_arrival_datetime:
+          description: ISO 8601 datetime the delivery actually arrived, or null while it hasn't arrived
+          type: string
+        actual_departure_datetime:
+          description: ISO 8601 datetime the delivery actually departed, or null while it hasn't departed
+          type: string
+        id:
+          description: The delivery's identifier in Metrc — Metrc's own integer id, not a Distru ID.
+          type: integer
+        packages:
+          description: The packages on this delivery, in manifest order
+          items:
+            $ref: '#/components/schemas/MetrcTransferPackage'
+          type: array
+        received_datetime:
+          description: ISO 8601 datetime the delivery was received, or null while it hasn't been received
+          type: string
+        recipient_license_number:
+          description: The license number of the facility receiving this delivery
+          type: string
+        recipient_name:
+          description: The name of the facility receiving this delivery
+          type: string
+      required:
+      - packages
+      - recipient_name
+      - recipient_license_number
+      - id
+      title: Metrc Transfer Delivery
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    MetrcTag:
+      description: 'A Metrc tag: a unique compliance identifier provisioned to a license for tracking a package or plant in the state cannabis system.'
+      properties:
+        assigned_datetime:
+          description: ISO 8601 datetime this tag was assigned to a package or plant, or null while it is still unassigned
+          type: string
+        commissioned_date:
+          description: The ISO 8601 date this tag was commissioned in Metrc (e.g. "2026-08-20"), or null when not yet commissioned
+          type: string
+        id:
+          description: Distru's ID for this Metrc tag (not a Metrc identifier)
+          type: string
+        inserted_datetime:
+          description: The datetime this tag was created in Distru (not a Metrc timestamp)
+          type: string
+        is_assigned:
+          description: True once this tag has been assigned to a package or plant, false while still available. Mirrors whether `assigned_datetime` is set.
+          type: boolean
+        kind:
+          description: Whether the tag is for a package or a plant
+          enum:
+          - PACKAGE
+          - PLANT
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this tag is provisioned to
+          type: string
+        tag:
+          description: The Metrc tag label
+          type: string
+        updated_datetime:
+          description: The datetime this tag was last updated in Distru (not a Metrc timestamp)
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - is_assigned
+      - license_id
+      - kind
+      - tag
+      - id
+      title: Metrc Tag
+      type: object
+    MetrcLabTestBatch:
+      description: A lab test batch that can be assigned to a test sample package
+      properties:
+        name:
+          description: The lab test batch name as defined in Metrc. Pass this exact value in `lab_test_batches` when creating a test sample.
+          type: string
+        required:
+          description: Whether Metrc requires this batch on every test sample of the item category it is listed under. A test sample missing a required batch is rejected.
+          type: boolean
+      required:
+      - required
+      - name
+      title: Metrc Lab Test Batch
+      type: object
+    MetrcStrain:
+      description: 'A Metrc strain: a strain definition synced from Metrc, scoped to one of your licenses.'
+      properties:
+        cbd_level:
+          description: The strain's CBD level as reported by Metrc, a decimal fraction rendered as a string (e.g. "0.005" for 0.5%), or null when none is reported
+          type: string
+        fetched_datetime:
+          description: The datetime Distru last fetched this strain from Metrc
+          type: string
+        genetics:
+          description: The strain's genetics as reported by Metrc (e.g. "60% Indica / 40% Sativa")
+          type: string
+        id:
+          description: The strain's identifier in Metrc. A Metrc identifier, not a Distru ID.
+          type: integer
+        indica_percentage:
+          description: The strain's indica share as reported by Metrc, a percentage rendered as a string (e.g. "60" for 60%)
+          type: string
+        is_deleted:
+          description: True when the strain has been deleted in Metrc.
+          type: boolean
+        is_used:
+          description: True when Metrc reports the strain is in use (referenced by plants, plant batches, or items), so it can no longer be deleted in Metrc
+          type: boolean
+        license:
+          $ref: '#/components/schemas/License'
+        name:
+          description: The strain name as reported by Metrc
+          type: string
+        sativa_percentage:
+          description: The strain's sativa share as reported by Metrc, a percentage rendered as a string (e.g. "40" for 40%)
+          type: string
+        testing_status:
+          description: The strain's testing status as reported by Metrc (e.g. "None", "InHouse", "ThirdParty")
+          type: string
+        thc_level:
+          description: The strain's THC level as reported by Metrc, a decimal fraction rendered as a string (e.g. "0.212" for 21.2%), or null when none is reported
+          type: string
+      required:
+      - fetched_datetime
+      - license
+      - is_deleted
+      - is_used
+      - sativa_percentage
+      - indica_percentage
+      - testing_status
+      - genetics
+      - name
+      - id
+      title: Metrc Strain
+      type: object
+    MetrcTransferPackage:
+      description: One package on a Metrc transfer delivery, plus the Distru data linked to it (the imported Distru package and the unit type matching its unit of measure).
+      properties:
+        id:
+          description: The package's identifier in Metrc — Metrc's own integer id, the same `id` returned by [GET /public/v1/metrc/packages](#get-metrc-packages), the same value as the nested `package.metrc_id`, and accepted by the transfers `metrc_package_id` filter.
+          type: integer
+        is_testing_sample:
+          description: True when the package is a lab test sample
+          type: boolean
+        item_category_name:
+          description: The Metrc item category name
+          type: string
+        item_name:
+          description: The name of the Metrc item the package holds
+          type: string
+        label:
+          description: The package's full 24-character Metrc tag label
+          type: string
+        package:
+          $ref: '#/components/schemas/PackageCompact'
+        quantity:
+          description: 'The package''s quantity, rendered as a decimal string (e.g. "10.5"): the shipped quantity on an outgoing transfer, the received quantity on an incoming one'
+          type: string
+        status:
+          description: 'The package''s state on this delivery: `SHIPPED` (in transit or not yet processed by the recipient), `ACCEPTED`, `REJECTED`, or `RETURNED`.'
+          enum:
+          - ACCEPTED
+          - REJECTED
+          - RETURNED
+          - SHIPPED
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        wholesale_price:
+          description: The package's wholesale price on the manifest, rendered as a decimal string, or null when the transfer carries no wholesale pricing
+          type: string
+      required:
+      - is_testing_sample
+      - unit_type
+      - quantity
+      - status
+      - item_category_name
+      - item_name
+      - label
+      - id
+      title: Metrc Transfer Package
+      type: object
+    MetrcLabTestBatches:
+      description: 'The complete set of lab test batches for the given license, keyed by Metrc item category name.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/MetrcLabTestBatch'
+            type: array
+          description: An object with one key per Metrc item category defined for the license, each holding the lab test batches assignable to a test sample of that category, sorted by `name`.
+          type: object
+      title: Metrc Lab Test Batches
+      type: object
+    MetrcPackageResponse:
+      description: A single Metrc package
+      properties:
+        data:
+          $ref: '#/components/schemas/MetrcPackage'
+      title: Metrc Package Response
+      type: object
+    MetrcItem:
+      description: 'A Metrc item: an item definition synced from Metrc, scoped to one of your licenses.'
+      properties:
+        category_name:
+          description: The Metrc product category name
+          type: string
+        category_type:
+          description: The Metrc product category type
+          type: string
+        fetched_datetime:
+          description: The datetime Distru last fetched this item from Metrc
+          type: string
+        id:
+          description: The item's identifier in Metrc — Metrc's own integer id, not a Distru ID.
+          type: integer
+        inserted_datetime:
+          description: ISO 8601 datetime this item was created in Metrc
+          type: string
+        is_deleted:
+          description: True when the item has been deleted in Metrc.
+          type: boolean
+        license:
+          $ref: '#/components/schemas/License'
+        name:
+          description: The item name as reported by Metrc
+          type: string
+        quantity_type:
+          description: How the item's quantity is measured
+          enum:
+          - COUNT_BASED
+          - VOLUME_BASED
+          - WEIGHT_BASED
+          type: string
+        strain:
+          $ref: '#/components/schemas/MetrcItemStrain'
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        updated_datetime:
+          description: ISO 8601 datetime this item was last modified in Metrc
+          type: string
+      required:
+      - fetched_datetime
+      - updated_datetime
+      - inserted_datetime
+      - is_deleted
+      - license
+      - unit_type
+      - quantity_type
+      - category_type
+      - category_name
+      - name
+      - id
+      title: Metrc Item
+      type: object
+    CompactOrder:
+      description: A compact view of an order as nested inside another entity (an invoice or a payment) in Distru. Use its id to fetch the full order from the orders endpoint.
+      properties:
+        id:
+          description: ID for this order
+          type: string
+        order_number:
+          description: The order number as shown in the Distru UI (e.g. "ORD-0001"). Unique per company.
+          type: string
+        status:
+          description: The fulfillment status of this order (SCREAMING_CASE) — its lifecycle stage, distinct from an invoice's payment status.
+          type: string
+        total:
+          description: The order total (line items plus charges/taxes minus discounts), as a 2-decimal string (e.g. "150.50").
+          type: string
+      required:
+      - total
+      - status
+      - order_number
+      - id
+      title: CompactOrder
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    MetrcTransfers:
+      description: 'A collection of Metrc transfers.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Metrc Transfers
+          items:
+            $ref: '#/components/schemas/MetrcTransfer'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Metrc Transfers
+      type: object
+    MetrcItemStrain:
+      description: The Metrc strain an item is defined for.
+      properties:
+        id:
+          description: The strain's identifier in Metrc — Metrc's own integer id, the same `id` returned by the Metrc strains endpoint.
+          type: integer
+        name:
+          description: The strain name as reported by Metrc
+          type: string
+      required:
+      - name
+      - id
+      title: Metrc Item Strain
+      type: object
+    MetrcTagResponse:
+      description: A single Metrc tag
+      properties:
+        data:
+          $ref: '#/components/schemas/MetrcTag'
+      title: Metrc Tag Response
+      type: object
+    MetrcPackageLocation:
+      description: The Metrc location holding a package.
+      properties:
+        id:
+          description: The location's identifier in Metrc — Metrc's own integer id, the same `id` returned by [GET /public/v1/metrc/locations](#get-metrc-locations). Null when Metrc reports only a name.
+          type: integer
+        name:
+          description: The location name as reported by Metrc, or null when Metrc reports none
+          type: string
+      title: Metrc Package Location
+      type: object
+    MetrcPackages:
+      description: 'A collection of Metrc packages.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Metrc Packages
+          items:
+            $ref: '#/components/schemas/MetrcPackage'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Metrc Packages
+      type: object
+    PackageCompact:
+      description: A compact reference to a Distru package — the id plus the fields needed to recognize it. The full package (costs, product, custom fields, ...) is available from [GET /public/v1/packages](#get-packages), filtered by `ids`.
+      properties:
+        batch_number:
+          description: The batch number of the package's batch, or null when it has none
+          type: string
+        compliance_label:
+          description: The compliance tag on the package (its Metrc label), or null when not compliance-tracked
+          type: string
+        distru_status:
+          description: The package's status in Distru (e.g. `ACTIVE`, `SELLING`, `SOLD`, `FINISHED`) — the same values as the packages endpoint's `distru_statuses` filter
+          type: string
+        id:
+          description: The package ID, usable with the packages endpoints
+          type: string
+        license_id:
+          description: The ID of the license the package belongs to, or null when it has none
+          type: string
+        location_id:
+          description: The ID of the location holding the package, or null when it has none
+          type: string
+        metrc_id:
+          description: The Metrc package id this Distru package mirrors — Metrc's own integer id. Null when not Metrc-tracked.
+          type: integer
+        quantity:
+          description: The package's total quantity in Distru
+          type: string
+        quantity_active:
+          description: The portion of `quantity` not reserved by sales orders or assemblies
+          type: string
+      required:
+      - quantity_active
+      - quantity
+      - distru_status
+      - id
+      title: Package Compact
+      type: object
+    License:
+      description: A cannabis license held by a company or tied to a location, identifying it to the state and its compliance system.
+      properties:
+        active:
+          description: Whether this license is currently active
+          type: boolean
+        expiry_datetime:
+          description: ISO 8601 datetime this license expires (e.g. "2026-08-20T00:00:00Z")
+          type: string
+        id:
+          description: ID for this license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this license was created at
+          type: string
+        issue_datetime:
+          description: ISO 8601 datetime this license was issued, or null when not set
+          type: string
+        license_number:
+          description: License number
+          example: C11-1234567890
+          type: string
+        license_type:
+          description: The license type as configured in Distru. A state-specific free-form value, e.g. "Distributor" or "Type 11 Distributor-Transport"
+          type: string
+      required:
+      - active
+      - inserted_datetime
+      - expiry_datetime
+      - license_type
+      - license_number
+      - id
+      title: License
+      type: object
+    MetrcStrains:
+      description: 'A collection of Metrc strains.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Metrc Strains
+          items:
+            $ref: '#/components/schemas/MetrcStrain'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Metrc Strains
+      type: object
+    MetrcLocations:
+      description: 'A collection of Metrc locations.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Metrc Locations
+          items:
+            $ref: '#/components/schemas/MetrcLocation'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Metrc Locations
+      type: object
+    MetrcPackage:
+      description: A Metrc package synced from Metrc, scoped to one of your licenses, plus the Distru data linked to it (matching unit type, cached item, imported Distru package).
+      properties:
+        archived_date:
+          description: The date the package was discontinued in Metrc (`YYYY-MM-DD`), or null when not discontinued
+          type: string
+        contains_remediated_product:
+          description: True when the package contains remediated product. Null when Metrc reports nothing.
+          type: boolean
+        expiration_date:
+          description: The package's expiration date (`YYYY-MM-DD`), or null when Metrc reports none
+          type: string
+        fetched_datetime:
+          description: The datetime Distru last fetched this package from Metrc
+          type: string
+        finished_date:
+          description: The date the package was finished in Metrc (`YYYY-MM-DD`), or null while unfinished
+          type: string
+        id:
+          description: The package's identifier in Metrc — Metrc's own integer id, not a Distru ID.
+          type: integer
+        is_finished_good:
+          description: True when the package is flagged as a finished good in Metrc. Null when Metrc reports nothing.
+          type: boolean
+        is_production_batch:
+          description: True when the package is a production batch. Null when Metrc reports nothing.
+          type: boolean
+        is_testing_sample:
+          description: True when the package is a lab test sample. Null when Metrc reports nothing.
+          type: boolean
+        is_trade_sample:
+          description: True when the package is a trade sample. Null when Metrc reports nothing.
+          type: boolean
+        item:
+          $ref: '#/components/schemas/MetrcItem'
+        lab_testing_state:
+          description: The package's lab testing state as reported by Metrc (e.g. "NotSubmitted", "SubmittedForTesting", "TestPassed"), or null when none is reported
+          type: string
+        lab_testing_state_date:
+          description: The date the lab testing state last changed (`YYYY-MM-DD`), or null when Metrc reports none
+          type: string
+        label:
+          description: The package's full 24-character Metrc tag label, or null when Metrc reports none
+          type: string
+        license:
+          $ref: '#/components/schemas/License'
+        location:
+          $ref: '#/components/schemas/MetrcPackageLocation'
+        note:
+          description: The free-text note on the package in Metrc, or null when there is none
+          type: string
+        package:
+          $ref: '#/components/schemas/PackageCompact'
+        packaged_date:
+          description: The date the package was created in Metrc (`YYYY-MM-DD`), or null when Metrc reports none
+          type: string
+        product_requires_remediation:
+          description: True when the product requires remediation. Null when Metrc reports nothing.
+          type: boolean
+        production_batch_number:
+          description: The production batch number, or null when the package has none
+          type: string
+        quantity:
+          description: The package's current quantity as reported by Metrc, rendered as a decimal string (e.g. "12.5"), or null when Metrc reports none
+          type: string
+        received_datetime:
+          description: ISO 8601 datetime the package was received on an incoming transfer, or null when it wasn't received on a transfer
+          type: string
+        received_from_facility_license_number:
+          description: The license number of the facility that shipped this package to you, or null when it wasn't received on a transfer
+          type: string
+        received_from_facility_name:
+          description: The name of the facility that shipped this package to you, or null when it wasn't received on a transfer
+          type: string
+        received_from_manifest_number:
+          description: The manifest number of the incoming transfer that delivered this package, or null when it wasn't received on a transfer
+          type: string
+        remediation_date:
+          description: The date the product was remediated (`YYYY-MM-DD`), or null when it wasn't
+          type: string
+        source_harvest_names:
+          description: The comma-separated Metrc harvest names this package traces back to, or null when it has no source harvests
+          type: string
+        source_package_labels:
+          description: The comma-separated Metrc tag labels of the packages this one was created from, or null when it has no source packages
+          type: string
+        status:
+          description: 'The package''s derived state:
+
+            • `ACTIVE` — live at the facility
+
+            • `ONHOLD` — on administrative hold in Metrc
+
+            • `TRANSFERRED` — shipped away on a transfer
+
+            • `FINISHED` — zeroed out and finished
+
+            • `DISCONTINUED` — discontinued in Metrc
+
+            The `statuses` filter accepts the same values.
+
+            '
+          enum:
+          - ACTIVE
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - TRANSFERRED
+          type: string
+        transferred_datetime:
+          description: ISO 8601 datetime Distru observed the package leave on an outgoing transfer, or null while it hasn't been transferred away
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        updated_datetime:
+          description: ISO 8601 datetime this package was last modified in Metrc, or null when Metrc reports none
+          type: string
+      required:
+      - fetched_datetime
+      - status
+      - id
+      title: Metrc Package
+      type: object
+    MetrcLocation:
+      description: 'A Metrc location: a room/location definition synced from Metrc, scoped to one of your licenses.'
+      properties:
+        fetched_datetime:
+          description: The datetime Distru last fetched this location from Metrc
+          type: string
+        for_harvests:
+          description: True when Metrc allows harvests in this location
+          type: boolean
+        for_packages:
+          description: True when Metrc allows packages in this location
+          type: boolean
+        for_plant_batches:
+          description: True when Metrc allows plant batches in this location
+          type: boolean
+        for_plants:
+          description: True when Metrc allows plants in this location
+          type: boolean
+        id:
+          description: The location's identifier in Metrc. A Metrc identifier, not a Distru ID.
+          type: integer
+        is_deleted:
+          description: True when the location has been deleted in Metrc.
+          type: boolean
+        license:
+          $ref: '#/components/schemas/License'
+        location_type_name:
+          description: The Metrc location type name (e.g. "Default Location Type")
+          type: string
+        name:
+          description: The location name as reported by Metrc
+          type: string
+      required:
+      - fetched_datetime
+      - license
+      - is_deleted
+      - for_plants
+      - for_plant_batches
+      - for_packages
+      - for_harvests
+      - location_type_name
+      - name
+      - id
+      title: Metrc Location
+      type: object
+    MetrcItems:
+      description: 'A collection of Metrc items.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Metrc Items
+          items:
+            $ref: '#/components/schemas/MetrcItem'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Metrc Items
+      type: object
+    MetrcTransfer:
+      description: A Metrc transfer synced from Metrc, scoped to one of your licenses, plus the Distru data linked to it (the imported order or purchase) and its `deliveries` tree with their packages.
+      properties:
+        deliveries:
+          description: The transfer's deliveries with their packages, in manifest order
+          items:
+            $ref: '#/components/schemas/MetrcTransferDelivery'
+          type: array
+        direction:
+          description: 'The transfer''s direction relative to the owning license: `INCOMING` (shipped to it) or `OUTGOING` (shipped from it). The `direction` filter accepts the same values.'
+          enum:
+          - INCOMING
+          - OUTGOING
+          type: string
+        fetched_datetime:
+          description: The datetime Distru last fetched this transfer from Metrc
+          type: string
+        id:
+          description: The transfer's identifier in Metrc — Metrc's own integer id, not a Distru ID. An internal transfer between two of your licenses appears as two rows sharing this id, one per direction.
+          type: integer
+        import_status:
+          description: '`IMPORTED` when the transfer was imported into Distru as a sales order (outgoing), a purchase (incoming), or a stock transfer; `IGNORED` when it wasn''t and is marked ignore-for-import; `UNIMPORTED` otherwise. The `import_status` filter accepts the same values.'
+          enum:
+          - IGNORED
+          - IMPORTED
+          - UNIMPORTED
+          type: string
+        importable_details:
+          description: A human-readable explanation of why the transfer is not importable, or null when it is importable or the reason is evident from its package states
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime the transfer was created in Metrc
+          type: string
+        is_importable:
+          description: True when the transfer's package states allow importing it into Distru — at least one package shipped or accepted for an outgoing transfer, at least one accepted for an incoming one. The `is_importable` filter additionally excludes already-imported and ignored transfers.
+          type: boolean
+        license:
+          $ref: '#/components/schemas/License'
+        manifest_number:
+          description: The transfer's Metrc manifest number
+          type: string
+        order:
+          $ref: '#/components/schemas/CompactOrder'
+        package_count:
+          description: The number of packages on the transfer, across all its deliveries
+          type: integer
+        purchase:
+          $ref: '#/components/schemas/CompactPurchase'
+        received_datetime:
+          description: ISO 8601 datetime the transfer was received, or null while it hasn't been received
+          type: string
+        shipment_type_name:
+          description: The Metrc shipment type (e.g. "Transfer", "Wholesale Manifest"), or null when Metrc reports none on the transfer
+          type: string
+        shipper_license_number:
+          description: The license number of the facility shipping the transfer
+          type: string
+        shipper_name:
+          description: The name of the facility shipping the transfer
+          type: string
+        transporter_license_number:
+          description: The license number of the transporter facility, or null when Metrc reports none
+          type: string
+        transporter_name:
+          description: The name of the transporter facility, or null when Metrc reports none
+          type: string
+        updated_datetime:
+          description: ISO 8601 datetime this transfer was last modified in Metrc
+          type: string
+      required:
+      - fetched_datetime
+      - updated_datetime
+      - deliveries
+      - inserted_datetime
+      - license
+      - import_status
+      - is_importable
+      - package_count
+      - shipper_name
+      - shipper_license_number
+      - direction
+      - manifest_number
+      - id
+      title: Metrc Transfer
+      type: object
+    MetrcTransferResponse:
+      description: A single Metrc transfer, including its deliveries
+      properties:
+        data:
+          $ref: '#/components/schemas/MetrcTransfer'
+      title: Metrc Transfer Response
+      type: object
+    CompactPurchase:
+      description: A compact view of a purchase as nested inside another entity. Use its id to fetch the full purchase from the purchases endpoint.
+      properties:
+        id:
+          description: ID for this purchase
+          type: string
+        purchase_number:
+          description: The purchase number as shown in the Distru UI (e.g. "PO-0001"). Unique per company.
+          type: string
+        status:
+          description: The fulfillment status of this purchase (SCREAMING_CASE).
+          type: string
+        total:
+          description: The purchase total, as a 2-decimal string (e.g. "150.50").
+          type: string
+      required:
+      - total
+      - status
+      - purchase_number
+      - id
+      title: CompactPurchase
+      type: object
+    MetrcTags:
+      description: 'A collection of Metrc tags.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Metrc Tags
+          items:
+            $ref: '#/components/schemas/MetrcTag'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Metrc Tags
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

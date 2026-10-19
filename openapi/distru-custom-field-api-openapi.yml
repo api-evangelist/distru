@@ -1,0 +1,438 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Custom Field API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Custom Field
+paths:
+  /public/v1/custom-fields:
+    get:
+      description: 'List every custom field definition owned by the authenticated company.
+
+
+        A custom field is a user-defined attribute attached to one entity type (its `parent_object`) — for example an extra `Batch #` text field on orders or a `Lab` dropdown on packages. Once defined, the field becomes available on every record of that entity type, and callers populate it per-record through that entity''s `custom_data` map on its own create/update endpoint (the numeric `id` returned here is the key used inside `custom_data`).
+
+
+        Pass `parent_object` to return only the fields for one entity type; omit it to return the company''s fields across all entity types. Fields come sorted by `id`, oldest first. This is a read-only settings lookup and changes nothing in inventory or compliance.
+
+
+        Required permission: `settings_permissions_custom_fields`.'
+      operationId: DistruPublic.V1.CustomFieldController.index
+      parameters:
+      - description: 'Return only the fields attached to this entity type. Exact match against the parent object identifier; an unknown value returns an empty list. One of: `assembly`, `batch`, `company`, `contact`, `invoice`, `order`, `package`, `product`, `purchase`, `request`, `return`, `shipment`, `stock_transfer`, `task`. Omit to return the company''s custom fields across all entity types. Example: `?parent_object=order`'
+        in: query
+        name: parent_object
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: List of custom field definitions
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitions'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: List custom field definitions
+      tags:
+      - Custom Field
+    post:
+      description: 'Create a new custom field on one entity type (`parent_object`).
+
+
+        Once created, the field is immediately available on every record of that entity type. Callers then set a per-record value by putting `"": ` into that record''s `custom_data` map on its own create/update endpoint, where `` is the numeric id returned here. Creating a field does not touch existing records — they simply carry no value for it until one is written — and has no effect on inventory, Metrc, or BioTrack.
+
+
+        This endpoint only creates. It never updates: there is no upsert here, and `field_type`, `parent_object`, and `filterable` are fixed at creation and cannot be changed afterward. To edit a field''s `name`, `description`, `required` flag, or option list later, use `POST /public/v1/custom-fields/{id}`.
+
+
+        Field-type rules the request must satisfy:
+
+        • `dropdown` and `checkbox` fields require a non-empty `field_options` list (the selectable values); each option must be unique, non-empty, and free of commas.
+
+        • `text` and `date` fields must not carry `field_options`, and are always non-filterable regardless of what `filterable` is sent.
+
+
+        Required permission: `settings_permissions_custom_fields`.'
+      operationId: DistruPublic.V1.CustomFieldController.insert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Display name of the field, e.g. `Lab Name`. Required. Must be unique among the fields on the same `parent_object` for this company; uniqueness is case-insensitive, so `Lab` and `lab` collide. At most 70 characters. May not use a reserved name (such as `category`, `strain`, or `owner_id`) or contain certain special characters.
+                description:
+                  type: string
+                  description: Optional free-text note describing the field's purpose. At most 100 characters. Omit or send null for no description.
+                parent_object:
+                  type: string
+                  description: 'The entity type this field is attached to. Required and immutable after creation. One of: `assembly`, `batch`, `company`, `contact`, `invoice`, `order`, `package`, `product`, `purchase`, `request`, `return`, `shipment`, `stock_transfer`, `task`.'
+                field_type:
+                  enum:
+                  - checkbox
+                  - date
+                  - dropdown
+                  - text
+                  type: string
+                  description: 'The kind of value this field stores. Required and immutable after creation. One of: `text` (free text), `date` (a calendar date), `dropdown` (a single choice from `field_options`), `checkbox` (one or more choices from `field_options`). `dropdown` and `checkbox` require `field_options`; `text` and `date` must not have them.'
+                filterable:
+                  type: boolean
+                  description: Whether records of this entity type can be filtered by this field's value. Defaults to false when omitted. Applies only to `dropdown` and `checkbox` fields; for `text` and `date` it is forced to false no matter what is sent. Immutable after creation, so this is the only chance to enable it.
+                required:
+                  type: boolean
+                  description: Whether a value for this field must be supplied when a record of this entity type is saved in the Distru app. Defaults to false when omitted. Editable later via the update endpoint.
+                field_options:
+                  items:
+                    type: string
+                  type: array
+                  description: The selectable values for `dropdown` and `checkbox` fields, e.g. `["Lab A", "Lab B"]`. Required and non-empty for those two types; each value must be unique, non-empty, at most 255 characters, and contain no commas. Must be omitted (or empty) for `text` and `date` fields.
+                disabled_field_options:
+                  items:
+                    type: string
+                  type: array
+                  description: The subset of `field_options` to turn off. A disabled option can no longer be selected on new or edited records, but it stays in `field_options` so records already holding the value keep displaying it. Every value must also be present in `field_options`. Applies only to `dropdown` and `checkbox` fields; must be omitted (or empty) for `text` and `date`. Defaults to empty when omitted.
+              required:
+              - name
+              - parent_object
+              - field_type
+        required: true
+      responses:
+        '201':
+          description: Custom field created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create a custom field
+      tags:
+      - Custom Field
+  /public/v1/custom-fields/{id}:
+    delete:
+      description: 'Deletes a custom field definition and every value ever stored in it. This is a hard delete and it cannot be undone: the definition is removed permanently, and the field''s value is erased from the `custom_data` of every record of the field''s entity type across your whole company — an order field is scrubbed from every order, a package field from every package, and so on. The erasure happens synchronously in this request, so a 204 means the values are already gone; for a field carrying values on many thousands of records the request can take a while to respond. The field''s column also disappears from that entity''s table view in the Distru app. Recreating a field with the same name later produces a new field with a new numeric id and no values.
+
+
+        A custom field can always be deleted — no record, value, or setting blocks it, including fields marked `required`. Responds 204 with no body on success, or 404 if no field with that id belongs to your company (a field owned by another company is indistinguishable from one that does not exist). No inventory is created, consumed, or released, and nothing is synced to Metrc or BioTrack.
+
+
+        Required permission: `settings_permissions_custom_fields`.'
+      operationId: DistruPublic.V1.CustomFieldController.delete
+      parameters:
+      - description: 'The numeric id of the custom field to delete, as returned by the list endpoint and used as the key inside each record''s `custom_data`. An id that doesn''t exist for your company returns 404. Example: `482`'
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a custom field
+      tags:
+      - Custom Field
+    get:
+      description: 'Get one custom field definition by its numeric id, scoped to the authenticated company.
+
+
+        Use this to resolve a field''s current type, options, and settings — for example before writing a value into an entity''s `custom_data`, where this same id is the map key. Returns 404 when no field with that id belongs to the company (a field owned by another company is indistinguishable from one that does not exist). Read-only; touches nothing in inventory or compliance.
+
+
+        Required permission: `settings_permissions_custom_fields`.'
+      operationId: DistruPublic.V1.CustomFieldController.show
+      parameters:
+      - description: 'The numeric id of the custom field, as returned by the list endpoint and used as the key inside each record''s `custom_data`. Example: `482`'
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: A single custom field definition
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a custom field definition
+      tags:
+      - Custom Field
+    post:
+      description: 'Update an existing custom field. Only `name`, `description`, `required`, and `field_options` are editable here; `field_type`, `parent_object`, and `filterable` are fixed at creation. This endpoint does not accept those three fields — any value sent for them is silently ignored, not applied.
+
+
+        Each body field is sparse: omit a field to leave it unchanged. For `name`, `description`, and `required`, sending an explicit null is treated the same as omitting it — the field keeps its current value, so an existing `description` cannot be blanked back to empty through this endpoint. Only the fields you send with a real value are applied, so a request that sends just `name` renames the field and leaves its options and settings intact.
+
+
+        `field_options` is a full replacement of the option list, and editing it ripples through the whole company''s data:
+
+        • An option present before but absent from the new list is deleted. Deleting an option scrubs that value out of every record of this entity type — for a `dropdown` the record''s selection is cleared, for a `checkbox` that one value is removed from the record''s selected set — and removes it from any saved filters that referenced it (a filter left with no values is dropped). This runs across all matching records for the company and can be a large change.
+
+        • An option that stays in the list is preserved along with the records that selected it.
+
+        • A new value in the list is added as a selectable option.
+
+        • Renaming an option (by editing its text while keeping its position) carries the new name into every record and saved filter that used the old value.
+
+        Omitting `field_options` entirely leaves the current options untouched. This field applies only to `dropdown` and `checkbox` fields.
+
+
+        This is a settings/metadata change only — it does not affect inventory, Metrc, or BioTrack. Returns 404 when no field with that id belongs to the company.
+
+
+        Required permission: `settings_permissions_custom_fields`.'
+      operationId: DistruPublic.V1.CustomFieldController.update
+      parameters:
+      - description: 'The numeric id of the custom field to update, as returned by the list endpoint. Example: `482`'
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: New display name. Omit (or send null) to leave unchanged. Must stay unique among the fields on the same entity type for this company; uniqueness is case-insensitive, so `Lab` and `lab` collide. At most 70 characters, not a reserved name, and free of certain special characters. Renaming also updates the field's column label in the Distru app.
+                description:
+                  type: string
+                  description: New description. Omit (or send null) to leave unchanged — null does not clear an existing description. At most 100 characters.
+                required:
+                  type: boolean
+                  description: New value for whether a value must be supplied when a record is saved. Omit to leave unchanged.
+                field_options:
+                  items:
+                    type: string
+                  type: array
+                  description: 'The complete new option list for a `dropdown` or `checkbox` field, e.g. `["Lab A", "Lab C"]`. This is a full replace, not a merge: any current option missing from this list is deleted and scrubbed from every record and saved filter that used it (see the endpoint description). Each value must be unique, non-empty, at most 255 characters, and contain no commas. Omit the field to leave the current options unchanged; send the complete list to change them. Do not send null. Ignored for `text` and `date` fields.'
+                disabled_field_options:
+                  items:
+                    type: string
+                  type: array
+                  description: 'The complete new set of turned-off options for a `dropdown` or `checkbox` field. This is a full replace: an option listed here is disabled, and any option not listed is re-enabled. A disabled option can no longer be selected on new or edited records but stays in `field_options` so records already holding it keep displaying it. Every value must be one of the field''s options (the new `field_options` when you also send that, otherwise the current ones); an unknown value is rejected. Omit to leave the current disabled set unchanged; send `[]` to re-enable everything. Ignored for `text` and `date` fields.'
+      responses:
+        '200':
+          description: Custom field updated
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CustomFieldDefinitionResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Update a custom field
+      tags:
+      - Custom Field
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CustomFieldDefinitions:
+      description: A collection of custom field definitions
+      properties:
+        data:
+          description: CustomFieldDefinitions
+          items:
+            $ref: '#/components/schemas/CustomFieldDefinition'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: CustomFieldDefinitions
+      type: object
+    CustomFieldDefinition:
+      description: A custom field definition
+      properties:
+        description:
+          description: Free-text note describing the field, or null when none was set.
+          type: string
+        disabled_field_options:
+          description: 'The subset of `field_options` that have been turned off. Applies only to `dropdown` and `checkbox` fields; always empty for `text` and `date` fields. A disabled option can no longer be selected on new or edited records, but it stays in `field_options` and is listed here so that historical records already holding the value continue to display it. Every value here also appears in `field_options`. Example: a dropdown with `field_options` `["Small", "Medium", "Large"]` and `disabled_field_options` `["Medium"]` keeps showing "Medium" on records saved with it, but "Medium" is no longer offered when picking a value. Always present (an empty array when nothing is disabled). Set it on create or update via the `disabled_field_options` request field.'
+          items:
+            type: string
+          type: array
+        field_options:
+          description: The selectable values for `dropdown` and `checkbox` fields, in display order; an empty array for `text` and `date` fields. For a `checkbox` field a record may hold several of these; for a `dropdown` at most one.
+          items:
+            type: string
+          type: array
+        field_type:
+          description: 'The kind of value this field stores: `text` (free text), `date` (a calendar date), `dropdown` (a single choice from `field_options`), or `checkbox` (one or more choices from `field_options`). Fixed at creation. Always present.'
+          type: string
+        filterable:
+          description: Whether records of this entity type can be filtered by this field's value. Always false for `text` and `date` fields. Always present.
+          type: boolean
+        id:
+          description: The field's numeric id. This is the key used to read and write the field's value inside a record's `custom_data` map. Always present.
+          type: integer
+        name:
+          description: Display name of the field. Unique (case-insensitively) among the fields on the same `parent_object` for the company. Always present.
+          type: string
+        parent_object:
+          description: 'The entity type this field is attached to. One of: `assembly`, `batch`, `company`, `contact`, `invoice`, `order`, `package`, `product`, `purchase`, `request`, `return`, `shipment`, `stock_transfer`, `task`.'
+          type: string
+        required:
+          description: Whether a value must be supplied when a record of this entity type is saved in the Distru app. Always present.
+          type: boolean
+      required:
+      - disabled_field_options
+      - required
+      - filterable
+      - field_type
+      - name
+      - id
+      title: CustomFieldDefinition
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    CustomFieldDefinitionResponse:
+      description: A single custom field definition wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/CustomFieldDefinition'
+      title: CustomFieldDefinition Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

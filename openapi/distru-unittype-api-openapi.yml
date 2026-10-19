@@ -1,0 +1,256 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Unit Type API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: UnitType
+paths:
+  /public/v1/unit-types:
+    get:
+      description: 'List unit types for the authenticated company. A unit type is a company-scoped unit of measure
+
+        (e.g. Gram, Pound, Milliliter, or a custom unit you define) used to express quantities throughout
+
+        Distru — on products, inventory levels, cost type rates, and order and purchase
+
+        line items. This endpoint is read-only; unit types are managed in the Distru web app.
+
+
+        There are two kinds of unit type in the response:
+
+        • Distru''s built-in standard units (Gram, Pound, Liter, etc.) are `locked` (cannot be renamed or
+
+        deleted) and always carry a `category` (COUNT, VOLUME, or WEIGHT) and a `qty_per_si_unit`
+
+        conversion factor.
+
+        • Custom units you create are unlocked and have both `category` and `qty_per_si_unit` set to null —
+
+        they are treated as opaque labels with no physical conversion.
+
+
+        Results are scoped to your company and ordered oldest-first by creation time. Both active and
+
+        inactive unit types are returned. The response is paginated — follow the `next_page` URL to page
+
+        through the full set.'
+      operationId: DistruPublic.V1.UnitTypeController.index
+      parameters:
+      - description: Restrict the result to specific unit types by ID (the same ID returned as each unit type's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to unit types by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to unit types by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of unit types
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UnitTypes'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get unit types
+      tags:
+      - UnitType
+  /public/v1/unit-types/{id}:
+    get:
+      description: 'Get a single unit type by ID. Returns 404 if no unit type with that ID exists in your company.
+
+        Inactive unit types are still returned. This endpoint is read-only.
+
+
+        Remember the two shapes a unit type can take: a locked, built-in standard unit carries a
+
+        `category` and `qty_per_si_unit`; a custom unit you defined returns null for both.'
+      operationId: DistruPublic.V1.UnitTypeController.show
+      parameters:
+      - description: ID of the unit type to fetch, as returned in the `id` field of the list endpoint.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single unit type
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UnitTypeFullResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a unit type
+      tags:
+      - UnitType
+components:
+  schemas:
+    UnitTypeFull:
+      description: A unit type
+      properties:
+        active:
+          description: Whether this unit type is active and selectable when choosing a unit of measure. Always present; inactive unit types are hidden from most pickers but are still returned by the read endpoints.
+          type: boolean
+        category:
+          description: Physical dimension this unit measures. Populated only for Distru's built-in standard units (`locked` is true); null for custom units you define, which have no physical dimension. Always populated together with `qty_per_si_unit` — either both are set or both are null.
+          enum:
+          - COUNT
+          - VOLUME
+          - WEIGHT
+          type: string
+        id:
+          description: ID of this unit type. Stable across renames; use it as the `id` for the fetch endpoint.
+          type: string
+        inserted_datetime:
+          description: When the unit type was created, as a UTC ISO-8601 timestamp (e.g. `"2026-08-20T14:30:00Z"`). Always present.
+          type: string
+        locked:
+          description: Whether this unit type is one of Distru's built-in standard units, which cannot be renamed or deleted. Always present. When true, `category` and `qty_per_si_unit` are populated; when false (a custom unit you defined) both are null.
+          type: boolean
+        name:
+          description: Display name of the unit type (e.g. `"Gram"`, `"Each"`). Always present and unique within your company (case-insensitive).
+          type: string
+        qty_per_si_unit:
+          description: Decimal string giving how many of this unit make up one SI base unit of its `category`. For WEIGHT the SI base unit is the kilogram (a Gram is `"1000"`, a Pound is ~`"2.20462"`). For VOLUME the SI base unit is the liter (a Milliliter is `"1000"`, a Gallon is ~`"0.264172"`). For COUNT it is `"1"`, since a count unit has no physical measure. Populated only for Distru's built-in standard units (`locked` is true); null for custom units, and always null exactly when `category` is null.
+          type: string
+        updated_datetime:
+          description: When the unit type was last modified, as a UTC ISO-8601 timestamp. Equal to `inserted_datetime` until the unit type is first updated. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - locked
+      - active
+      - name
+      - id
+      title: UnitType
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    UnitTypeFullResponse:
+      description: A single unit type envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/UnitTypeFull'
+      title: Unit Type Response
+      type: object
+    UnitTypes:
+      description: A collection of unit types
+      properties:
+        data:
+          description: Unit Types
+          items:
+            $ref: '#/components/schemas/UnitTypeFull'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Unit Types
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

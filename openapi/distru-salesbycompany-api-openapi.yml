@@ -1,0 +1,257 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Sales By Company API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: SalesByCompany
+paths:
+  /public/v1/reports/sales-by-company:
+    get:
+      description: 'Returns one row per customer with its last order date, order count, total received (payments applied to the customer''s orders) and total sales (order totals net of returns) over the reported date range. A customer only appears when it has at least one order matching every active filter inside the range — customers with no qualifying order in the window are omitted entirely, so an empty `data` array is a valid result.
+
+
+        This is a read-only report and has no side effects. It does not touch inventory, compliance (Metrc/BioTrack), or any other entity — it only aggregates existing orders, payments and returns.
+
+
+        Date handling:
+
+        • When no `order_datetime` filter is provided, the range defaults to the last 30 days (from the start of the day 30 days ago through the end of today).
+
+        • The range and all dates are resolved in the API user''s own timezone, so day boundaries follow that timezone rather than UTC.
+
+
+        Status handling:
+
+        • When `status` is omitted, every status except `CANCELED` is counted.
+
+        • Canceled orders are only counted when the `status` filter explicitly includes `CANCELED`.
+
+
+        Row ordering:
+
+        • The report does not accept a sort parameter. By default rows are returned by `total_sales` descending (highest-selling customer first).
+
+        • When `search` is supplied, rows are instead ordered by how closely the customer''s name matches the search term.
+
+
+        Every value is returned as it appears in the report''s CSV export, with numeric cells returned as strings (currency and percent formatting stripped), matching the rest of the API. Any custom fields configured on the customer relationship are appended as extra columns keyed by their slugified label; those keys are per-company and are also listed in `meta.columns`. Report-level information (the resolved date range and column definitions) is returned under `meta`.
+
+
+        Each row also carries the IDs of the records it names — `customer_id` and `customer_owner_id`, each right after its name column — so a row can be followed to the company or user endpoints without a name lookup. The CSV export leaves these ID columns out.
+
+
+        Requires the "view the sales by company report" permission on the API key.'
+      operationId: DistruPublic.V1.Report.SalesByCompanyController.index
+      parameters:
+      - description: Restricts which orders are counted toward each customer's metrics (order count and totals) to the given statuses. Repeat the key once per value. When omitted, every status except `CANCELED` is counted; include `CANCELED` explicitly to count canceled orders. SCREAMING_CASE enum values only.
+        in: query
+        name: status
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - PENDING
+            - PROCESSING
+            - READY_TO_SHIP
+            - DELIVERING
+            - DELIVERED
+            - COMPLETED
+            - CANCELED
+            type: string
+      - description: Bounds which orders are counted to those whose order date falls in this range (inclusive on both ends). A comma-separated pair of ISO8601 datetimes, `after,before`. Either side may be left blank for an open-ended bound (e.g. `2026-01-01T00:00:00Z,` for from-only, or `,2026-02-01T00:00:00Z` for until-only). When omitted entirely, defaults to the last 30 days. Bounds are evaluated in the API user's timezone.
+        in: query
+        name: order_datetime
+        required: false
+        example: ?order_datetime=2026-01-01T00:00:00Z,2026-02-01T00:00:00Z
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the customer's company name or legal business name; results are ordered by closeness of match. Omit to return all customers.
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+      - description: Restricts to customers belonging to any one of the given customer group IDs (OR across the list). Each is a Distru ID. Repeat the key once per value, e.g. `?company_relationship_group_ids[]=<id1>&company_relationship_group_ids[]=<id2>`. Omit to apply no group filter.
+        in: query
+        name: company_relationship_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restricts the counted orders to those whose owner (assigned sales rep) is any one of the given user IDs (OR across the list). Each is a Distru ID. Note this filters the orders, not the customer's assigned owner. Repeat the key once per value. Omit to apply no owner filter.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: The Sales By Company report
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/SalesByCompanyReport'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get the Sales By Company report
+      tags:
+      - SalesByCompany
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    SalesByCompanyReportColumn:
+      properties:
+        key:
+          description: The key used for this column in each data row
+          type: string
+        label:
+          description: The human-readable label of the column
+          type: string
+      required:
+      - label
+      - key
+      title: SalesByCompanyReportColumn
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    SalesByCompanyReportRow:
+      description: 'A single row of the Sales By Company report. Companies with CompanyRelationship custom fields will see additional keys.
+
+        '
+      properties:
+        category:
+          description: The customer's category, or null when unset.
+          type: string
+        customer_id:
+          description: The customer's company ID — the `id` [GET /public/v1/companies](#get-companies) returns.
+          type: string
+        customer_owner_id:
+          description: The ID of the sales rep assigned to this customer — the `id` [GET /public/v1/users](#get-users) returns — or null when no owner is assigned.
+          type: string
+        last_order_date:
+          description: The date of the customer's most recent order, formatted `MM/DD/YYYY` in the API user's timezone. This is the latest order of any status and may fall outside the reported date range.
+          type: string
+        name:
+          description: The customer's company name
+          type: string
+        order_count:
+          description: The number of the customer's orders counted under the active filters (status and date range). Always at least 1, since only customers with a qualifying order appear.
+          type: string
+        owner:
+          description: The full name of the sales rep assigned to this customer, or null when no owner is assigned.
+          type: string
+        relationship_type:
+          description: The name of the customer's relationship type, or null when none is assigned.
+          type: string
+        total_received:
+          description: The sum of payments applied to the customer's counted orders, as a currency amount.
+          type: string
+        total_sales:
+          description: The sum of the counted orders' totals minus any returns against them. Can be negative when returns exceed order totals.
+          type: string
+      required:
+      - total_sales
+      - total_received
+      - order_count
+      - last_order_date
+      - customer_id
+      - name
+      title: SalesByCompanyReportRow
+      type: object
+    SalesByCompanyReportMeta:
+      description: Report-level metadata
+      properties:
+        columns:
+          description: The report's column definitions in order, including any custom-field columns appended for this company. The `key` of each entry matches the property name used in every `data` row.
+          items:
+            $ref: '#/components/schemas/SalesByCompanyReportColumn'
+          type: array
+        date_range:
+          description: The human-readable resolved date range the report covers (in the API user's timezone), reflecting the default 30-day window when no `order_datetime` filter was supplied.
+          type: string
+        report:
+          description: The report identifier, always `sales_by_company`
+          type: string
+      required:
+      - columns
+      - date_range
+      - report
+      title: SalesByCompanyReportMeta
+      type: object
+    SalesByCompanyReport:
+      description: The Sales By Company report
+      properties:
+        data:
+          description: The report rows
+          items:
+            $ref: '#/components/schemas/SalesByCompanyReportRow'
+          type: array
+        meta:
+          $ref: '#/components/schemas/SalesByCompanyReportMeta'
+      required:
+      - meta
+      - data
+      title: SalesByCompanyReport
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

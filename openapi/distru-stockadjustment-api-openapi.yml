@@ -1,0 +1,464 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Stock Adjustment API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: StockAdjustment
+paths:
+  /public/v1/adjustments:
+    get:
+      description: 'List stock adjustments for your company, oldest first (by creation time), with optional filters.
+
+
+        A stock adjustment is a manual change to on-hand inventory that isn''t a sale, purchase, or transfer — for example recording waste, theft, damage, a physical recount, or a reconciliation with the state compliance system.
+
+
+        Narrow the result with the `product_ids`, `batch_ids`, and `location_ids` filters (matching each adjustment''s `product_id` / `batch_id` / `location_id`) and with the `inserted_datetime`, `completion_datetime`, and `updated_datetime` windows. When several filters are supplied an adjustment must satisfy all of them (AND).
+
+
+        Results are always scoped to the company the API key belongs to. The response is a paginated envelope: `data` holds the page of adjustments and `next_page` is the URL of the following page, or null on the last page.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.StockAdjustmentController.index
+      parameters:
+      - description: Restrict the result to specific stock adjustments by ID (the same ID returned as each stock adjustment's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by when the adjustment was created in Distru (its `inserted_datetime`). Inclusive ISO8601 range `after,before` separated by a comma; either bound may be omitted — `after,` keeps adjustments created on or after `after`, `,before` those on or before `before`, and `after,before` those inside the closed range. A range with both bounds empty is rejected.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by the adjustment's effective date — the `completion_datetime` in the response. Inclusive ISO8601 range `after,before` separated by a comma; either bound may be omitted. A range with both bounds empty is rejected.
+        in: query
+        name: completion_datetime
+        required: false
+        example: ?completion_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by when the adjustment was last modified in Distru (its `updated_datetime`). Same inclusive ISO8601 `after,before` comma range format as `inserted_datetime`, with either bound optional.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Restrict to adjustments made against specific batches by batch ID (as returned in each adjustment's `batch_id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to adjustments made at specific locations by location ID (as returned in each adjustment's `location_id`). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: location_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to adjustments of specific products by product ID (as returned in each adjustment's `product_id`). Repeat the bracketed key once per ID; matches ANY. A malformed ID is rejected with a 400; an unknown-but-well-formed ID matches nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of stock adjustments
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/StockAdjustments'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get adjustments
+      tags:
+      - StockAdjustment
+    post:
+      description: 'Record a stock adjustment — a manual change to on-hand inventory that isn''t a sale, purchase, or transfer (for example waste, theft, damage, a recount, or a reconciliation with the state compliance system).
+
+
+        Identify what to adjust with exactly one of `product_id`, `batch_id`, or `package_id`, matching how the product''s inventory is tracked (product-, batch-, or package-tracked). Supplying more than one, or none, is rejected.
+
+
+        There are two adjustment modes, selected by whether you pass `package_id`:
+
+
+        • Standard adjustment (`product_id` or `batch_id`): set `quantity` in the product''s unit type and a source `location_id`. A positive `quantity` adds on-hand inventory at that location (recorded as a gain), a negative `quantity` removes it (recorded as a loss); when `reason` is `waste` the quantity moves the stock into a waste state and must be negative. No compliance system is touched, so the change is visible in Distru inventory immediately.
+
+
+        • Compliance adjustment (`package_id`): set `compliance_quantity` in the package''s unit type and omit `location_id` — the package''s current location is used automatically. The package''s tracked quantity is updated and the change is pushed to the connected state traceability system (Metrc or BioTrack) synchronously, as part of this request. A 200 means the compliance system accepted the change; if it rejects it, you get a 400 carrying the compliance error message as a single human-readable string. `reason` must be one the compliance system accepts for package adjustments.
+
+
+        The whole operation is atomic: if any validation fails or the compliance sync is rejected, nothing is persisted — no inventory moves and the package is left untouched. A compliance adjustment additionally requires the target package to be in an adjustable state — it is rejected if the package is on hold, destroyed, discontinued, inactive, syncing, transferred, finished, scheduled for destruction, assigned to an order, or has unresolved compliance audit discrepancies, and a negative adjustment cannot exceed the package''s currently available quantity. For Metrc finished-good packages, an increase also cannot push the quantity above what was received or created for that package (less what has already been used), and count-based packages may be required to stay whole numbers.
+
+
+        Stock adjustments are immutable: once created they cannot be edited or deleted through this API.
+
+
+        Required permission: `products_permissions_adjust_inventory`. Setting `unit_cost` additionally requires cost accounting to be enabled for the company and permission to apply costs on quantity adjustments.'
+      operationId: DistruPublic.V1.StockAdjustmentController.insert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id:
+                  type: string
+                  description: ID of the product to adjust. Provide only when the product is product-tracked. Supply exactly one of `product_id`, `batch_id`, or `package_id`; supplying more than one, or none, is rejected. Choosing `product_id` or `batch_id` makes this a standard (non-compliance) adjustment.
+                batch_id:
+                  type: string
+                  description: ID of the batch to adjust. Provide only when the batch's product is batch-tracked. Supply exactly one of `product_id`, `batch_id`, or `package_id`. Choosing `product_id` or `batch_id` makes this a standard (non-compliance) adjustment.
+                package_id:
+                  type: string
+                  description: 'ID of the package to adjust. Provide only when the product is package-tracked. Presence of `package_id` switches this into a compliance adjustment: use `compliance_quantity` instead of `quantity`, omit `location_id`, and the change is synced to Metrc or BioTrack. Supply exactly one of `product_id`, `batch_id`, or `package_id`.'
+                quantity:
+                  type: number
+                  description: Amount to adjust stock by, expressed in the product's unit type, as a decimal string (e.g. `"10"` adds ten, `"-4"` removes four). Required for standard adjustments (`product_id`/`batch_id`) and must be omitted when `package_id` is set (use `compliance_quantity` instead). Positive adds on-hand inventory, negative removes it. Must be negative when `reason` is `waste`. Must be greater than -1000000000.
+                compliance_quantity:
+                  type: number
+                  description: 'Amount to adjust stock by, expressed in the package''s unit type, as a decimal string. Required when `package_id` is set (a compliance adjustment) and must be omitted otherwise (use `quantity` instead). Same sign convention as `quantity`: positive adds, negative removes, and a negative amount cannot exceed the package''s currently available quantity. In the response, this value is echoed back as `compliance_quantity` (package unit type) while `quantity` carries the same change converted into the product''s unit type.'
+                description:
+                  type: string
+                  description: Free-text note explaining the adjustment. Required for compliance adjustments (`package_id` set); optional for standard adjustments. Max length 800 characters for standard adjustments and 250 characters for compliance adjustments.
+                unit_cost:
+                  type: number
+                  description: 'Cost per unit applied to the added inventory, as a decimal string: per unit of the product''s unit type for a standard adjustment, of the package''s unit type for a compliance adjustment. Allowed only for companies with cost accounting enabled and for callers with permission to apply costs on quantity adjustments. Must be omitted when the adjustment quantity is negative (a removal can''t be costed). Required for a positive adjustment when the company setting ''Require Cost on Intake and Quantity Adjustments'' is on. The value you send is reflected back in the response as `unit_cost` and drives `total_cost`.'
+                completion_datetime:
+                  type: string
+                  description: Effective date/time of the adjustment — surfaced as `completion_datetime` in the response — as an ISO8601 datetime, e.g. `2022-07-10T00:00:00Z`. Required for both standard and compliance adjustments.
+                reason:
+                  type: string
+                  description: Reason for the adjustment. Required. For standard adjustments, one of the lowercase, case-sensitive values `waste`, `stolen`, `damaged`, `fire`, `write-off`, `expired`, `lab-testing`, `revaluation`, or `other`; only `waste` changes behavior — it forces `quantity` to be negative and moves the stock into a waste state rather than a plain loss. For compliance adjustments, must be a reason the connected state compliance system (Metrc or BioTrack) accepts for package adjustments; an unrecognized reason is rejected together with the list of valid reasons. Echoed back verbatim as `reason` in the response.
+                location_id:
+                  type: string
+                  description: ID of the source location the adjustment applies to. Required for standard adjustments. Must be omitted for compliance adjustments (`package_id` set) — the package's current location is used automatically, so setting it is rejected.
+      responses:
+        '200':
+          description: The stock adjustment was inserted successfully
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/StockAdjustmentResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Insert a stock adjustment
+      tags:
+      - StockAdjustment
+  /public/v1/adjustments/{id}:
+    get:
+      description: 'Get a single stock adjustment by its ID. Returns 404 if no adjustment with that ID exists for your company. Like the list endpoint, this reads eventually consistent data — a just-created adjustment may take up to 1 second to appear.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.StockAdjustmentController.show
+      parameters:
+      - description: ID of the stock adjustment to fetch.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single stock adjustment
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/StockAdjustmentResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a stock adjustment
+      tags:
+      - StockAdjustment
+components:
+  schemas:
+    StockAdjustment:
+      description: A manual change to on-hand inventory that isn't a sale, purchase, or transfer — for example recording waste, theft, damage, a physical recount, or a reconciliation with the state compliance system. A positive quantity adds inventory; a negative quantity removes it.
+      properties:
+        batch_id:
+          description: The ID of this adjustment's batch, or null when the adjusted product is not batch-tracked
+          type: string
+        completion_datetime:
+          description: ISO 8601 datetime this adjustment took effect on inventory
+          type: string
+        compliance_quantity:
+          description: The adjustment quantity expressed in the package's unit type, as reported to the state compliance system, as a decimal string. Null when the adjusted product is not package-tracked (no `package_id`).
+          type: string
+        compliance_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        creator:
+          $ref: '#/components/schemas/User'
+        description:
+          description: A free-text note explaining this adjustment, or null when none was entered
+          type: string
+        id:
+          description: ID for this stock adjustment
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this adjustment was created at
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this adjustment is associated with — taken from the adjustment's location. Null when there is no location or the location has no license.
+          type: string
+        location_id:
+          description: ID of the [location](#model-location) this adjustment is associated with, or null when none is set
+          type: string
+        owner_id:
+          description: The ID of the Distru [user](#model-user) who owns this adjustment, or null when unassigned
+          type: string
+        package_id:
+          description: The ID of this adjustment's package, or null when the adjusted product is not package-tracked
+          type: string
+        product_id:
+          description: The ID of this adjustment's product. Populated regardless of the product's inventory tracking method.
+          type: string
+        quantity:
+          description: The size of the adjustment in the product's unit type, as a decimal string. A positive value adds inventory; a negative value removes it (e.g. "-5").
+          type: string
+        reason:
+          description: 'Why the inventory was adjusted. Returned lowercase (not SCREAMING_CASE), one of: "waste", "stolen", "damaged", "fire", "write-off", "expired", "lab-testing", "revaluation", or "other".'
+          enum:
+          - damaged
+          - expired
+          - fire
+          - lab-testing
+          - other
+          - revaluation
+          - stolen
+          - waste
+          - write-off
+          type: string
+        total_cost:
+          description: The total cost of this adjustment, as a decimal string, or null when no cost was recorded
+          type: string
+        unit_cost:
+          description: The cost per unit of `compliance_unit_type` when `compliance_quantity` is set, otherwise of `unit_type` — `total_cost` divided by the absolute `compliance_quantity` or `quantity` — as a decimal string. Null when `total_cost` is null or the quantity is zero.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        updated_datetime:
+          description: ISO 8601 datetime this adjustment was last modified at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - completion_datetime
+      - reason
+      - quantity
+      - product_id
+      - id
+      title: StockAdjustment
+      type: object
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    StockAdjustments:
+      description: A collection of Stock Adjustments
+      properties:
+        data:
+          description: Stock Adjustments
+          items:
+            $ref: '#/components/schemas/StockAdjustment'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Stock Adjustments
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    StockAdjustmentResponse:
+      description: A single stock adjustment envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/StockAdjustment'
+      title: Stock Adjustment Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

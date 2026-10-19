@@ -1,0 +1,372 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Strain API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Strain
+paths:
+  /public/v1/strains:
+    get:
+      description: 'List the strains in your catalog. A strain is a reference record — a genetic classification you attach to products — so this endpoint is a lookup of that catalog, not of inventory or orders. Use it to resolve a strain''s `id` before referencing it elsewhere, or to sync your local copy of the strain list.
+
+
+        Results are scoped to your company and paginated: read the top-level `next_page` URL to fetch the following page, and stop when it is null. Page size is fixed by the server and is not client-controllable. Filter by `name` (case-insensitive substring), `types` (one or more genetic classifications), or by creation/last-modified window. When more than one filter is supplied they combine with AND (a strain must satisfy every filter to be returned). Both datetime filters are inclusive on the bounds you provide. Strains are not soft-deleted or archived, so every strain in your catalog is returned — there are no hidden states to account for.
+
+
+        Responses are eventually consistent: a strain you just created or updated may take up to 1 second to appear here or reflect its latest values.
+
+
+        Required permission: `settings_permissions_strains`.'
+      operationId: DistruPublic.V1.StrainController.index
+      parameters:
+      - description: Restrict the result to specific strains by ID (the same ID returned as each strain's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by creation datetime. Accepts a comma-separated `from,to` range (ISO-8601 UTC); either bound is inclusive and either side may be omitted. `2022-07-10T00:00:00Z,` returns strains created on or after that instant; `,2022-07-10T00:00:00Z` returns those created on or before it; `2022-07-01T00:00:00Z,2022-07-31T23:59:59Z` returns a closed window. Omit entirely to apply no creation-time filter.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the strain `name` (partial matches count; e.g. `kush` matches `OG Kush`). Send a single value, not a list.
+        in: query
+        name: name
+        required: false
+        example: ?name=kush
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Restrict the result to strains whose genetic classification (`strain_type`) is any of the given types (SCREAMING_CASE, matches ANY). Repeat the bracketed key once per type. An empty list is treated as no filter; at most 200 types may be given.
+        in: query
+        name: types
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - INDICA
+            - INDICA_DOMINANT
+            - SATIVA
+            - SATIVA_DOMINANT
+            - HYBRID
+            - HIGH_CBD
+            type: string
+      - description: Filter by last-modified datetime. Accepts a comma-separated `from,to` range (ISO-8601 UTC); either bound is inclusive and either side may be omitted. `,2022-07-10T00:00:00Z` returns strains last modified on or before that instant; `2022-07-10T00:00:00Z,` returns those modified on or after it. Omit entirely to apply no update-time filter.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of strains
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Strains'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get strains
+      tags:
+      - Strain
+    post:
+      description: 'Create or update a strain through a single endpoint: omit `id` to create a new strain, or pass the `id` of an existing one to update it in place. A strain is a catalog/reference record used to classify products by genetics — it holds no inventory and is not pushed to Metrc or BioTrack, so calling this never moves stock or touches state-compliance traceability. What it does affect is your product catalog and menus: products are grouped under a strain, so renaming a strain or changing its type reflects everywhere that strain is shown, without altering the products themselves. To remove a strain from your catalog entirely, use the delete endpoint instead.
+
+
+        Updates are sparse. Only the fields you send are changed; any field you omit keeps its current value (sending `id` with just `name` renames the strain and leaves `strain_type` untouched). The whole write is a single all-or-nothing operation — if validation fails, nothing is persisted and a 400 is returned with the field errors.
+
+
+        `name` must be unique within your company; reusing an existing strain''s name is rejected with a 400. On success the response is the full created or updated strain, the same shape as show.
+
+
+        Required permission: `settings_permissions_strains`.'
+      operationId: DistruPublic.V1.StrainController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: The Distru id of the strain to update, as returned by list/show/upsert. Omit to create a new strain instead. When present, the strain must belong to your company or the request returns 404. Not a Metrc or other external identifier.
+                name:
+                  type: string
+                  description: Display name of the strain (e.g. `"Blue Dream"`). Required when creating (no `id`); optional when updating, where omitting it leaves the current name unchanged. Leading/trailing whitespace is trimmed before it is stored and checked. Must be unique within your company — uniqueness is compared exactly and case-sensitively on the trimmed value, so `"Blue Dream"` and `"blue dream"` are treated as different names. May not contain special characters. A duplicate or invalid name returns 400.
+                strain_type:
+                  enum:
+                  - INDICA
+                  - INDICA_DOMINANT
+                  - SATIVA
+                  - SATIVA_DOMINANT
+                  - HYBRID
+                  - HIGH_CBD
+                  type: string
+                  description: 'The strain''s genetic classification, SCREAMING_CASE: `INDICA` or `SATIVA` for a pure variety, `INDICA_DOMINANT` or `SATIVA_DOMINANT` for a leaning hybrid, `HYBRID` for a balanced hybrid, or `HIGH_CBD`. Optional — a strain may have no classification, and omitting this on update leaves the current value unchanged.'
+      responses:
+        '200':
+          description: The created or updated strain
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/StrainResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create or update a strain
+      tags:
+      - Strain
+  /public/v1/strains/{id}:
+    delete:
+      description: 'Permanently delete a strain. This is a HARD delete — the strain row is removed outright (strains have no archived or soft-deleted state), so it immediately disappears from the list and fetch endpoints and its `id` stops resolving. Deletion cannot be undone; recreating the strain via upsert produces a new strain with a new `id`.
+
+
+        Deleting a strain never deletes the products classified under it: those products remain intact, but their strain association is cleared, so they read back with a null strain. The strain is also removed from any menus that grouped products by it. No inventory is created, consumed, or released, and nothing is synced to Metrc or BioTrack.
+
+
+        A strain can be deleted at any time, with one exception: when your company runs BioTrack compliance and the strain is attached to any package-tracked product, the request is rejected with a 400 — BioTrack requires every package-tracked product to keep a strain. This check also counts inactive or deleted products, since they could be reactivated later; reassign those products to another strain first. Companies on Metrc or with no compliance system can delete a strain regardless of its product associations. Returns 204 on success, or 404 if no strain with that `id` exists in your company.
+
+
+        Required permission: `settings_permissions_strains`.'
+      operationId: DistruPublic.V1.StrainController.delete
+      parameters:
+      - description: ID of the strain to delete, as returned in the `id` field of the list or upsert response. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a strain
+      tags:
+      - Strain
+    get:
+      description: 'Fetch one strain by its `id`. Returns the same reference record found in the list endpoint — its name and genetic classification — scoped to your company. A strain from another company, or one that does not exist, returns 404 (the two cases are indistinguishable, so you cannot use this to probe for strains you can''t see).
+
+
+        Required permission: `settings_permissions_strains`.'
+      operationId: DistruPublic.V1.StrainController.show
+      parameters:
+      - description: The Distru strain id, as returned in the `id` field of the list or upsert response (e.g. `"01H..."`). Not a Metrc or other external identifier.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single strain
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/StrainResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a strain
+      tags:
+      - Strain
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    Strains:
+      description: 'A collection of Strains.
+
+        Note: This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+        '
+      properties:
+        data:
+          description: Strains
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Strains
+      type: object
+    StrainResponse:
+      description: A single Strain
+      properties:
+        data:
+          $ref: '#/components/schemas/Strain'
+      title: Strain Response
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

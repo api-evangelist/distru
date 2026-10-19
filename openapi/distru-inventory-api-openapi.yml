@@ -1,90 +1,291 @@
 openapi: 3.2.0
 info:
-  title: Distru Public Inventory API
-  version: v1
-  x-apievangelist-generated: '2026-07-18'
-  x-apievangelist-method: generated
-  x-apievangelist-source: https://apidocs.distru.dev
-  description: 'The Distru Public API provides read and write access to a cannabis ERP: products, inventory, orders, invoices, purchases, companies, contacts, batches, packages, assemblies, strains, test results, locations, menus and more.'
-  contact:
-    name: Distru
-    email: hello@distru.com
-    url: https://www.distru.com/features/distru-api
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Inventory API
+  version: '1.0'
 servers:
-- url: https://app.distru.com/public/v1
-  description: Production
+- url: https://app.distru.com
 security:
-- bearerAuth: []
+- Bearer: []
 tags:
 - name: Inventory
 paths:
-  /inventory:
+  /public/v1/inventory:
     get:
-      tags:
-      - Inventory
-      operationId: listInventory
-      summary: List inventory
+      description: 'Get on-hand inventory levels rolled up by a caller-chosen set of attributes. Each returned row is one group, and the `groupings` you request decides both how quantities are aggregated and which id fields (`product_id`, `location_id`, `batch_number`) appear on each row. Only active, positive-quantity, sellable stock is counted — inventory that has been consumed, voided, transferred out, or fully sold is excluded, as is any stock whose product has been deactivated. Results are always scoped to the company that owns the API key.
+
+
+        Results can be narrowed to specific products (`product_ids`), locations (`location_ids`), and batches (`batch_ids`), or by attributes of the underlying product — category, subcategory, group, strain, brand, vendor, tag, and SKU. All filters are AND-ed together; within a single multi-valued filter the values are OR-ed.
+
+
+        Groups with 0 active and 0 available quantity are omitted from the response. Groups are sorted ascending by the ids of the attributes they are grouped by, in the order those attributes appear in `groupings`.
+
+
+        Results are paginated. Page size is fixed by the server; the response `next_page` holds the URL of the following page, or null on the last page. Follow it to walk every group rather than building page selectors yourself. `next_page` carries an opaque `page[after]` cursor that resumes right after the last group of the page, so a group that appears or disappears between requests does not shift the pages after it.
+
+
+        Grouping by `BATCH_NUMBER` behaves specially:
+
+        • Products that track inventory at the product level (not by batch) are excluded entirely — they only surface when you do not group by `BATCH_NUMBER`.
+
+        • `reserved` cannot be determined at the batch/package granularity, so it is always returned as `"0"` and `available` equals `active` for every row.
+
+
+        This is a read-only endpoint. It returns eventually consistent data: a change to inventory (a sale, a receipt, an adjustment) can take up to roughly 1 second to be reflected here, so a value read immediately after a write may still be stale.
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.InventoryController.index
       parameters:
-      - $ref: '#/components/parameters/pageNumber'
-      - $ref: '#/components/parameters/pageSize'
-      responses:
-        '200':
-          $ref: '#/components/responses/Paged'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-components:
-  responses:
-    Unauthorized:
-      description: Missing or invalid API key.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    Paged:
-      description: A page of results.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Page'
-  schemas:
-    Page:
-      type: object
-      properties:
-        data:
+      - description: 'Required. The attributes to roll inventory up by, in SCREAMING_CASE. Accepted values are `PRODUCT`, `LOCATION` and `BATCH_NUMBER`. `PRODUCT` must always be included; a request without it is rejected. The order you list attributes in is the order rows are sorted by (ascending on each attribute''s id). Each requested attribute adds its id field to every returned row: `PRODUCT` → `product_id`, `LOCATION` → `location_id`, `BATCH_NUMBER` → `batch_number`; attributes you omit are not broken out and their id field is absent from the rows. Including `BATCH_NUMBER` also drops product-tracked products from the results and forces `reserved` to `"0"` (see the endpoint description).'
+        in: query
+        name: groupings
+        required: true
+        style: form
+        explode: false
+        schema:
           type: array
           items:
-            type: object
-        next_page:
-          type:
-          - string
-          - 'null'
-          description: URL of the next page of results, or null on the last page.
-    Problem:
-      type: object
+            enum:
+            - PRODUCT
+            - LOCATION
+            - BATCH_NUMBER
+            type: string
+      - description: Restrict the results to these products, each identified by its Distru product id. Omit to include every product in the company. Ids that do not belong to the company are silently ignored. When `BATCH_NUMBER` is in `groupings`, product-tracked products among these ids are still excluded, just as they are for an unfiltered request (see the `groupings` param).
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory held at these locations, each identified by its Distru location id. Omit to include every location. Applies whether or not `LOCATION` is in `groupings`; ids that do not belong to the company are silently ignored.
+        in: query
+        name: location_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory from these batches, each identified by its Distru batch id. Omit to include every batch. Applies whether or not `BATCH_NUMBER` is in `groupings`; ids that do not belong to the company are silently ignored.
+        in: query
+        name: batch_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products in any of these product categories, each identified by its Distru product category id. Multiple ids are OR-ed. Omit to include every category; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products in any of these product subcategories, each identified by its Distru product subcategory id. Multiple ids are OR-ed. Omit to include every subcategory; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products in any of these product groups, each identified by its Distru product group id. Multiple ids are OR-ed. Omit to include every group; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products with any of these strains, each identified by its Distru strain id. Multiple ids are OR-ed. Omit to include every strain; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products with any of these brands, each identified by its Distru brand id (a company-relationship id, not a raw company id). Multiple ids are OR-ed. Omit to include every brand; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products supplied by any of these vendors, each identified by its Distru vendor id (a company-relationship id, not a raw company id). Multiple ids are OR-ed. Omit to include every vendor; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products carrying any of these tags, each identified by its Distru tag id. Multiple ids are OR-ed. Omit to include products regardless of tags; ids that do not belong to the company match nothing. At most 200 ids.
+        in: query
+        name: product_tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict the results to inventory of products whose SKU exactly matches (case-insensitive) any value in the list. Multiple values are OR-ed. Omit to include every SKU. At most 200 values.
+        in: query
+        name: product_skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. A cursor is tied to the `groupings` it was issued for: send the same `groupings` with it, or the request is rejected.'
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of active and available quantity for each group
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Inventories'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get inventory levels
+      tags:
+      - Inventory
+components:
+  schemas:
+    Inventory:
       properties:
-        error:
+        active:
+          description: Total on-hand quantity for this group, as a decimal string (e.g. "10.000000000"). Always present.
           type: string
+        available:
+          description: Quantity free to sell or use, i.e. `active` minus `reserved`, as a decimal string. Can be negative when more is reserved than is on hand. Equals `active` when `BATCH_NUMBER` is in `groupings`. Always present.
+          type: string
+        batch_number:
+          description: 'Batch number of the underlying batch or package. Present only when `BATCH_NUMBER` is in `groupings`; absent otherwise. May be null: inventory whose batch/package has no batch number is aggregated together under a single null-batch group.'
+          type: string
+        cost_per_unit_actual:
+          description: Actual cost per unit — `total_cost_actual` divided by the active quantity, as a decimal string. Null when `total_cost_actual` is null or the active quantity is not greater than 0.
+          type: string
+        cost_per_unit_default:
+          description: Default (standard) cost per unit — `total_cost_default` divided by the active quantity, as a decimal string. Null when `total_cost_default` is null or the active quantity is not greater than 0.
+          type: string
+        location_id:
+          description: Distru location id this group is held at. Present only when `LOCATION` is in `groupings`; absent otherwise, and may be null for stock that has no location (e.g. inventory held by a user rather than at a location).
+          type: string
+        product_id:
+          description: Distru product id this group belongs to. Always present.
+          type: string
+        reserved:
+          description: Quantity spoken for but not yet fulfilled, and therefore not sellable, as a decimal string. This is the quantity on unfulfilled line items of PROCESSING sales orders plus the quantity on unfulfilled inputs of pending assemblies — "unfulfilled" meaning no specific package or batch has been assigned yet. Always `"0"` when `BATCH_NUMBER` is in `groupings`, since reservations cannot be attributed at batch/package granularity. Always present.
+          type: string
+        total_cost_actual:
+          description: Total actual cost of the active quantity, as a decimal string, or null when no cost could be traced. Distru traces the inputs and components that produced the currently active inventory and sums their real costs incurred along the chain that led to this inventory — for example the price paid when a component was purchased, assembly costs, and costs added by stock adjustments, among others.
+          type: string
+        total_cost_default:
+          description: Total default (standard) cost of the active quantity, as a decimal string, or null when no cost could be traced. Traced the same way as `total_cost_actual`, but each input/component is valued at its product's configured unit cost instead of its real cost.
+          type: string
+        updated_datetime:
+          description: ISO8601 UTC timestamp of the most recent change to any stock counted in this group. Always present.
+          format: datetime
+          type: string
+      required:
+      - updated_datetime
+      - available
+      - reserved
+      - active
+      - product_id
+      title: Inventory
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Inventories:
+      description: A list of active and available quantity for each group
+      properties:
+        data:
+          description: Inventories
+          items:
+            $ref: '#/components/schemas/Inventory'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Inventories
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
         message:
+          description: Human-readable, customer-facing description of what went wrong.
           type: string
-  parameters:
-    pageNumber:
-      name: page[number]
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-      description: 1-based page number.
-    pageSize:
-      name: page[size]
-      in: query
-      required: false
-      schema:
-        type: integer
-        maximum: 500
-      description: Page size (max 500 for most collections).
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
   securitySchemes:
-    bearerAuth:
+    Bearer:
       type: http
       scheme: bearer
-      description: 'API key issued in the Distru app under Settings > Integrations > Distru API, sent as `Authorization: Bearer <API_KEY>`. Keys expire one year from issue date.'
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

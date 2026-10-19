@@ -1,0 +1,371 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Vehicle API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Vehicle
+paths:
+  /public/v1/vehicles:
+    get:
+      description: 'List the authenticated company''s vehicles, oldest first (by creation time, ascending). Only vehicles owned by the API key''s company are returned; soft-deleted vehicles are omitted. Narrow the result with the `inserted_datetime` and `updated_datetime` range filters, or omit them to return the full set, paginated.
+
+
+        Results are paged; follow `next_page` in the response envelope until it is null to walk every page.
+
+
+        Required permission: `settings_permissions_vehicles`.'
+      operationId: DistruPublic.V1.VehicleController.index
+      parameters:
+      - description: Restrict the result to specific vehicles by ID (the same ID returned as each vehicle's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to vehicles by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to vehicles by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of vehicles
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Vehicles'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get vehicles
+      tags:
+      - Vehicle
+    post:
+      description: 'Create or update a vehicle. This is a single upsert: omit `id` to create a new vehicle, or pass the `id` of an existing vehicle owned by your company to update it in place. Passing an `id` that does not exist, is soft-deleted, or belongs to another company returns 404 — this endpoint never creates a vehicle at a caller-chosen id.
+
+
+        On create, `make`, `model` and `license_plate_number` are required. Updates are sparse: only the fields you send are changed, and any field you omit keeps its current value. There is no way to clear a field back to null through this endpoint — sending a field always overwrites it with the value you provide, and omitting it leaves the stored value intact. `make`, `model` and `license_plate_number` can never be blank.
+
+
+        If your company has the BioTrack compliance integration enabled, this endpoint also pushes the vehicle to the state traceability system (BioTrack) as part of the same request. That sync is synchronous, so no polling is needed: a 200 means BioTrack accepted the vehicle too, and if BioTrack rejects it the whole call fails and nothing is saved (create and BioTrack sync commit or roll back together). For BioTrack-enabled companies the following fields become required in addition to the three above: `year`, `color`, `vin`, `license_plate_state` and `description`. Companies without BioTrack are not synced anywhere and only need `make`, `model` and `license_plate_number`.
+
+
+        On validation failure (missing required field, BioTrack rejection) the response is a 400 whose body is `{ "errors": [...] }`, each entry carrying a human-readable message pointing at the offending body field.
+
+
+        Vehicles are a settings-level record referenced by transfers and manifests; upserting one does not touch inventory, orders, or purchases.
+
+
+        Required permission: `settings_permissions_vehicles`.'
+      operationId: DistruPublic.V1.VehicleController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the vehicle to update. Omit to create a new vehicle; when present it must identify a vehicle owned by your company.
+                make:
+                  type: string
+                  description: Manufacturer of the vehicle (e.g. "Ford"). Required on create and can never be cleared; on update, omit to leave unchanged.
+                model:
+                  type: string
+                  description: Model of the vehicle (e.g. "Transit"). Required on create and can never be cleared; on update, omit to leave unchanged.
+                year:
+                  type: string
+                  description: Model year of the vehicle, sent as a free-form string (e.g. "2021") — it is stored verbatim and never validated or coerced to a number. Optional for companies without BioTrack, but required when your company has BioTrack enabled. Omit to leave unchanged on update.
+                color:
+                  type: string
+                  description: Color of the vehicle (e.g. "White"). Optional, but required when your company has BioTrack enabled. Omit to leave unchanged on update.
+                license_plate_number:
+                  type: string
+                  description: License plate number. Required on create and can never be cleared; on update, omit to leave unchanged.
+                license_plate_state:
+                  type: string
+                  description: State the license plate is registered in, as a two-letter US state code (e.g. "CA"); must be one of the recognized US state/territory codes. Optional for companies without BioTrack, but required when your company has BioTrack enabled. Omit to leave unchanged on update.
+                vin:
+                  type: string
+                  description: Vehicle identification number (VIN). Optional, but required when your company has BioTrack enabled. Omit to leave unchanged on update.
+                description:
+                  type: string
+                  description: Free-text name or description for the vehicle. Optional, but required when your company has BioTrack enabled. Omit to leave unchanged on update.
+      responses:
+        '200':
+          description: The created or updated vehicle
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VehicleResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create or update a vehicle
+      tags:
+      - Vehicle
+  /public/v1/vehicles/{id}:
+    delete:
+      description: 'Deletes a vehicle. This is a soft delete: the vehicle stops appearing in the list and fetch endpoints, its `id` returns 404, and it can no longer be updated through the upsert endpoint — but the record is retained, so anything that already references it is unaffected. The delete cannot be undone through the API; recreating the vehicle via upsert produces a new vehicle with a new `id`. Responds 204 with no body on success, or 404 if no vehicle with that `id` exists in your company (including one that was already deleted or belongs to another company).
+
+
+        A vehicle can be deleted at any time regardless of what references it: transfers, shipping manifests on orders, purchases, and stock transfers that already name the vehicle keep their reference and continue to render it. No inventory is created, consumed, or released.
+
+
+        For a company with the BioTrack compliance integration enabled, a successful delete also queues an asynchronous removal of the vehicle in BioTrack — a 204 means the vehicle was deleted in Distru, not that BioTrack has processed the removal. That delete is rejected up front with a 400 (and the vehicle is kept) when your company or user BioTrack credentials are missing or lack permission for this operation; once queued, a later rejection by BioTrack does not restore the Distru record. Companies without BioTrack (Metrc or no compliance system) have no such sync and can always delete a vehicle.
+
+
+        Required permission: `settings_permissions_vehicles`.'
+      operationId: DistruPublic.V1.VehicleController.delete
+      parameters:
+      - description: ID of the vehicle to delete, as returned by the list, fetch, and upsert endpoints. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete a vehicle
+      tags:
+      - Vehicle
+    get:
+      description: 'Fetch a single vehicle by its id. Scoped to the API key''s company — an id belonging to another company, or a soft-deleted vehicle, returns 404, as does an unknown id.
+
+
+        Required permission: `settings_permissions_vehicles`.'
+      operationId: DistruPublic.V1.VehicleController.show
+      parameters:
+      - description: The vehicle's id, as returned by the list or upsert endpoints.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single vehicle
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VehicleResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a vehicle
+      tags:
+      - Vehicle
+components:
+  schemas:
+    VehicleResponse:
+      description: A single vehicle envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Vehicle'
+      title: Vehicle Response
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Vehicles:
+      description: A collection of vehicles
+      properties:
+        data:
+          description: Vehicles
+          items:
+            $ref: '#/components/schemas/Vehicle'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Vehicles
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Vehicle:
+      description: A vehicle
+      properties:
+        color:
+          description: Color of the vehicle, or null if never set. Always populated for BioTrack-synced vehicles.
+          type: string
+        description:
+          description: Free-text name or description for the vehicle, or null if never set. Always populated for BioTrack-synced vehicles.
+          type: string
+        id:
+          description: ID of the vehicle. Stable across updates.
+          type: string
+        inserted_datetime:
+          description: When the vehicle was created, as a UTC ISO-8601 timestamp. Always present.
+          type: string
+        license_plate_number:
+          description: License plate number. Always present.
+          type: string
+        license_plate_state:
+          description: State the license plate is registered in, as a two-letter US state code (e.g. "CA"), or null if never set. Always populated for BioTrack-synced vehicles.
+          type: string
+        make:
+          description: Manufacturer of the vehicle. Always present.
+          type: string
+        model:
+          description: Model of the vehicle. Always present.
+          type: string
+        updated_datetime:
+          description: When the vehicle was last updated, as a UTC ISO-8601 timestamp. Always present.
+          type: string
+        vin:
+          description: Vehicle identification number (VIN), or null if never set. Always populated for BioTrack-synced vehicles.
+          type: string
+        year:
+          description: Model year as a free-form string (e.g. "2021"), or null if never set. Always populated for BioTrack-synced vehicles.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - license_plate_number
+      - model
+      - make
+      - id
+      title: Vehicle
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

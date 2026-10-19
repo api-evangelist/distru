@@ -1,0 +1,614 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Payment API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Payment
+paths:
+  /public/v1/payments:
+    get:
+      description: 'Get a paginated list of your company''s payments, newest first (ordered by creation time, then id).
+
+
+        A payment is a single record of money moving, and comes in one of two kinds, reported in `payment_type`:
+
+        • INVOICE — money received from a customer against an invoice. The `invoice` field is populated and `purchase` is null.
+
+        • PURCHASE — money paid to a vendor against a purchase. The `purchase` field is populated and `invoice` is null.
+
+
+        At most one of `invoice` / `purchase` is populated on any payment; the other is always null. Only invoice payments carry `credit_uses` and `overpayment_credits` (both null on purchase payments).
+
+
+        Payments are not team-restricted: every payment in your company is returned. What a payment points at is team-restricted: `invoice`, `purchase` and `company` are null when the authenticated user cannot view them under their team restrictions, a credit use''s `credit` is null for a credit they cannot view, and `overpayment_credits` leaves such credits out. `payment_type` still says which kind of payment it is.
+
+
+        Each payment has a `status` of POSTED or VOIDED. A voided payment is retained rather than deleted, so historical references to it still resolve. By default this endpoint returns both POSTED and VOIDED payments; pass `payment_status` to narrow. Soft-deleted payments are never returned.
+
+
+        Narrow the result with `company_ids` (the customer/vendor), `invoice_ids` (INVOICE payments only), `purchase_ids` (PURCHASE payments only), `payment_method_ids`, `amount` range, `payment_number`, `payment_type`, `payment_status`, and the `inserted_datetime` / `payment_datetime` / `updated_datetime` windows. When several filters are supplied a payment must satisfy all of them (AND).
+
+
+        Results are eventually consistent: a newly created, updated, or voided payment can take up to 1 second to appear here or to reflect its latest state.
+
+
+        Required permission: `payments_permissions_view`.'
+      operationId: DistruPublic.V1.PaymentController.index
+      parameters:
+      - description: Restrict the result to specific payments by ID (the same ID returned as each payment's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter by the payment `amount` as an inclusive `min,max` decimal range separated by a comma. Either bound may be omitted: `100,` keeps payments of 100 or more, `,500` those of 500 or less, `100,500` those in between. A range with both bounds empty is rejected.'
+        in: query
+        name: amount
+        required: false
+        example: ?amount=100,500
+        schema:
+          type: string
+      - description: Restrict to payments tied to specific companies by company ID (the same ID returned as each payment's `company.id` — the customer for INVOICE payments, the vendor for PURCHASE payments). Repeat the bracketed key once per ID; matches ANY. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: company_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by when the payment was created in Distru. Accepts a comma-separated `after,before` ISO8601 datetime range; either side may be omitted for an open-ended bound. `2022-07-10T00:00:00Z,` returns payments created at or after that instant, `,2022-07-10T00:00:00Z` returns those created at or before it, and giving both bounds a closed range.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Restrict to INVOICE payments applied to any of the given invoices by invoice ID (the same ID returned under each payment's `invoice.id`). Repeat the bracketed key once per ID; matches ANY. PURCHASE payments never match. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: invoice_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to payments made with specific payment methods by payment method ID (the same ID returned under each payment's `payment_method.id`). Repeat the bracketed key once per ID; matches ANY. Payments fully paid with credits (which have no payment method) never match. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: payment_method_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Restrict to PURCHASE payments applied to any of the given purchases by purchase ID (the same ID returned under each payment's `purchase.id`). Repeat the bracketed key once per ID; matches ANY. INVOICE payments never match. Unknown IDs match nothing; an empty list is no filter. At most 200 IDs.
+        in: query
+        name: purchase_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Filter by the payment's `payment_datetime` (the datetime the payment was recorded as made, not when it was created in Distru). Same comma-separated `after,before` ISO8601 range format as `inserted_datetime`, with either bound optional.
+        in: query
+        name: payment_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Filter to payments whose `payment_number` contains this value (case-insensitive substring match, not an exact match).
+        in: query
+        name: payment_number
+        required: false
+        schema:
+          type: string
+      - description: Filter by payment status. POSTED returns only non-voided payments; VOIDED returns only voided ones. Omit to return both POSTED and VOIDED payments.
+        in: query
+        name: payment_status
+        required: false
+        schema:
+          type: string
+          enum:
+          - POSTED
+          - VOIDED
+      - description: Filter by what the payment is tied to. INVOICE returns money received from customers against invoices; PURCHASE returns money paid to vendors against purchases. Omit to return both types.
+        in: query
+        name: payment_type
+        required: false
+        schema:
+          type: string
+          enum:
+          - INVOICE
+          - PURCHASE
+      - description: Filter by when the payment was last modified in Distru. Same comma-separated `after,before` ISO8601 range format as `inserted_datetime`, with either bound optional.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of payments
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Payments'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get payments
+      tags:
+      - Payment
+  /public/v1/payments/{id}:
+    get:
+      description: 'Get a single payment by its ID.
+
+
+        The response carries the same shape as a list entry, plus `quickbooks_deposit_account_name` (the human-readable name of the QuickBooks Online deposit account, resolved only here — the list endpoint omits it). Like the list endpoint, at most one of `invoice` / `purchase` is populated depending on `payment_type`, and `status` is POSTED or VOIDED.
+
+
+        Returns 404 if no payment with that ID exists within your company; soft-deleted payments return 404 too. Voided payments are returned normally with `status` VOIDED. A payment on an invoice or purchase the authenticated user cannot view under their team restrictions is still returned; the records they cannot view are null or left out, as in the list.
+
+
+        Required permission: `payments_permissions_view`.'
+      operationId: DistruPublic.V1.PaymentController.show
+      parameters:
+      - description: The payment's Distru ID, as returned in the `id` field of the list endpoint. An ID that doesn't exist for your company returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single payment
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a payment
+      tags:
+      - Payment
+  /public/v1/payments/{id}/void:
+    post:
+      description: 'Void a payment by its ID. A voided payment is retained rather than deleted — its record still resolves and it keeps appearing in the list and show endpoints with `status` VOIDED. The response returns the payment in its post-void state.
+
+
+        This one endpoint voids both kinds of payment; it dispatches on `payment_type`:
+
+        • INVOICE — reverses the money applied to the invoice, recomputes the invoice''s payment status, and cancels both the credits this payment generated from an overpayment and the credits applied toward it. Requires the `invoices_permissions_receive_payment` permission. A payment on an invoice the authenticated user cannot view under their team restrictions returns 403.
+
+        • PURCHASE — reverses the money applied to the purchase, recomputes the purchase''s payment status and updates the payment''s `updated_datetime`. Requires the `purchases_permissions_make_payments` permission. A payment on a purchase the authenticated user cannot view under their team restrictions returns 403.
+
+
+        Voiding an already-voided payment returns 400. If the company is connected to QuickBooks Online, the void is queued to sync there (a 200 is not confirmation it reached QuickBooks Online — poll QuickBooks Online to observe the result); an invoice payment is also pushed to LeafLink when that integration is configured for the customer. The change is eventually consistent — it can take up to 1 second to reflect in the list and show endpoints.'
+      operationId: DistruPublic.V1.PaymentController.void
+      parameters:
+      - description: The ID of the payment to void, as returned in the `id` field of the list and show payment endpoints. An ID that doesn't exist for your company, or a soft-deleted payment, returns 404.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The voided payment
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Void a payment
+      tags:
+      - Payment
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    PaymentCreditUse:
+      description: A credit applied towards an invoice payment
+      properties:
+        amount:
+          description: The amount of credit applied toward the payment, as a decimal string (e.g. `"25.00"`). Always present.
+          type: string
+        credit:
+          $ref: '#/components/schemas/PaymentCredit'
+        id:
+          description: ID for this credit use. Always present.
+          type: string
+      required:
+      - amount
+      - id
+      title: PaymentCreditUse
+      type: object
+    CompactInvoice:
+      description: A compact view of an invoice as nested inside another entity (an order or a payment) in Distru. Use its id to fetch the full invoice from the invoices endpoint.
+      properties:
+        id:
+          description: ID for this invoice
+          type: string
+        invoice_number:
+          description: The invoice number as shown in the Distru UI (e.g. "INV-0001"). Unique per company.
+          type: string
+        status:
+          description: 'The payment status of this invoice (SCREAMING_CASE), reflecting how much of its total has been paid — distinct from the parent order''s fulfillment `status`.• NOT_PAID: no payments applied.• PARTIALLY_PAID: paid in part but less than the total.• FULLY_PAID: paid in full.• OVER_PAID: payments exceed the total.'
+          type: string
+        total:
+          description: The invoice total (line items plus charges/taxes minus discounts), as a decimal string (e.g. "150.50").
+          type: string
+      required:
+      - total
+      - status
+      - invoice_number
+      - id
+      title: CompactInvoice
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    Payments:
+      description: A collection of Payments
+      properties:
+        data:
+          description: Payments
+          items:
+            $ref: '#/components/schemas/Payment'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Payments
+      type: object
+    PaymentCredit:
+      description: A compact representation of a credit related to a payment
+      properties:
+        amount:
+          description: The credit's current remaining amount as a decimal string (e.g. `"50.00"`); reflects credit already spent, not the original issued amount. Always present.
+          type: string
+        credit_number:
+          description: The credit number as shown in the Distru UI. Always present.
+          type: string
+        id:
+          description: ID for this credit. Always present.
+          type: string
+        source:
+          description: How the credit originated. INVOICE_PAYMENT (from an invoice overpayment), RETURN (from a return), USER (manually created), or QB_CREDIT_MEMO / QB_PAYMENT (synced from QuickBooks Online). Always present.
+          enum:
+          - INVOICE_PAYMENT
+          - QB_CREDIT_MEMO
+          - QB_PAYMENT
+          - RETURN
+          - USER
+          type: string
+      required:
+      - source
+      - amount
+      - credit_number
+      - id
+      title: PaymentCredit
+      type: object
+    PaymentResponse:
+      description: A single Payment
+      properties:
+        data:
+          $ref: '#/components/schemas/Payment'
+      title: Payment Response
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    PaymentPurchase:
+      description: A compact representation of the purchase a payment belongs to
+      properties:
+        id:
+          description: The purchase's ID. Always present.
+          type: string
+        purchase_number:
+          description: The purchase number as shown in the Distru UI. Always present.
+          type: string
+        status:
+          description: The purchase's status, or null if the purchase has no status set.
+          type:
+          - string
+          - 'null'
+        total:
+          description: The purchase's total as a decimal string (e.g. `"1200.00"`). Defaults to `"0"`. Always present.
+          type: string
+      required:
+      - total
+      - purchase_number
+      - id
+      title: PaymentPurchase
+      type: object
+    PaymentMethod:
+      description: A way payments are made or received (e.g. Cash, Check, Credit Card, Bank Transfer).
+      properties:
+        active:
+          description: True when this payment method is active and can be selected on new payments. Defaults to false.
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this payment method was soft-deleted, or null when it has not been deleted
+          type: string
+        id:
+          description: ID for this payment method
+          type: string
+        inserted_datetime:
+          description: The datetime this payment method was created at
+          type: string
+        name:
+          description: Name of the payment method (e.g. "Cash")
+          type: string
+        qb_payment_method_id:
+          description: The ID of the matching payment method in QuickBooks Online, or null when this payment method is not mapped to one
+          type: string
+        type:
+          description: The payment method type (SCREAMING_CASE). One of CASH, CHECK, CREDIT_CARD, BANK_REMITTANCE, or BANK_TRANSFER.
+          enum:
+          - CASH
+          - CHECK
+          - CREDIT_CARD
+          - BANK_REMITTANCE
+          - BANK_TRANSFER
+          type: string
+        updated_datetime:
+          description: The datetime this payment method was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - active
+      - type
+      - name
+      - id
+      title: PaymentMethod
+      type: object
+    Payment:
+      description: A record of money exchanged — received from a customer against an invoice, or paid to a vendor against a purchase order.
+      properties:
+        amount:
+          description: 'The payment amount as a decimal string with trailing zeros trimmed (e.g. `"150"` or `"99.5"`), in the currency of the related invoice or purchase. For an INVOICE payment this is the amount applied to the invoice: it includes any portion covered by applied credits (`credit_uses`) but excludes any overpaid portion that became a customer credit (`overpayment_credits`) — the invoice''s `paid_amount` is the sum of `amount` across its active payments. Normally at least `0.01`; the one exception is a payment synced from QuickBooks Online to represent a void, which appears as `"0"`. Always present.'
+          type: string
+        company:
+          $ref: '#/components/schemas/CompanyCompact'
+        credit_uses:
+          description: Credits applied toward this invoice payment (an empty array when none were applied). Null for PURCHASE payments.
+          items:
+            $ref: '#/components/schemas/PaymentCreditUse'
+          type:
+          - array
+          - 'null'
+        description:
+          description: Free-text note attached to the payment, or null if none was entered.
+          type:
+          - string
+          - 'null'
+        fully_paid_with_credits:
+          description: True when the payment was covered entirely by credits; in that case `payment_method` is null. Defaults to false. Always present.
+          type: boolean
+        id:
+          description: The payment's ID. Always present.
+          type: string
+        inserted_datetime:
+          description: ISO8601 datetime the payment record was created in Distru. Distinct from `payment_datetime`. Always present.
+          type: string
+        invoice:
+          $ref: '#/components/schemas/CompactInvoice'
+        overpayment_credits:
+          description: Credits generated from overpaying this invoice payment (an empty array when there was no overpayment). Leaves out credits the authenticated user cannot view under their team restrictions. Null for PURCHASE payments.
+          items:
+            $ref: '#/components/schemas/PaymentCredit'
+          type:
+          - array
+          - 'null'
+        payment_datetime:
+          description: The full ISO8601 datetime the payment was recorded as made (e.g. `"2022-07-10T00:00:00Z"`). This is the user-entered payment datetime, distinct from `inserted_datetime` (when the record was created in Distru). Always present.
+          type: string
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethod'
+        payment_number:
+          description: The payment number as shown in the Distru UI. Unique per company. Always present.
+          type: string
+        payment_type:
+          description: 'What this payment is tied to: INVOICE (money received from a customer against an invoice) or PURCHASE (money paid to a vendor against a purchase). Determines which of `invoice`/`purchase` is populated and whether `credit_uses`/`overpayment_credits` are present. Always present.'
+          type: string
+        purchase:
+          $ref: '#/components/schemas/PaymentPurchase'
+        quickbooks_deposit_account_id:
+          description: ID of the QuickBooks Online deposit account this payment posts to, or null when the payment is not linked to a deposit account.
+          type:
+          - string
+          - 'null'
+        quickbooks_deposit_account_name:
+          description: Name of the QuickBooks Online deposit account in `quickbooks_deposit_account_id`. For an INVOICE payment it is the account's full name (`Parent:Child` for a sub-account), which [POST /public/v1/invoices/{id}/payments](#insert-a-payment-for-an-invoice) accepts back as `quickbooks_deposit_account_name`; for a PURCHASE payment it is the account's own name. Only returned on the single-payment (show) response, and null there when no deposit account is linked; absent from list responses.
+          type:
+          - string
+          - 'null'
+        quickbooks_sync_enqueued:
+          description: Whether a QuickBooks Online sync was queued for this payment. Only present on the payment creation response; absent from list and show responses.
+          type: boolean
+        status:
+          description: The payment's status. POSTED for a live payment; VOIDED for one that was voided (retained for history rather than deleted). Always present.
+          type: string
+        updated_datetime:
+          description: ISO8601 datetime the payment record was last modified in Distru. Equals `inserted_datetime` until the payment is edited or voided. Always present.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - fully_paid_with_credits
+      - status
+      - payment_type
+      - payment_datetime
+      - payment_number
+      - amount
+      - id
+      title: Payment
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

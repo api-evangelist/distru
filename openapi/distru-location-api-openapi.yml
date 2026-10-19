@@ -1,0 +1,451 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Location API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Location
+paths:
+  /public/v1/locations:
+    get:
+      description: 'Returns the paginated list of locations belonging to your company, oldest first (ascending creation date). A location is a physical or logical place that holds inventory and appears throughout the rest of the API: it is where a purchase receives inventory, where an order ships from, and where stock and packages are held. Each location optionally links to a compliance license; that link (`license` / `license_id`) is null for locations with no compliance license. When the linked license is a Metrc license, `metrc_id` is the identifier of the corresponding Metrc room; it is null for locations not synced to Metrc, and it is a raw Metrc integer id, not a Distru id.
+
+
+        By default only non-deleted locations are returned; use `deleted` to include or isolate soft-deleted locations. Filter the result set by `name` (case-insensitive substring), `license_number` (exact match on the linked license), creation window (`inserted_datetime`), and last-modified window (`updated_datetime`); when several are supplied a location must satisfy all of them to be returned (AND). Results are scoped to your own company; you never see another tenant''s locations.
+
+
+        Results are paginated: read the top-level `next_page` URL to fetch the following page, and stop when it is null. Page size is fixed by the server and is not client-controllable.
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `companies_permissions_view`.'
+      operationId: DistruPublic.V1.LocationController.index
+      parameters:
+      - description: Restrict the result to specific locations by ID (the same ID returned as each location's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by creation datetime. Accepts a comma-separated `from,to` range in ISO-8601 UTC; both bounds are inclusive and either side may be omitted. `2022-07-10T00:00:00Z,` returns locations created on or after that time; `,2022-07-10T00:00:00Z` returns those created on or before it; `2022-07-01T00:00:00Z,2022-07-31T00:00:00Z` returns those in the window. Omit the param to apply no creation-date filter. Combines with `updated_datetime` via AND — a location must fall in both windows to be returned.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: 2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Controls whether soft-deleted locations are returned. `no` (the default when omitted) returns only non-deleted locations, `only` returns only soft-deleted ones, `include` returns both. A soft-deleted location has a non-null `deleted_at` in the response.
+        in: query
+        name: deleted
+        required: false
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - include
+          - only
+          default: 'no'
+      - description: Filter by the exact `license_number` of the location's linked compliance license (as returned under `license.license_number`). Case-sensitive exact match; locations with no linked license never match. Send a single value, not a list.
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=C11-0000001-LIC
+        schema:
+          type: string
+      - description: Case-insensitive substring match on the location `name` (partial matches count; e.g. `main` matches `Main Warehouse`). Send a single value, not a list.
+        in: query
+        name: name
+        required: false
+        example: ?name=warehouse
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Filter by last-modified datetime. Accepts a comma-separated `from,to` range in ISO-8601 UTC; both bounds are inclusive and either side may be omitted. `,2022-07-10T00:00:00Z` returns locations last modified on or before that time; `2022-07-10T00:00:00Z,` returns those modified on or after it. Omit the param to apply no last-modified filter.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ',2022-07-10T00:00:00Z'
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of locations
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Locations'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get locations
+      tags:
+      - Location
+    post:
+      description: 'Upsert a single location belonging to your own company — one POST handles both create and update. Include an existing location `id` in the body to update that location, or omit `id` to create a new one. The create path returns 201 and the update path returns 200; either way the response body is the full location, including its geocoded `latitude`/`longitude`. Locations written here are the ones returned by GET /public/v1/locations and referenced across the API:
+
+        • a purchase receives inventory into a location, and an order ships from one
+
+        • every package sits at a location, and can be moved from one location to another
+
+        • inventory quantities are always tracked per location
+
+        • an assembly claims its inputs and produces its outputs at locations
+
+        • stock adjustments add or remove inventory at a location
+
+
+        To manage the locations of your partner companies instead, use POST /public/v1/companies/{id}/locations.
+
+
+        `latitude` and `longitude` cannot be sent — they are derived by geocoding the address, because Distru uses these coordinates to generate directions for transfer templates and to optimize delivery routes. Since those features require coordinates, an address that cannot be geocoded is rejected: nothing is saved and the request returns 400 (correct the address fields and retry). If the geocoding service itself is temporarily unavailable the request returns 503 — the address may be fine; retry later. Previously geocoded addresses resolve without contacting the geocoding service.
+
+
+        Any location that will hold cannabis inventory must be associated with one of your licenses via `license_id` — compliance is tracked per license, so a location without one is only suitable for non-regulated items. Choose the license carefully: once a location is linked to a Metrc or BioTrack license, the link is permanent — it can never be changed or cleared. Only links to Distru-only licenses (`compliance_type` `NONE`) can be swapped or removed later.
+
+
+        This endpoint never writes to Metrc: it does not create Metrc rooms, and `metrc_id` is read-only — it stays null unless the location is synced through the Distru app. Linking the first location to a Metrc license that cannot assign locations to plant batches auto-assigns that location as the license''s intake location.
+
+
+        Companies with a BioTrack integration cannot manage locations through the API at all — their requests return a 400, because BioTrack locations require room configuration and syncing this endpoint does not support.
+
+
+        Updates are sparse: only the fields you send are changed, any field you omit keeps its current value, and sending `null` for a nullable field clears it (a required field rejects `null` with a 400). Changing any address field re-geocodes the location and refreshes its coordinates.
+
+
+        Required permission: `companies_permissions_create` to create a location, `companies_permissions_edit` to update an existing one.'
+      operationId: DistruPublic.V1.LocationController.upsert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID of the location. Provide it to update that location — it must belong to your company and not be soft-deleted, otherwise the request returns 404. Omit it to create a new location.
+                name:
+                  type: string
+                  description: Display name of the location. Required on create; cannot be set to `null`. Characters with diacritics are replaced with their closest ASCII equivalent (e.g. `Española` becomes `Espanola`).
+                street_address:
+                  type: string
+                  description: Street address (e.g. `1234 Mission St`). Required on create; cannot be set to `null`. Part of the geocoded address.
+                apt:
+                  type: string
+                  description: Apartment, suite, or unit within the street address, or `null` to clear it. Optional.
+                city:
+                  type: string
+                  description: City of the address. Required on create; cannot be set to `null`.
+                state:
+                  type: string
+                  description: State or region of the address. Required on create; cannot be set to `null`. When `country` is `US`, must be a two-letter US state abbreviation (e.g. `CA`).
+                zip:
+                  type: string
+                  description: Postal code of the address. Required on create; cannot be set to `null`. When `country` is `US`, must be a valid ZIP code (`#####` or `#####-####`) whose prefix matches the state.
+                country:
+                  type: string
+                  description: Country of the address as an ISO 3166-1 alpha-2 code (e.g. `US`). Required on create; cannot be set to `null`. Official country names and common spellings are normalized to their code (e.g. `United States` becomes `US`).
+                license_id:
+                  type: string
+                  description: ID of one of your company's [licenses](#model-license) (as returned by [GET /public/v1/licenses](#get-licenses)), linking the location to that license, or `null` to unlink. Optional. A license that doesn't belong to your company is rejected with a 400. Once linked to a Metrc or BioTrack license the link is permanent and cannot be changed or cleared; only Distru-only licenses can be relinked.
+      responses:
+        '200':
+          description: An updated location
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '201':
+          description: A new location
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: The geocoding service is temporarily unavailable — retry later
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Upsert a location
+      tags:
+      - Location
+  /public/v1/locations/{id}:
+    get:
+      description: 'Returns a single location by its ID, including its address fields, geo coordinates, compliance `metrc_id`, and its linked license. Use this to resolve a location referenced elsewhere (for example the `location_id` on a purchase or order) into its full detail.
+
+
+        Several fields can be null: `license` / `license_id` when the location has no compliance license; `metrc_id` when it is not synced to a Metrc room (and when present it is a raw Metrc integer id, not a Distru id); and `latitude` / `longitude` when no coordinates have been set.
+
+
+        Lookups are scoped to your own company: an ID that does not exist, or that belongs to another company, returns `404` — the two cases are indistinguishable. A soft-deleted location is still returned here (with a non-null `deleted_at`); it is only hidden from the list endpoint unless you opt in via its `deleted` filter.
+
+
+        Required permission: `companies_permissions_view`.'
+      operationId: DistruPublic.V1.LocationController.show
+      parameters:
+      - description: The location's Distru ID, as returned in the `id` field of a location response. IDs from external systems such as Metrc are not accepted here.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single location
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a location
+      tags:
+      - Location
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    LocationResponse:
+      description: A single location wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Location'
+      title: Location Response
+      type: object
+    Location:
+      description: 'A place where inventory is held. This is flexible: it can be a whole site such as a warehouse or store, or a more specific spot like a room or area within one. Has an address and optionally a license.'
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        apt:
+          description: The apartment/suite/unit of this location, or null when none was entered
+          type: string
+        city:
+          description: The city of this location
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        country:
+          description: The country of this location
+          type: string
+        deleted_at:
+          description: ISO 8601 datetime this location was deleted at, or null when it is not deleted
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this location was created at
+          type: string
+        latitude:
+          description: The latitude of this location, or null when it has not been geocoded
+          type: number
+        license:
+          $ref: '#/components/schemas/License'
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        longitude:
+          description: The longitude of this location, or null when it has not been geocoded
+          type: number
+        metrc_id:
+          description: The location's ID in Metrc. A Metrc identifier, not a Distru ID. Null when the location is not linked to Metrc.
+          type: integer
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+        state:
+          description: The state of this location
+          type: string
+        street_address:
+          description: The street address of this location
+          type: string
+        updated_datetime:
+          description: ISO 8601 datetime this location was last updated at
+          type: string
+        zip:
+          description: The postal code of this location
+          type: string
+      required:
+      - country
+      - zip
+      - state
+      - city
+      - street_address
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - address
+      - id
+      title: Location
+      type: object
+    License:
+      description: A cannabis license held by a company or tied to a location, identifying it to the state and its compliance system.
+      properties:
+        active:
+          description: Whether this license is currently active
+          type: boolean
+        expiry_datetime:
+          description: ISO 8601 datetime this license expires (e.g. "2026-08-20T00:00:00Z")
+          type: string
+        id:
+          description: ID for this license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this license was created at
+          type: string
+        issue_datetime:
+          description: ISO 8601 datetime this license was issued, or null when not set
+          type: string
+        license_number:
+          description: License number
+          example: C11-1234567890
+          type: string
+        license_type:
+          description: The license type as configured in Distru. A state-specific free-form value, e.g. "Distributor" or "Type 11 Distributor-Transport"
+          type: string
+      required:
+      - active
+      - inserted_datetime
+      - expiry_datetime
+      - license_type
+      - license_number
+      - id
+      title: License
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Locations:
+      description: A collection of Locations
+      properties:
+        data:
+          description: Locations
+          items:
+            $ref: '#/components/schemas/Location'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Locations
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

@@ -1,0 +1,1943 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Package API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Package
+paths:
+  /public/v1/packages:
+    get:
+      description: 'Get packages sorted by their creation date and filtered by various attributes
+
+
+        This endpoint returns eventually consistent data, with changes taking up to 1 second to propagate in responses.
+
+
+        Required permission: `products_permissions_view`. Results are filtered to
+
+        only include packages the authenticated user can access under their team
+
+        restrictions.'
+      operationId: DistruPublic.V1.PackageController.index
+      parameters:
+      - description: 'Filter by creation datetime, given as an inclusive `after,before` range of ISO 8601 timestamps separated by a comma. Either bound may be left empty: `after,` keeps only packages created on or after `after`; `,before` only those created on or before `before`; `after,before` keeps those inside the closed range. A range with both bounds empty is rejected.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      - description: Keep only packages currently stored in any of these Distru location IDs (matches the `location.id` string in a package). Combined with the other filters by AND; multiple ids inside this filter are OR-ed. Ids that do not resolve to one of your locations simply match nothing.
+        in: query
+        name: location_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose license has exactly this license number (exact string match, not a substring).
+        in: query
+        name: license_number
+        required: false
+        example: ?license_number=1234567890
+        schema:
+          type: string
+      - description: Filter packages by package ID (the same string as each package's `id` in responses). Multiple ids are OR-ed. Values that do not decode to a known package id match no rows.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages of any of these product IDs (matches a package's `product_id`). Multiple ids are OR-ed.
+        in: query
+        name: product_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Keep only packages in any of these Distru statuses (multiple values are OR-ed). Case-insensitive. If any value is not one of the statuses below, the filter matches no rows. Allowed values:
+
+          • `ACTIVE` — active in both Distru and the compliance system
+
+          • `ASSEMBLING` — fully consumed by a pending assembly
+
+          • `DESTROYED` — destroyed (BioTrack only; Metrc packages never reach this)
+
+          • `DISCONTINUED` — discontinued in Metrc
+
+          • `FINISHED` — finished (quantity 0)
+
+          • `ONHOLD` — on hold in Metrc (Metrc only)
+
+          • `RETURNING` — tied to a Metrc return that has shipped
+
+          • `SELLING` — assigned to a Distru sales order
+
+          • `SOLD` — sold on a Metrc-enabled sales order
+
+          • `TRANSFERRED` — transferred out of its Metrc license
+
+
+          Note: the `status` field in responses is returned lowercase (e.g. `active`); this filter accepts either case. (The old `statuses` filter name still works but is deprecated.)
+
+          '
+        in: query
+        name: distru_statuses
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: When `true`, each package in the response also carries its cost fields (`total_cost_actual`, `total_cost_default`, `cost_per_unit_actual`, `cost_per_unit_default`). Omitted or `false` leaves those fields out of the response entirely.
+        in: query
+        name: include_costs
+        required: false
+        schema:
+          type: boolean
+      - description: Filter by last-modified datetime, given as an inclusive `after,before` range of ISO 8601 timestamps separated by a comma, with the same empty-bound rules as `inserted_datetime`.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by custom field values, as `custom_data[{id}]=value` where `{id}` is a custom field's numeric id. Repeat with different ids to filter on several fields at once; a record must match every one (AND). Matching is case-sensitive exact against the value stored on the record. The id must be a filterable custom field defined on this entity — use `GET /public/v1/custom-fields?parent_object=package` to list the ids, their types, and which are filterable. A non-numeric id, an id not defined on this entity, or an id that isn't filterable returns a 400.
+        in: query
+        name: custom_data
+        required: false
+        schema:
+          type: object
+      - description: Case-insensitive substring match on the package's `compliance_label`. Must be at least 4 characters; a shorter value is a 400.
+        in: query
+        name: compliance_label
+        required: false
+        schema:
+          type: string
+      - description: Keep only packages whose `compliance_label` exactly matches (case-sensitive) any value in the list — send labels exactly as they appear in responses. Multiple values are OR-ed.
+        in: query
+        name: compliance_labels
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Case-insensitive substring match on the package's `batch_number`.
+        in: query
+        name: batch_number
+        required: false
+        schema:
+          type: string
+      - description: Keep only packages whose `batch_number` exactly matches (case-sensitive) any value in the list — send batch numbers exactly as they appear in responses. Multiple values are OR-ed.
+        in: query
+        name: batch_numbers
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Case-insensitive substring match on the package's `compliance_product_name`.
+        in: query
+        name: compliance_product_name
+        required: false
+        schema:
+          type: string
+      - description: Keep only packages whose `compliance_product_name` exactly matches (case-insensitive) any value in the list. Multiple values are OR-ed.
+        in: query
+        name: compliance_product_names
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose license is any of these Distru license IDs (matches a package's `license_id`). Multiple ids are OR-ed; ids that do not resolve match nothing.
+        in: query
+        name: license_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages stored in any of these bins (matches an id in a package's `bins[].id`). Multiple ids are OR-ed.
+        in: query
+        name: bin_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages owned by any of these users (matches a package's `owner.id`). Multiple ids are OR-ed.
+        in: query
+        name: owner_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages with any of these unit types (matches a package's `unit_type.id`). Multiple ids are OR-ed.
+        in: query
+        name: unit_type_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product is in any of these categories (matches the package's `product.category.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_category_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product is in any of these subcategories (matches the package's `product.subcategory.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_subcategory_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product is in any of these groups (matches the package's `product.product_group.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_group_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product has any of these brands (matches the package's `product.brand.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_brand_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product is supplied by any of these vendors (matches the package's `product.vendor.id`; this is the company-relationship ID, not the raw company ID). Multiple ids are OR-ed.
+        in: query
+        name: product_vendor_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product has any of these strains (matches the package's `product.strain.id`). Multiple ids are OR-ed.
+        in: query
+        name: product_strain_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product carries any of these tags (matches an id in the package's `product.tags[].id`). Multiple ids are OR-ed.
+        in: query
+        name: product_tag_ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose product SKU exactly matches (case-insensitive) any value in the list (matches the package's `product.sku`). Multiple values are OR-ed.
+        in: query
+        name: product_skus
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Keep only packages whose `lab_testing_state` exactly equals this value (case-insensitive).
+        in: query
+        name: lab_testing_state
+        required: false
+        schema:
+          type: string
+      - description: Keep only packages whose `lab_testing_state` is any of these values (case-insensitive, OR-ed).
+        in: query
+        name: lab_testing_states
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by the package's `expiration_datetime`, given as an inclusive `after,before` range of ISO 8601 timestamps separated by a comma, with the same empty-bound rules as `inserted_datetime`.
+        in: query
+        name: expiration_datetime
+        required: false
+        example: ?expiration_datetime=2026-01-01T00:00:00Z,2026-12-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by the package's `finished_datetime`, an inclusive `after,before` range of ISO 8601 timestamps separated by a comma, same empty-bound rules as `inserted_datetime`.
+        in: query
+        name: finished_datetime
+        required: false
+        example: ?finished_datetime=2026-01-01T00:00:00Z,
+        schema:
+          type: string
+      - description: Filter by the package's `inactivated_datetime`, an inclusive `after,before` range of ISO 8601 timestamps separated by a comma, same empty-bound rules as `inserted_datetime`.
+        in: query
+        name: inactivated_datetime
+        required: false
+        example: ?inactivated_datetime=,2026-12-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by the package's `harvest_date`, given as an inclusive `after,before` range of `YYYY-MM-DD` dates separated by a comma. Either bound may be empty; both empty is rejected.
+        in: query
+        name: harvest_date
+        required: false
+        example: ?harvest_date=2026-01-01,2026-12-31
+        schema:
+          type: string
+      - description: Filter by the package's `packaged_date`, an inclusive `after,before` range of `YYYY-MM-DD` dates separated by a comma, same empty-bound rules as `harvest_date`.
+        in: query
+        name: packaged_date
+        required: false
+        example: ?packaged_date=2026-01-01,
+        schema:
+          type: string
+      - description: Keep only test-sample (`true`) or non-test-sample (`false`) packages. Omit to match either.
+        in: query
+        name: is_test_sample
+        required: false
+        schema:
+          type: boolean
+      - description: Keep only trade-sample (`true`) or non-trade-sample (`false`) packages. Omit to match either.
+        in: query
+        name: is_trade_sample
+        required: false
+        schema:
+          type: boolean
+      - description: Keep only production-batch (`true`) or non-production-batch (`false`) packages. Omit to match either.
+        in: query
+        name: is_production_batch
+        required: false
+        schema:
+          type: boolean
+      - description: Keep only packages that currently hold active quantity (`true`, `quantity_active > 0`) or none (`false`, `quantity_active = 0`). Omit to match either.
+        in: query
+        name: has_quantity_active
+        required: false
+        schema:
+          type: boolean
+      - description: Keep only packages whose primary lab result has a file attached (`true`) or does not (`false`) — i.e. whether a downloadable COA exists. Omit to match either.
+        in: query
+        name: has_coa_attached
+        required: false
+        schema:
+          type: boolean
+      - description: Keep only packages that contain remediated material (`true`) or do not (`false`). Omit to match either.
+        in: query
+        name: contains_remediated_material
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: A list of packages
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Packages'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get packages
+      tags:
+      - Package
+  /public/v1/packages/finish:
+    post:
+      description: 'Finish a list of packages. Sets each package''s status to `FINISHED` and records the finish time. Finishing marks a fully depleted package as closed out for compliance; it removes the package from active inventory listings but does not itself deduct any quantity.
+
+
+        `package_ids` is a non-empty list of at most 300 package IDs. Optionally pass `finished_datetime` (ISO 8601) to set the finish time; it defaults to the current time. An ID that doesn''t match a package of your company rejects the whole request, with an error pointing at that ID''s position in `package_ids` (e.g. `["package_ids", 0]`).
+
+
+        Every package must be finishable, or the whole request fails. A package is rejected when it:
+
+        • still has active quantity — a package must already be at zero quantity before it can be finished
+
+        • is already finished
+
+        • is discontinued, on hold, inactive, or has been transferred out of its license
+
+        • is still syncing with Metrc from an earlier operation
+
+        • has an unresolved Metrc compliance discrepancy
+
+
+        This operation is atomic: if any package cannot be finished the entire request is rejected and no packages are changed. In that case the error message lists the offending packages by their compliance label; it is a single human-readable string, not a per-package structured error.
+
+
+        Metrc only — not supported for BioTrack packages, and a working Metrc connection is required. Metrc is updated asynchronously: a successful response means the packages were finished in Distru and a pending Metrc activity was created for each one. Distru syncs those activities to Metrc sequentially in the background, so the 200 response is not confirmation that the packages are finished in Metrc. Poll `GET /public/v1/packages` with a recent `updated_datetime` lower bound to observe the synced result. Requires a Metrc key configured with permission to finish packages in Metrc.
+
+
+        Required permission: `products_permissions_adjust_inventory`.'
+      operationId: DistruPublic.V1.PackageController.finish
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinishPackagesRequest'
+        description: The packages to finish
+        required: true
+      responses:
+        '200':
+          description: The finished packages
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Packages'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Finish packages
+      tags:
+      - Package
+  /public/v1/packages/import:
+    post:
+      description: 'Import Metrc packages into Distru. Distru never imports Metrc packages on its own — there is no auto-import. Whenever new packages appear under your license in Metrc — you accept an incoming transfer, you create packages directly in Metrc, or you bring your pre-existing Metrc inventory into Distru when onboarding — those packages exist only in Metrc until you explicitly import them, either on the import screen in the Distru app or through this endpoint. Importing creates a Distru package for each Metrc package, linked to one of your products, and places its full Metrc quantity as active inventory in a destination location; from then on the package can be sold, assembled, and otherwise operated on in Distru.
+
+
+        Each entry identifies its Metrc package by exactly one of `compliance_label` — the full 24-character Metrc tag, the `label` returned by GET /public/v1/metrc/packages — or `metrc_package_id`, Metrc''s integer package id (the `id` returned by the same endpoint); use whichever is more convenient, including a mix across entries, but referencing the same Metrc package twice is rejected. All packages in one request must belong to the same license. Only packages that are active or on hold in Metrc and have quantity left can be imported; finished, discontinued and transferred-out packages, empty packages, and packages that were already imported are rejected.
+
+
+        Each entry''s `location_id` names the destination location for its imported inventory, so one request can import into several locations of the license. When omitted on an entry, it defaults to the license''s intake location (the `intake_location` returned by GET /public/v1/licenses); omitting it when the license has no intake location configured is rejected.
+
+
+        `product_id` links each package to one of your package-tracked products, whose unit type must measure the same way as the package''s Metrc unit (weight, volume or count). We recommend passing it explicitly so you are certain which product each package lands on, but omitting it and letting Distru infer the product can simplify your integration. Every Metrc package references a Metrc item — the Metrc-side definition of what the package contains, with an id and a name. When `product_id` is omitted, Distru matches the package''s Metrc item against your package-tracked products the same way the import screen in the Distru app does, in this order:
+
+        • the product you most recently imported a package of the same Metrc item as, under the same license
+
+        • a product whose name equals the Metrc item''s name (case-insensitive)
+
+        • when neither exists: the product of the previously imported Metrc item whose name most resembles this one''s, if the two names are at least a 70% match
+
+
+        If no product can be inferred, that entry is rejected with a 400 pointing at its `product_id` — pass it explicitly. Every successful import is remembered, so future imports of the same Metrc item default to the product you chose.
+
+
+        `cost_per_unit` optionally records what one unit of the package cost you, feeding cost tracking and per-package cost breakdowns. Setting it requires the `costs_permissions_apply_on_package_import` permission (403 otherwise), and your company''s cost settings may require a cost on every imported package.
+
+
+        This operation is atomic: if any entry is rejected, nothing is imported. Importing is Distru-side only — nothing is pushed to Metrc — but it requires a working Metrc connection and is unavailable for BioTrack companies.
+
+
+        Required permission: `metrc_permissions_import_packages`.'
+      operationId: DistruPublic.V1.PackageController.import_packages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportPackagesRequest'
+        description: The packages to import
+        required: true
+      responses:
+        '200':
+          description: The imported packages
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Packages'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Import packages
+      tags:
+      - Package
+  /public/v1/packages/move:
+    post:
+      description: 'Move a list of packages to a destination location within a single license.
+
+
+        `package_ids` is a non-empty list of at most 300 package IDs; they must all resolve and all belong to the same license. All packages must be active and have a positive active quantity. `location_id` is the destination Distru location and must belong to that same license. Optionally pass `metrc_location_id` (Metrc''s own location id) to also move the packages to a Metrc location.
+
+
+        Each package''s on-hand inventory is relocated to `location_id` via an internal stock transfer (one per distinct source location), so the move is reflected in inventory ledgers at both the source and destination. Packages already stored in `location_id` are left untouched.
+
+
+        This operation is atomic: if any package or location is invalid the entire request is rejected and nothing is moved. The error message is a single human-readable string, not a per-package structured error.
+
+
+        Not supported for BioTrack licenses. For Metrc licenses, if `metrc_location_id` is passed, then Metrc is updated asynchronously: a successful response means the moves were applied in Distru and a pending Metrc activity was created for each package. The Metrc path additionally requires that your state has Metrc locations enabled and a Metrc key with permission to move packages.
+
+
+        Required permission: `products_permissions_adjust_inventory`.'
+      operationId: DistruPublic.V1.PackageController.move
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovePackagesRequest'
+        description: The packages to move
+        required: true
+      responses:
+        '200':
+          description: The moved packages
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Packages'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Move packages
+      tags:
+      - Package
+  /public/v1/packages/{id}:
+    post:
+      description: 'Update the Distru-tracked fields of an existing package. Packages cannot be created through the API, only updated.
+
+
+        These are Distru-side attributes only — this endpoint does not push anything to Metrc or BioTrack, does not move inventory, and does not change the package''s quantity or status. To change a package''s location use `POST /public/v1/packages/move`; to finish it use `POST /public/v1/packages/finish`.
+
+
+        `is_inactive` flips the package between active and inactive. Inactivating hides the package from active inventory in Distru and excludes its quantity from its product''s active-quantity figures; it does not change the package''s quantity, `distru_status`, or anything in the compliance system, and it can be reversed at any time by sending `false`. The flip runs in the same transaction as the rest of the update, so if it is rejected the whole request is rolled back and nothing is persisted.
+
+
+        Supports sparse updates: only the fields included in the request body are changed; omitted fields are left untouched. A field sent explicitly as `null` clears it (see `bin_ids` for the array-clearing rule). The path `id` is the package''s ID from `GET /public/v1/packages`; an unknown id returns 404, and one your team restrictions hide returns 403.
+
+
+        Required permission: `products_permissions_edit`.'
+      operationId: DistruPublic.V1.PackageController.update
+      parameters:
+      - description: The package's ID (the `id` string returned by `GET /public/v1/packages`).
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                batch_number:
+                  type: string
+                  description: 'The package''s batch number. Sparse: omit to leave unchanged; send `null` to clear.'
+                expiration_datetime:
+                  type: string
+                  description: 'The package''s expiration datetime, ISO 8601 (e.g. `2026-12-31T00:00:00Z`). Sparse: omit to leave unchanged; send `null` to clear. Read back on the package as `expiration_datetime`.'
+                description:
+                  type: string
+                  description: 'Free-form text describing the package. Sparse: omit to leave unchanged; send `null` to clear.'
+                harvest_date:
+                  type: string
+                  description: 'The package''s harvest date, `YYYY-MM-DD` (e.g. `2026-08-01`). Sparse: omit to leave unchanged; send `null` to clear.'
+                is_inactive:
+                  type: boolean
+                  description: 'Whether the package is inactive. Send `true` to inactivate, `false` to reactivate; a package already in the requested state is left unchanged. Sparse: omit to leave unchanged; `null` is rejected. Rejected with a 400 while the package is syncing with the compliance system. Read back on the package as `inactivated_datetime` (null while active).'
+                custom_data:
+                  type: object
+                  description: 'A map of custom field IDs to their values. Use GET /public/v1/custom-fields?parent_object=package to retrieve available custom fields, their IDs, and their types. The value format depends on the field''s type: a text field takes a string, a date field takes a full ISO8601 datetime, and a checkbox field takes an array of its selected options. Sparse at the top level only: omit `custom_data` to leave the package''s custom fields unchanged, but when you send it the map replaces the package''s entire custom field data, so include every field you want to keep.'
+                bin_ids:
+                  items:
+                    type: string
+                  type: array
+                  description: 'The IDs of the bins this package is stored in. Behaviour: omit `bin_ids` to leave the package''s bins unchanged; pass `null` or an empty array to clear all bins; pass a non-empty array to replace the package''s bins with exactly those. Ignored unless bin inventory tracking is enabled for your company.
+
+                    '
+      responses:
+        '200':
+          description: The updated package
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PackageFullResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Update a package
+      tags:
+      - Package
+  /public/v1/packages/{id}/primary-test-result/pdf:
+    post:
+      description: 'Generate the Certificate of Analysis (COA) PDF for a single package — built from the package''s primary lab result — and download it directly, get a signed link to it, or email it (see `format`). Returns 404 when the package has no primary lab result with an attached file, with the message `This package has no lab results attached`, which tells it apart from an unknown ID (`Not Found`).
+
+
+        The same permissions that govern downloading this PDF in the Distru web app apply to this endpoint; when `format` is `email`, the web app''s permission for emailing it applies instead (documents the web app cannot email keep the download permission).
+
+
+        `format` selects how the generated PDF is delivered and has three modes: `binary` returns the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` returns a JSON envelope `{"data": {"url": ..., "expires_datetime": ...}}` with a temporary signed download URL; `email` sends the PDF to the addresses in `email_addresses` and returns a JSON envelope `{"data": {"emailed_to": [...]}}`. `format` is required, but for backward compatibility omitting it defaults to `binary`.
+
+
+        All PDF download endpoints share a single, combined rate limit for your account: 20 requests per minute and 1000 per day in total across every PDF endpoint (not per endpoint). Requests over the limit return 429 with a Retry-After header, and only successful downloads count toward it.'
+      operationId: DistruPublic.V1.PackageController.download_primary_test_result_pdf
+      parameters:
+      - description: The package's ID (the same `id` string returned by `GET /public/v1/packages`).
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/DistruPublic.V1.AssemblyController.download_pdfBody'
+      responses:
+        '200':
+          description: 'When `format` is `binary` (or omitted), the raw PDF file (`Content-Type: application/pdf`). When `format` is `url`, a JSON body with a temporary signed download URL; when `format` is `email`, a JSON body listing the addresses the PDF was emailed to (see the PdfResponse schema).'
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/PdfResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found, or the package has no lab results attached (the message says which)
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's shared PDF download rate limit (20/minute, 1000/day across all PDF endpoints) was exceeded. Retry after the period in the Retry-After header.
+          content:
+            application/pdf,application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Generate a package's Certificate of Analysis (COA) PDF
+      tags:
+      - Package
+components:
+  schemas:
+    UnitType:
+      description: A unit of measure used for quantities and pricing (e.g. Gram, Each, Pound). This is the compact reference carrying just id and name; the full unit type (its measurement category and conversion factor) is available from the unit types endpoint.
+      properties:
+        id:
+          description: ID for this unit type
+          type: string
+        name:
+          description: Human readable name for this unit type
+          type: string
+      required:
+      - name
+      - id
+      title: Unit Type
+      type: object
+    ImportPackagesRequest:
+      properties:
+        packages:
+          description: 'Non-empty list of 1 to 300 Metrc packages to import, all belonging to the same license. Referencing the same Metrc package twice in one request is a 400. The import is all-or-nothing: one rejected entry fails the whole request.'
+          items:
+            $ref: '#/components/schemas/ImportPackagesRequestEntry'
+          type: array
+      required:
+      - packages
+      title: Import Packages Request
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    BinCompact:
+      description: Minimal details about a bin, as nested on other records
+      properties:
+        id:
+          description: ID for this bin
+          type: string
+        name:
+          description: The name of the bin
+          type: string
+      required:
+      - name
+      - id
+      title: BinCompact
+      type: object
+    BillOfMaterialsProductInput:
+      description: A specific product consumed by a bill of materials
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          description: How much of the product this recipe consumes, in the product's unit, as a decimal string (e.g. "2.5").
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsProductInput
+      type: object
+    BillOfMaterialsCost:
+      description: An additional cost applied by a bill of materials
+      properties:
+        cost_type:
+          $ref: '#/components/schemas/BillOfMaterialsCostType'
+        description:
+          description: Free-text description of this cost, or null when none was entered
+          type: string
+        id:
+          description: ID for this cost
+          type: string
+        quantity:
+          description: How many units of the cost type this line applies, as a decimal string (e.g. "3"). Multiply by the cost type's `cost_per_unit` to get the line total.
+          type: string
+      required:
+      - quantity
+      - id
+      title: BillOfMaterialsCost
+      type: object
+    CompactMenu:
+      description: A lightweight reference to a DistruCommerce menu — the online catalog a buyer browses to place an order — carrying just its id and name. Where it appears on a sales order, it is the menu that order was placed through. Use the id to fetch the full menu from the menus endpoint.
+      properties:
+        id:
+          description: ID of the menu
+          type: string
+        name:
+          description: Display name of the menu
+          type: string
+      required:
+      - name
+      - id
+      title: CompactMenu
+      type: object
+    Product:
+      description: A sellable or trackable item in your catalog — its name, pricing, category, unit of measure, and how its inventory is tracked (see `inventory_tracking_method`).
+      properties:
+        batches_with_active_quantity_by_location:
+          description: The product's batches that hold active quantity, grouped by location. Present only when the request passes `include_batches_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not batch-tracked or holds no active batches.
+          items:
+            $ref: '#/components/schemas/BatchesWithActiveQuantityByLocation'
+          type: array
+        bill_of_materials:
+          $ref: '#/components/schemas/BillOfMaterials'
+        brand:
+          $ref: '#/components/schemas/CompanyCompact'
+        category:
+          $ref: '#/components/schemas/ProductCategoryCompact'
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this product
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        deleted_at:
+          description: ISO 8601 datetime the product was soft-deleted at, or null when the product has not been deleted
+          type: string
+        description:
+          description: Plain-text description of this product, or null when none was entered. Always null together with `description_markdown` and non-null together with it — one is never set without the other.
+          type: string
+        description_markdown:
+          description: The same description in Markdown. Null when `description` is null; populated whenever `description` is populated.
+          type: string
+        external_name:
+          description: Customer-facing name shown on DistruCommerce menus and the Order Tracker, or null when none is set (it does not fall back to `name`)
+          type: string
+        gross_weight:
+          description: The gross weight of one unit including packaging, as a decimal string, measured in `gross_weight_unit_type`. Null when not set; it is always set together with `gross_weight_unit_type` and null together with it.
+          type: string
+        gross_weight_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        id:
+          description: ID for this product
+          type: string
+        images:
+          description: 'The images associated with this product, in display order: by `rank`, lowest first (the first is the primary image), then by id. Images with no rank come last. Empty array when the product has no images.'
+          items:
+            $ref: '#/components/schemas/Image'
+          type: array
+        inserted_datetime:
+          description: The datetime this product was created at
+          type: string
+        inventory_tracking_method:
+          description: 'How this product''s inventory is tracked. One of: `BATCH` (grouped into batches sharing traits such as expiration dates and test results), `PACKAGE` (inventory is defined by packages), `PRODUCT` (ungrouped; inventory exists directly on the product).'
+          enum:
+          - PACKAGE
+          - BATCH
+          - PRODUCT
+          type: string
+        is_active:
+          description: True when the product is active. False when it has been marked inactive (archived), which hides it from most product pickers.
+          type: boolean
+        is_featured:
+          description: True when the product is flagged as featured
+          type: boolean
+        leaflink_product_id:
+          description: The LeafLink product ID this product is synced to, or null if not synced
+          type: integer
+        menu_visibility:
+          description: 'Which menus this product is shown in. One of `DO_NOT_INCLUDE`, `INCLUDE_IN_ALL`, `INCLUDE_IN_SELECT` (same values accepted by the upsert endpoint); defaults to `DO_NOT_INCLUDE`. The `menus` field below lists the specific menus the product belongs to — this is how you see which menus when the value is `INCLUDE_IN_SELECT`. Setting `INCLUDE_IN_ALL` adds the product to every menu, and a menu created later gets it too, except a copy of a menu it isn''t on, or a new (not copied) menu made by a user who can''t see the product: read `menus` for where it really is.'
+          enum:
+          - DO_NOT_INCLUDE
+          - INCLUDE_IN_ALL
+          - INCLUDE_IN_SELECT
+          type: string
+        menus:
+          description: 'Menus this product is on, ordered by menu creation time then id (includes inactive menus). Follows `menu_visibility`: the chosen menus for `INCLUDE_IN_SELECT`, every menu but the exceptions listed under `menu_visibility` for `INCLUDE_IN_ALL`, and usually none for `DO_NOT_INCLUDE`. A change made by a team-restricted user never removes the product from menus that user can''t see, so those stay listed.'
+          items:
+            $ref: '#/components/schemas/CompactMenu'
+          type: array
+        msrp:
+          description: Manufacturer's suggested retail price, as a decimal string (e.g. "19.99"), or null when not set
+          type: string
+        name:
+          description: Human readable name for this product
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packages_with_active_quantity_by_location:
+          description: The product's packages that hold active quantity, grouped by location. Present only when the request passes `include_packages_with_active_quantity_by_location=true`; the field is absent otherwise. Empty array when the product is not package-tracked or holds no active packages.
+          items:
+            $ref: '#/components/schemas/PackagesWithActiveQuantityByLocation'
+          type: array
+        product_group:
+          $ref: '#/components/schemas/ProductGroupCompact'
+        quantity_active:
+          description: Total active on-hand quantity of this product across all locations, as a decimal string (e.g. "100"). Sums the product's active stock — positive quantity held at a location. Equals the sum of the per-location amounts in `quantity_active_by_location`, so the two always reconcile. "0" when the product has no active stock. Reserved stock is still physically on-hand, so it is included here; subtract `quantity_reserved` to get `quantity_available`. Sold stock and in-transit stock (held by a user rather than a location) is excluded.
+          type: string
+        quantity_active_by_location:
+          description: The product's active on-hand quantity broken down by location — one entry per location holding active stock, ordered by location id. Empty array when the product has no active stock. The entries sum to `quantity_active`.
+          items:
+            $ref: '#/components/schemas/QuantityActiveByLocation'
+          type: array
+        quantity_available:
+          description: Active on-hand quantity minus reserved quantity, as a decimal string (e.g. "100"). Equals `quantity_active` − `quantity_reserved` — what is on-hand and not already spoken for by unfulfilled sales orders or draft assemblies. Can be negative when more is reserved than is on-hand at a location. "0" when the product has no active stock and nothing reserved.
+          type: string
+        quantity_available_threshold_max:
+          description: 'Over-stock alert threshold: Distru flags the product when its available quantity rises above this value. Decimal string, or null when no over-stock alert is configured. When both thresholds are set, this is strictly greater than `quantity_available_threshold_min`.'
+          type: string
+        quantity_available_threshold_min:
+          description: 'Low-stock alert threshold: Distru flags the product when its available quantity drops below this value. Decimal string, or null when no low-stock alert is configured. When both thresholds are set, this is strictly less than `quantity_available_threshold_max`.'
+          type: string
+        quantity_reserved:
+          description: 'Total quantity of this product currently reserved across all locations, as a decimal string (e.g. "100"). Reserved quantity is a soft hold tracked separately from on-hand stock (`quantity_active`): it rises as unfulfilled sales order items and draft assembly inputs are created, and falls as they are deleted or fulfilled. "0" when nothing is reserved.'
+          type: string
+        sku:
+          description: The stock keeping unit (SKU) configured for this product
+          type: string
+        strain:
+          $ref: '#/components/schemas/Strain'
+        subcategory:
+          $ref: '#/components/schemas/ProductSubcategoryCompact'
+        tags:
+          description: The tags associated with this product. Empty array when the product has no tags.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        tasks:
+          description: 'The tasks linked to this product that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        total_cannabinoid_unit:
+          description: The unit `total_thc` and `total_cbd` are measured in — one of MG (milligrams per unit) or PERCENT (percent by weight). Null when neither potency value is set.
+          type: string
+        total_cbd:
+          description: Total CBD potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        total_thc:
+          description: Total THC potency, as a decimal string, measured in `total_cannabinoid_unit`. Null when not set. Non-negative; when the unit is PERCENT it is between 0 and 100. Whenever this is set, `total_cannabinoid_unit` is also set. This is a static label on the product, not a lab-test value.
+          type: string
+        treez_wholesale_price:
+          description: The Treez wholesale price of this product, as a decimal string, or null when not set
+          type: string
+        unit_cost:
+          description: The cost (purchase price) of one unit of this product, as a decimal string, or null when not set
+          type: string
+        unit_net_weight:
+          description: The net contents of one unit of this product (weight, volume, or count of the contents), as a decimal string, measured in `unit_net_weight_serving_size_unit_type`. Null when not set.
+          type: string
+        unit_net_weight_serving_size_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        unit_price:
+          description: The list (sale) price of one unit of this product, as a decimal string (e.g. "25.00")
+          type: string
+        unit_serving_size:
+          description: The serving size per unit, as a decimal string, measured in `unit_net_weight_serving_size_unit_type` (the same unit as `unit_net_weight`). Null when not set. When both are set, this is at most `unit_net_weight`.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+        units_per_case:
+          description: The number of units of this product packed in one case, as a decimal string (e.g. "12"), or null when not set
+          type: string
+        upc:
+          description: The UPC barcode of this product, or null when not set
+          type: string
+        updated_datetime:
+          description: The datetime this product was last updated at
+          type: string
+        vendor:
+          $ref: '#/components/schemas/CompanyCompact'
+        wholesale_unit_price:
+          description: The wholesale unit price of this product, as a JSON number (e.g. 12.5) rather than a decimal string — unlike `unit_price`. Null when not set.
+          type: number
+      required:
+      - quantity_reserved
+      - quantity_available
+      - quantity_active_by_location
+      - quantity_active
+      - custom_data
+      - inventory_tracking_method
+      - unit_price
+      - is_featured
+      - is_active
+      - tasks
+      - updated_datetime
+      - inserted_datetime
+      - sku
+      - name
+      - id
+      title: Product
+      type: object
+    CompanyCompact:
+      description: A lightweight reference to a company — just its identity — embedded on other entities (orders, invoices, products, etc.) to point at the full company without inlining it. The company is a trading partner (a customer or vendor) in your Distru network. Use the id to fetch its full details from the companies endpoint.
+      properties:
+        id:
+          description: ID for this company
+          example: 3f128a34-cc59-4b49-8883-23bf10e59c6c
+          type: string
+        name:
+          description: Human readable name for this company
+          example: Retailer 1
+          type: string
+        tasks:
+          description: 'The tasks linked to this company that the authenticated user can see: none without `tasks_permissions_view`, and only those their team restrictions allow. An empty array when there are none.'
+          items:
+            $ref: '#/components/schemas/TaskCompact'
+          type: array
+        updated_datetime:
+          description: ISO 8601 datetime this company was last updated at
+          type: string
+      required:
+      - tasks
+      - updated_datetime
+      - name
+      - id
+      title: CompanyCompact
+      type: object
+    TaskCompact:
+      description: A compact reference to a task, as it appears in another entity's `tasks` list.
+      properties:
+        due_datetime:
+          description: When the task is due, as a UTC ISO8601 datetime.
+          type: string
+        id:
+          description: ID of the task.
+          type: string
+        name:
+          description: The task's name.
+          type: string
+        status:
+          description: The task's status.
+          enum:
+          - ACTIVE
+          - COMPLETED
+          type: string
+      required:
+      - due_datetime
+      - status
+      - name
+      - id
+      title: Task (compact)
+      type: object
+    ImportPackagesRequestEntry:
+      properties:
+        batch_number:
+          description: Batch number recorded on the created Distru package. Optional; read back on the package as `batch_number`.
+          type: string
+        bin_ids:
+          description: IDs of the bins to store the imported package in. Optional; ignored unless bin inventory tracking is enabled for your company.
+          items:
+            type: string
+          type: array
+        compliance_label:
+          description: The Metrc package's full 24-character tag label, exactly as returned in the `label` field of `GET /public/v1/metrc/packages` (case-sensitive). Exactly one of `compliance_label` and `metrc_package_id` must be set per entry. A label unknown to your company, or one whose package is discontinued or transferred out in Metrc, is a 400.
+          type: string
+        cost_per_unit:
+          description: What one unit of this package cost you, as a decimal string (e.g. "12.50"). Optional; requires the `costs_permissions_apply_on_package_import` permission. Depending on your company's cost settings, a cost may be required on every imported package.
+          type: string
+        expiration_datetime:
+          description: The package's expiration datetime, ISO 8601 (e.g. `2026-12-31T00:00:00Z`). Optional; read back on the package as `expiration_datetime`.
+          type: string
+        location_id:
+          description: ID of the destination Distru location this package's imported inventory lands in (the `location.id` string on a package). Must belong to the same license as the Metrc packages; entries may target different locations. When omitted, defaults to the license's intake location (the `intake_location` on the licenses endpoints); omitting it when the license has no intake location configured is a 400.
+          type: string
+        metrc_package_id:
+          description: Metrc's integer package id, as returned in the `id` field of `GET /public/v1/metrc/packages` (a foreign Metrc identifier, not a Distru ID). Exactly one of `compliance_label` and `metrc_package_id` must be set per entry.
+          type: integer
+        product_id:
+          description: ID of the package-tracked product to import this package as. Recommended, so you are certain which product the package lands on. When omitted, Distru infers the product from the package's Metrc item — your most recent import of the same item, then a product named exactly like the item, then a close name match — see the endpoint description. When no product can be inferred the entry is rejected with a 400.
+          type: string
+      title: Import Packages Request Entry
+      type: object
+    BillOfMaterials:
+      description: A product's bill of materials (recipe of inputs and additional costs)
+      properties:
+        costs:
+          description: The additional (non-material) costs this recipe applies, ordered oldest first. Empty when none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsCost'
+          type: array
+        description:
+          description: Free-text description of this bill of materials, or null when none was entered
+          type: string
+        dynamic_inputs:
+          description: The inputs that select products by attribute (category, strain, tag, and so on) rather than naming a specific product. Empty when this recipe has none.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsDynamicInput'
+          type: array
+        id:
+          description: ID for this bill of materials
+          type: string
+        name:
+          description: Human readable name for this bill of materials
+          type: string
+        product_inputs:
+          description: The inputs that name a specific product to consume. Empty when this recipe has none. See `dynamic_inputs` for inputs that select products by attribute instead.
+          items:
+            $ref: '#/components/schemas/BillOfMaterialsProductInput'
+          type: array
+      required:
+      - costs
+      - dynamic_inputs
+      - product_inputs
+      - name
+      - id
+      title: BillOfMaterials
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    BillOfMaterialsDynamicInput:
+      description: A dynamic input of a bill of materials. It selects products by attribute rather than naming a specific product. Each attribute list holds the entities matched by that criterion, or is empty when the criterion is not used.
+      properties:
+        id:
+          description: ID for this input
+          type: string
+        product_categories:
+          description: The product categories this input matches on, or empty when it does not match on category. A product must match every non-empty criterion.
+          items:
+            $ref: '#/components/schemas/ProductCategoryCompact'
+          type: array
+        product_groups:
+          description: The product groups this input matches on, or empty when it does not match on group.
+          items:
+            $ref: '#/components/schemas/ProductGroupCompact'
+          type: array
+        product_subcategories:
+          description: The product subcategories this input matches on, or empty when it does not match on subcategory.
+          items:
+            $ref: '#/components/schemas/ProductSubcategoryCompact'
+          type: array
+        quantity:
+          description: How much this recipe consumes of whatever product matches, as a decimal string (e.g. "2.5").
+          type: string
+        strains:
+          description: The strains this input matches on, or empty when it does not match on strain.
+          items:
+            $ref: '#/components/schemas/Strain'
+          type: array
+        tags:
+          description: The tags this input matches on, or empty when it does not match on tag.
+          items:
+            $ref: '#/components/schemas/ProductTagRef'
+          type: array
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - tags
+      - strains
+      - product_groups
+      - product_subcategories
+      - product_categories
+      - quantity
+      - id
+      title: BillOfMaterialsDynamicInput
+      type: object
+    Packages:
+      description: A collection of Packages
+      properties:
+        data:
+          description: Packages
+          items:
+            $ref: '#/components/schemas/PackageFull'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Packages
+      type: object
+    PdfResponse:
+      description: 'The JSON envelope a PDF endpoint returns for the non-binary formats: `format=url` returns `url` + `expires_datetime`, `format=email` returns `emailed_to`.'
+      properties:
+        data:
+          description: The response payload; which fields are present depends on the requested `format`.
+          properties:
+            emailed_to:
+              description: The recipient email addresses the PDF was emailed to, present only when `format=email`.
+              items:
+                type: string
+              type: array
+            expires_datetime:
+              description: ISO 8601 datetime when the signed `url` expires (e.g. "2026-08-20T00:00:00Z"), present only when `format=url`.
+              type: string
+            url:
+              description: Temporary signed URL to download the PDF, present only when `format=url`. Stops working once `expires_datetime` passes; request the endpoint again for a fresh URL.
+              type: string
+          type: object
+      title: PdfResponse
+      type: object
+    ProductCategoryCompact:
+      description: The top-level classification of a product (e.g. Flower, Edibles, Concentrates). Categories are defined per company and can be organized into subcategories.
+      properties:
+        id:
+          description: ID for this category
+          type: string
+        name:
+          description: Human readable name for this category
+          type: string
+        official_product_category_id:
+          description: The ID of Distru's standardized (official) category this maps to, used to normalize categories across companies. Null when this category is not mapped to a standardized category.
+          type: string
+      required:
+      - name
+      - id
+      title: ProductCategoryCompact
+      type: object
+    License:
+      description: A cannabis license held by a company or tied to a location, identifying it to the state and its compliance system.
+      properties:
+        active:
+          description: Whether this license is currently active
+          type: boolean
+        expiry_datetime:
+          description: ISO 8601 datetime this license expires (e.g. "2026-08-20T00:00:00Z")
+          type: string
+        id:
+          description: ID for this license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this license was created at
+          type: string
+        issue_datetime:
+          description: ISO 8601 datetime this license was issued, or null when not set
+          type: string
+        license_number:
+          description: License number
+          example: C11-1234567890
+          type: string
+        license_type:
+          description: The license type as configured in Distru. A state-specific free-form value, e.g. "Distributor" or "Type 11 Distributor-Transport"
+          type: string
+      required:
+      - active
+      - inserted_datetime
+      - expiry_datetime
+      - license_type
+      - license_number
+      - id
+      title: License
+      type: object
+    LocationCompact:
+      description: A compact reference to a [location](#model-location) as nested inside another entity in Distru. Use its `id` to fetch the full location from the locations endpoint.
+      properties:
+        address:
+          description: The full address as a single formatted line, built from the street, apt, city, state, zip, and country fields
+          example: 1234 Warehouse Street, Oakland, CA
+          type: string
+        company_id:
+          description: ID of the [company](#model-company) that owns this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        id:
+          description: ID for this location
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        license_id:
+          description: ID of the [license](#model-license) this location is associated with, or null when the location has no license
+          example: 02c88a3f-d759-4973-88f9-60049d682524
+          type: string
+        name:
+          description: Human readable name for this location
+          example: Warehouse 1
+          type: string
+      required:
+      - name
+      - address
+      - id
+      title: LocationCompact
+      type: object
+    ProductTagRef:
+      description: A tag associated with a product
+      properties:
+        id:
+          description: ID for this tag
+          type: string
+        name:
+          description: The name of this tag
+          type: string
+      required:
+      - name
+      - id
+      title: ProductTagRef
+      type: object
+    PackageFullResponse:
+      description: A single package wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/PackageFull'
+      title: PackageFull Response
+      type: object
+    User:
+      description: A member of your Distru team — the account behind actions like owning or creating records.
+      properties:
+        banned:
+          description: True when this user has been banned and can no longer sign in
+          type: boolean
+        deleted_at:
+          description: ISO 8601 datetime this user was deleted at, or null when the user is not deleted
+          type: string
+        email:
+          description: The email address of this user
+          type: string
+        full_name:
+          description: The full name of this user, or null when not set
+          type: string
+        id:
+          description: ID for this user
+          type: string
+        inserted_datetime:
+          description: ISO 8601 datetime this user was created at
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        updated_datetime:
+          description: ISO 8601 datetime this user was last updated at. It also moves on changes not shown here, such as the user signing in.
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - email
+      - id
+      title: User
+      type: object
+    ProductGroupCompact:
+      description: A named grouping of products, defined per company (e.g. a brand line or product family).
+      properties:
+        id:
+          description: ID for this product group
+          type: string
+        name:
+          description: The name of this product group
+          type: string
+      required:
+      - name
+      - id
+      title: ProductGroupCompact
+      type: object
+    Role:
+      description: A permission role that determines what a [user](#model-user) can do in Distru.
+      properties:
+        id:
+          description: ID for this role
+          type: string
+        name:
+          description: Name of the role (e.g. Admin, Sales)
+          type: string
+      required:
+      - name
+      - id
+      title: Role
+      type: object
+    CustomField:
+      description: A user-defined field attached to a record, with the value set for this particular record. Which custom fields exist is configured in Distru; use `GET /public/v1/custom-fields` to list the definitions and their IDs.
+      properties:
+        id:
+          description: The ID of this custom field's definition (matches an `id` from `GET /public/v1/custom-fields`). An integer.
+          type: integer
+        name:
+          description: The name of this custom field
+          type: string
+        value:
+          description: This record's value for the custom field, as a string, or null when no value has been set for this record
+          type: string
+      required:
+      - name
+      - id
+      title: CustomField
+      type: object
+    QuantityActiveByLocation:
+      description: Active on-hand quantity of an entity held at a single location.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        quantity:
+          description: Active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity
+      - location
+      title: QuantityActiveByLocation
+      type: object
+    FinishPackagesRequest:
+      properties:
+        finished_datetime:
+          description: Finish timestamp recorded on every package in the request, ISO 8601 (e.g. `2026-08-20T15:04:05Z`). Defaults to the current time when omitted.
+          type: string
+        package_ids:
+          description: 'Non-empty list of 1 to 300 package IDs to finish, each the `id` string returned by `GET /public/v1/packages`. All must belong to your company. Every package must be finishable: already-finished packages, packages still syncing with Metrc, and packages with a Metrc compliance discrepancy are rejected, and because the operation is all-or-nothing a single bad id fails the whole request.'
+          items:
+            type: string
+          type: array
+      required:
+      - package_ids
+      title: Finish Packages Request
+      type: object
+    PackageFull:
+      description: A specific, compliance-tracked quantity of a product with all its details — its tag, product, dates, quantity, and testing state. This is the physical unit of inventory for package-tracked products.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        bins:
+          description: The bins this package is stored in. Only present when bin inventory tracking is enabled for the company.
+          items:
+            $ref: '#/components/schemas/BinCompact'
+          type: array
+        biotrack_id:
+          description: The BioTrack inventory ID for this package; null for non-BioTrack packages
+          type: integer
+        biotrack_inventory_type_id:
+          description: The BioTrack inventory type ID for this package. Null for non-BioTrack packages.
+          type: integer
+        biotrack_net_quantity_per_unit:
+          description: The BioTrack net quantity per unit for this package, as a decimal string. Null for non-BioTrack packages, and may be null for some BioTrack inventory types.
+          type: string
+        biotrack_room_id:
+          description: The BioTrack room ID where this package is stored. Null for non-BioTrack packages.
+          type: integer
+        biotrack_status:
+          description: The package's BioTrack inventory status. Null for non-BioTrack packages.
+          enum:
+          - ACTIVE
+          - DESTROYED
+          - SCHEDULED_FOR_DESTRUCTION
+          - SCHEDULED_FOR_TRANSPORT
+          - IN_TRANSPORT_BUT_NOT_RECEIVED
+          - RECEIVED
+          type: string
+        biotrack_usable_weight:
+          description: The BioTrack usable weight for this package. For weighable (weight/volume) packages this is the package's weight at creation; for count-based packages it is the per-unit amount of cannabis. May be null for some inventory types (and is null for non-BioTrack packages).
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        compliance_product_name:
+          description: The product/item name as reported by the compliance system (Metrc or BioTrack), or null when none is reported
+          type: string
+        compliance_strain_name:
+          description: The strain name as reported by the compliance system (Metrc or BioTrack), or null when none is reported
+          type: string
+        compliance_transferred_datetime:
+          description: The datetime this package was transferred out in the compliance system (ISO 8601); null if not transferred out
+          type: string
+        compliance_type:
+          description: 'The state compliance system tracking this package: METRC or BIOTRACK, or null when the package is not compliance-tracked. This determines which system-specific fields are populated: METRC packages carry the `metrc_*` fields (BioTrack ones null), BIOTRACK packages carry the `biotrack_*` fields (Metrc ones null).'
+          type: string
+        cost_per_unit_actual:
+          description: Actual cost per unit — `total_cost_actual` divided by the package quantity. Returned only by the list endpoint when the request passes `include_costs=true`; the field is absent otherwise. Null when no cost has been traced for this package.
+          type: string
+        cost_per_unit_default:
+          description: Default (standard) cost per unit — `total_cost_default` divided by the package quantity. Returned only by the list endpoint when the request passes `include_costs=true`; the field is absent otherwise. Null when no cost has been traced for this package.
+          type: string
+        creator:
+          $ref: '#/components/schemas/User'
+        custom_data:
+          description: The custom data for this package
+          items:
+            $ref: '#/components/schemas/CustomField'
+          type: array
+        description:
+          description: Free-text description of this package, or null when none was entered
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        expiration_datetime:
+          description: ISO 8601 datetime this package expires, or null when none is set
+          type: string
+        finished_datetime:
+          description: The datetime this package was finished in the compliance system (ISO 8601); null if not finished
+          type: string
+        harvest_date:
+          description: The harvest date for this package as an ISO 8601 date (e.g. "2026-08-20"), or null when none is set
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        inactivated_datetime:
+          description: The datetime this package was inactivated (ISO 8601); null while active
+          type: string
+        inserted_datetime:
+          description: The datetime this package was created at (ISO 8601)
+          type: string
+        is_production_batch:
+          description: True when this package is a new production lot (rather than added to existing inventory). Only applies to Metrc-tracked packages; always false otherwise.
+          type: boolean
+        is_test_sample:
+          description: True when this package is a test sample.
+          type: boolean
+        is_trade_sample:
+          description: True when this package is a Metrc trade sample. Always false for non-Metrc packages.
+          type: boolean
+        lab_testing_state:
+          description: The package's compliance lab-testing state (e.g. Metrc's TestPassed / NotSubmitted; BioTrack uses analogous values). Defaults to NotSubmitted, so this is always present.
+          type: string
+        license:
+          $ref: '#/components/schemas/License'
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_archived_date:
+          description: The date this package was archived in Metrc — i.e. the moment it was discontinued in Metrc (ISO 8601 date)
+          type: string
+        metrc_finished_date:
+          description: The date this package was finished in Metrc (ISO 8601 date)
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        metrc_production_batch_number:
+          description: The Metrc production batch number, set only when this package is a production batch (see `is_production_batch`); otherwise null.
+          type: string
+        metrc_received_datetime:
+          description: The most recent ISO 8601 datetime this package was received via a Metrc transfer, or null when it was never received via a transfer
+          type: string
+        metrc_received_from_manifest_number:
+          description: The Metrc manifest number the package was most recently received from, or null when it was not received via a transfer
+          type: string
+        metrc_source_harvest_names:
+          description: The Metrc source harvest names for this package. Null when the package is not Metrc-tracked or has no source harvest.
+          type: string
+        metrc_status:
+          description: The package's Metrc inventory status. Null for BioTrack-synced packages.
+          enum:
+          - ACTIVE
+          - INACTIVE
+          - ONHOLD
+          type: string
+        metrc_transfer_id:
+          description: The Metrc transfer ID this package is currently on; null if not in transit
+          type: integer
+        metrc_unit_name:
+          description: The Metrc unit of measure name for this package (e.g. "Grams"). Null when the package is not Metrc-tracked.
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'
+        packaged_date:
+          description: The compliance packaged date as an ISO 8601 date (e.g. "2026-08-20"), or null when none is set
+          type: string
+        primary_test_result:
+          $ref: '#/components/schemas/PrimaryTestResult'
+        product:
+          $ref: '#/components/schemas/Product'
+        product_id:
+          description: The ID of the [product](#model-product) this package holds
+          type: string
+        product_unit_quantity:
+          description: This package's quantity converted into its product's unit type (see `product_unit_type`), as a decimal string rounded to 9 places (e.g. "100"). Use this when you need the amount in product units rather than the package's own `unit_type`.
+          type: string
+        product_unit_type:
+          $ref: '#/components/schemas/UnitType'
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+        quantity_assembling:
+          description: The portion of `quantity` currently held for a pending assembly, in the package's `unit_type`, as a decimal string. "0" when none is allocated. Never negative.
+          type: string
+        total_cost_actual:
+          description: Total actual cost of this package. Distru traces the inputs and components that produced the package and sums the real costs incurred along that chain — for example the price paid when a component was purchased, assembly costs, and costs added by stock adjustments, among others. Returned only by the list endpoint when the request passes `include_costs=true`; the field is absent otherwise. Null when no cost has been traced for this package.
+          type: string
+        total_cost_default:
+          description: Total default (standard) cost of this package. Traced the same way as `total_cost_actual`, but each input/component is valued at its product's configured unit cost (the product's `unit_cost`) instead of its real cost. Returned only by the list endpoint when the request passes `include_costs=true`; the field is absent otherwise. Null when no cost has been traced for this package.
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - custom_data
+      - inserted_datetime
+      - is_production_batch
+      - is_test_sample
+      - quantity_active
+      - quantity_assembling
+      - quantity
+      - product_unit_quantity
+      - distru_status
+      - location_id
+      - license_id
+      - lab_testing_state
+      - is_trade_sample
+      - product_id
+      - product
+      - id
+      title: PackageFull
+      type: object
+    Package:
+      description: A specific, compliance-tracked quantity of a product identified by a unique tag (e.g. a Metrc package). This is the physical unit of inventory for package-tracked products. This is the compact reference; see PackageFull for all fields.
+      properties:
+        batch_number:
+          description: A free-text batch number set on the package, separate from any compliance tag. Null when none is set.
+          type: string
+        compliance_label:
+          description: The unique tag assigned by the state compliance system (e.g. the Metrc package tag). Always present for Metrc-tracked packages; may be null for BioTrack packages, and null when the package is not compliance-tracked.
+          type: string
+        distru_status:
+          description: 'The package''s inventory lifecycle status. One of:• ACTIVE: on hand and available.• ASSEMBLING: allocated to a pending assembly.• SELLING: reserved on an open sales order.• SOLD: consumed by a completed sale.• RETURNING: on an in-progress return.• TRANSFERRED: sent out on a compliance transfer.• ONHOLD: placed on hold in the compliance system.• FINISHED: finished in the compliance system.• DISCONTINUED: discontinued.• DESTROYED: destroyed.'
+          enum:
+          - ACTIVE
+          - ASSEMBLING
+          - DESTROYED
+          - DISCONTINUED
+          - FINISHED
+          - ONHOLD
+          - RETURNING
+          - SELLING
+          - SOLD
+          - TRANSFERRED
+          type: string
+        id:
+          description: ID for this package in Distru
+          type: string
+        license_id:
+          description: The ID of the [license](#model-license) this package is held under
+          type: string
+        location_id:
+          description: The ID of the [location](#model-location) where this package is physically stored
+          type: string
+        metrc_id:
+          description: The Metrc package ID for this package; null for non-Metrc packages
+          type: integer
+        quantity:
+          description: The total on-hand quantity of this package, in the package's `unit_type`, as a decimal string (e.g. "100"). Always equals `quantity_active` + `quantity_assembling`. Never negative.
+          type: string
+        quantity_active:
+          description: The freely usable portion of `quantity` — what can be used as an assembly input, moved to another location, added to a sales order, or adjusted down. Equals `quantity` minus `quantity_assembling`, in the package's `unit_type`, as a decimal string. Never negative.
+          type: string
+      required:
+      - distru_status
+      - quantity_active
+      - quantity
+      - location_id
+      - license_id
+      - id
+      title: Package
+      type: object
+    PrimaryTestResult:
+      description: A compact view of the primary [test result](#model-testresult) nested on a package or batch — just its headline potency figures. Fetch the full result from the test results endpoint for the complete analyte breakdown.
+      properties:
+        cbd_mg_per_unit:
+          description: CBD content in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        cbd_mg_per_unit_total:
+          description: Total CBD (including its acid precursor) in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        cbd_percentage:
+          description: CBD content as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        cbd_percentage_total:
+          description: Total CBD (including its acid precursor) as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        coa_url:
+          description: Public URL to view/download this test result's Certificate of Analysis (COA), or null when no file is attached
+          type: string
+        mg_per_unit_type:
+          description: The unit that the `*_mg_per_unit` figures are measured against, or null when not set
+          type: string
+        name:
+          description: The name of the test result
+          type: string
+        thc_mg_per_unit:
+          description: THC content in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        thc_mg_per_unit_total:
+          description: Total THC (including its acid precursor) in milligrams per unit, as a decimal string, or null when not measured
+          type: string
+        thc_percentage:
+          description: THC content as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+        thc_percentage_total:
+          description: Total THC (including its acid precursor) as a percentage by weight, as a decimal string, or null when not measured
+          type: string
+      required:
+      - name
+      title: PrimaryTestResult
+      type: object
+    MovePackagesRequest:
+      properties:
+        location_id:
+          description: ID of the destination Distru location (the `location.id` string on a package). Must belong to the same license as every package in `package_ids`; the packages' on-hand inventory is relocated there.
+          type: string
+        metrc_location_id:
+          description: Metrc's own numeric location id (a foreign Metrc identifier, not a Distru ID). Omit to move the packages only within Distru. When provided, the packages are also moved to this Metrc location; this path is Metrc-only (unavailable for BioTrack licenses) and requires that your state has Metrc locations enabled and a Metrc key with permission to move packages.
+          type: string
+        package_ids:
+          description: 'Non-empty list of 1 to 300 package IDs to move, each the `id` string returned by `GET /public/v1/packages`. All must resolve to packages in your company, all must belong to the same license, and each must be active with a positive active quantity. The move is all-or-nothing: one invalid id rejects the whole request.'
+          items:
+            type: string
+          type: array
+      required:
+      - location_id
+      - package_ids
+      title: Move Packages Request
+      type: object
+    Image:
+      description: An image as shown in Distru
+      properties:
+        id:
+          description: ID for this image
+          type: string
+        name:
+          description: Original file name of this image, or null when unknown
+          type: string
+        rank:
+          description: Display slot of this image among the product's images, 0 to 3; the lowest rank is the primary image. Null when unranked
+          type: integer
+        url:
+          description: URL to the full-size (original) image file, or null when no file is available
+          type: string
+      required:
+      - id
+      title: Image
+      type: object
+    BillOfMaterialsCostType:
+      description: The cost type applied by a bill-of-materials cost
+      properties:
+        cost_per_unit:
+          description: The cost per unit, as a decimal string (e.g. "5.00"). Present only when the caller has the `costs_permissions_view_cost_types_cost_per_unit` permission; the field is omitted otherwise.
+          type: string
+        id:
+          description: ID for this cost type
+          type: string
+        name:
+          description: Human readable name for this cost type
+          type: string
+        unit_type:
+          $ref: '#/components/schemas/UnitType'
+      required:
+      - name
+      - id
+      title: BillOfMaterialsCostType
+      type: object
+    PackagesWithActiveQuantityByLocation:
+      description: A location and the product's packages that hold active quantity there.
+      properties:
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+        packages:
+          description: The product's packages held at this location that have active quantity, ordered by id.
+          items:
+            $ref: '#/components/schemas/Package'
+          type: array
+      required:
+      - packages
+      - location
+      title: PackagesWithActiveQuantityByLocation
+      type: object
+    BatchesWithActiveQuantityByLocation:
+      description: A location and the product's batches that hold active quantity there.
+      properties:
+        batches:
+          description: The product's batches with active quantity at this location, each carrying its active quantity there, ordered by id.
+          items:
+            $ref: '#/components/schemas/BatchCompactWithQuantityActive'
+          type: array
+        location:
+          $ref: '#/components/schemas/LocationCompact'
+      required:
+      - batches
+      - location
+      title: BatchesWithActiveQuantityByLocation
+      type: object
+    Strain:
+      description: A cannabis strain (its genetics), such as "Blue Dream". Products can be linked to a strain to carry its name and type.
+      properties:
+        id:
+          description: ID for this strain
+          type: string
+        inserted_datetime:
+          description: The datetime this strain was created at
+          type: string
+        name:
+          description: Name of the strain
+          type: string
+        strain_type:
+          description: The genetic classification of the strain. Null when unset.
+          enum:
+          - INDICA
+          - INDICA_DOMINANT
+          - SATIVA
+          - SATIVA_DOMINANT
+          - HYBRID
+          - HIGH_CBD
+          type: string
+        updated_datetime:
+          description: The datetime this strain was last updated at
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - name
+      - id
+      title: Strain
+      type: object
+    ProductSubcategoryCompact:
+      description: A finer classification within a product category (e.g. "Pre-Rolls" under Flower).
+      properties:
+        id:
+          description: ID for this subcategory
+          type: string
+        name:
+          description: Human readable name for this subcategory
+          type: string
+      required:
+      - name
+      - id
+      title: ProductSubcategoryCompact
+      type: object
+    BatchCompactWithQuantityActive:
+      description: A compact [batch](#model-batch) reference plus its active on-hand quantity at the location it is nested under.
+      properties:
+        batch_number:
+          description: The batch number for this batch, or null when none is set
+          type: string
+        id:
+          description: ID for this batch
+          type: string
+        name:
+          description: Human readable name for this batch
+          type: string
+        quantity_active:
+          description: The batch's active on-hand quantity at this location, as a decimal string (e.g. "100"). Always positive.
+          type: string
+      required:
+      - quantity_active
+      - name
+      - id
+      title: BatchCompactWithQuantityActive
+      type: object
+  requestBodies:
+    DistruPublic.V1.AssemblyController.download_pdfBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              format:
+                enum:
+                - binary
+                - url
+                - email
+                type: string
+                description: 'How the generated PDF is delivered. One of `binary` — the raw PDF bytes as the response body (`Content-Type: application/pdf`); `url` — a JSON body with a short-lived signed download URL (see the [PdfResponse](#model-pdfresponse) response); or `email` — emails the PDF to the addresses in `email_addresses` and returns a JSON body listing who it was emailed to. Required, but omitting it defaults to `binary` for backward compatibility.'
+              email_addresses:
+                items:
+                  type: string
+                type: array
+                description: Recipient email addresses, used only when `format` is `email` (required in that case, ignored otherwise). An entry may hold several comma-separated addresses; spaces, blank entries and repeats are dropped, and `emailed_to` lists the addresses actually emailed. At least one address is required and every address must be valid, otherwise the request is rejected with a 400. At most 200 addresses may be given, counted after that cleanup.
+            required:
+            - format
+      required: true
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

@@ -67,70 +67,6 @@ maintainers:
 - FN: APIs.json
   email: info@apis.io
 apis:
-- aid: distru:distru-assemblies-api
-  name: Distru Assemblies API
-  description: The Assemblies API from Distru — 2 operation(s) for assemblies.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Assemblies
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-assemblies-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
-- aid: distru:distru-batches-api
-  name: Distru Batches API
-  description: The Batches API from Distru — 2 operation(s) for batches.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Batches
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-batches-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
-- aid: distru:distru-companies-api
-  name: Distru Companies API
-  description: The Companies API from Distru — 2 operation(s) for companies.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Companies
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-companies-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
-- aid: distru:distru-contacts-api
-  name: Distru Contacts API
-  description: The Contacts API from Distru — 2 operation(s) for contacts.
-  humanURL: https://apidocs.distru.dev
-  baseURL: https://app.distru.com/public/v1
-  tags:
-  - Contacts
-  properties:
-  - type: OpenAPI
-    url: openapi/distru-contacts-api-openapi.yml
-  - type: Documentation
-    url: https://apidocs.distru.dev
-  - type: APIReference
-    url: https://apidocs.distru.dev
-  - type: Authentication
-    url: authentication/distru-authentication.yml
 - aid: distru:distru-inventory-api
   name: Distru Inventory API
   description: The Inventory API from Distru — 1 operation(s) for inventory.
@@ -147,266 +83,995 @@ apis:
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-invoices-api
-  name: Distru Invoices API
-  description: The Invoices API from Distru — 3 operation(s) for invoices.
+- aid: distru:distru-assembly-api
+  name: Distru Assembly API
+  description: The Assembly API from Distru — 5 operation(s) for assembly.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Invoices
+  - Assembly
   properties:
   - type: OpenAPI
-    url: openapi/distru-invoices-api-openapi.yml
+    url: openapi/distru-assembly-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-locations-api
-  name: Distru Locations API
-  description: The Locations API from Distru — 2 operation(s) for locations.
+- aid: distru:distru-batch-api
+  name: Distru Batch API
+  description: The Batch API from Distru — 3 operation(s) for batch.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Batch
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-batch-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-bin-api
+  name: Distru Bin API
+  description: The Bin API from Distru — 2 operation(s) for bin.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Bin
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-bin-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-chargepreset-api
+  name: Distru Charge Preset API
+  description: The ChargePreset API from Distru — 2 operation(s) for chargepreset.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - ChargePreset
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-chargepreset-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-cogs-api
+  name: Distru Cogs API
+  description: The Cogs API from Distru — 1 operation(s) for cogs.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Cogs
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-cogs-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-company-api
+  name: Distru Company API
+  description: The Company API from Distru — 4 operation(s) for company.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Company
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-company-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-companygroup-api
+  name: Distru Company Group API
+  description: The CompanyGroup API from Distru — 2 operation(s) for companygroup.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - CompanyGroup
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-companygroup-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-contact-api
+  name: Distru Contact API
+  description: The Contact API from Distru — 2 operation(s) for contact.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Contact
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-contact-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-cost-api
+  name: Distru Cost API
+  description: The Cost API from Distru — 3 operation(s) for cost.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Cost
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-cost-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-costtype-api
+  name: Distru Cost Type API
+  description: The CostType API from Distru — 2 operation(s) for costtype.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - CostType
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-costtype-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-credit-api
+  name: Distru Credit API
+  description: The Credit API from Distru — 3 operation(s) for credit.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Credit
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-credit-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-cultivationtransactionhistory-api
+  name: Distru Cultivation Transaction History API
+  description: >-
+    The CultivationTransactionHistory API from Distru — 1 operation(s) for cultivationtransactionhistory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - CultivationTransactionHistory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-cultivationtransactionhistory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-deletedrecord-api
+  name: Distru Deleted Record API
+  description: The DeletedRecord API from Distru — 1 operation(s) for deletedrecord.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - DeletedRecord
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-deletedrecord-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-driver-api
+  name: Distru Driver API
+  description: The Driver API from Distru — 2 operation(s) for driver.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Driver
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-driver-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-fileattachment-api
+  name: Distru File Attachment API
+  description: The FileAttachment API from Distru — 1 operation(s) for fileattachment.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - FileAttachment
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-fileattachment-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-harvestoutputs-api
+  name: Distru Harvest Outputs API
+  description: The HarvestOutputs API from Distru — 1 operation(s) for harvestoutputs.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - HarvestOutputs
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-harvestoutputs-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-inventoryassets-api
+  name: Distru Inventory Assets API
+  description: The InventoryAssets API from Distru — 1 operation(s) for inventoryassets.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - InventoryAssets
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-inventoryassets-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-inventorytransactionhistory-api
+  name: Distru Inventory Transaction History API
+  description: >-
+    The InventoryTransactionHistory API from Distru — 1 operation(s) for inventorytransactionhistory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - InventoryTransactionHistory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-inventorytransactionhistory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-inventoryvaluation-api
+  name: Distru Inventory Valuation API
+  description: The InventoryValuation API from Distru — 1 operation(s) for inventoryvaluation.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - InventoryValuation
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-inventoryvaluation-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-invoice-api
+  name: Distru Invoice API
+  description: The Invoice API from Distru — 5 operation(s) for invoice.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Invoice
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-invoice-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-invoicehistory-api
+  name: Distru Invoice History API
+  description: The InvoiceHistory API from Distru — 1 operation(s) for invoicehistory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - InvoiceHistory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-invoicehistory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-license-api
+  name: Distru License API
+  description: The License API from Distru — 2 operation(s) for license.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - License
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-license-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-licensetype-api
+  name: Distru License Type API
+  description: The LicenseType API from Distru — 1 operation(s) for licensetype.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - LicenseType
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-licensetype-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-location-api
+  name: Distru Location API
+  description: The Location API from Distru — 2 operation(s) for location.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
   - Location
-  tags_raw:
-  - Locations
   properties:
   - type: OpenAPI
-    url: openapi/distru-locations-api-openapi.yml
+    url: openapi/distru-location-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-menus-api
-  name: Distru Menus API
-  description: The Menus API from Distru — 2 operation(s) for menus.
+- aid: distru:distru-menu-api
+  name: Distru Menu API
+  description: The Menu API from Distru — 2 operation(s) for menu.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Menus
+  - Menu
   properties:
   - type: OpenAPI
-    url: openapi/distru-menus-api-openapi.yml
+    url: openapi/distru-menu-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-orders-api
-  name: Distru Orders API
-  description: The Orders API from Distru — 2 operation(s) for orders.
+- aid: distru:distru-metrc-api
+  name: Distru Metrc API
+  description: The Metrc API from Distru — 10 operation(s) for metrc.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Metrc
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-metrc-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-officialproductcategory-api
+  name: Distru Official Product Category API
+  description: >-
+    The OfficialProductCategory API from Distru — 1 operation(s) for officialproductcategory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - OfficialProductCategory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-officialproductcategory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-order-api
+  name: Distru Order API
+  description: The Order API from Distru — 4 operation(s) for order.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
   - Order
-  tags_raw:
-  - Orders
   properties:
   - type: OpenAPI
-    url: openapi/distru-orders-api-openapi.yml
+    url: openapi/distru-order-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-packages-api
-  name: Distru Packages API
-  description: The Packages API from Distru — 1 operation(s) for packages.
+- aid: distru:distru-package-api
+  name: Distru Package API
+  description: The Package API from Distru — 6 operation(s) for package.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Packages
+  - Package
   properties:
   - type: OpenAPI
-    url: openapi/distru-packages-api-openapi.yml
+    url: openapi/distru-package-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-productposmappings-api
-  name: Distru ProductPosMappings API
-  description: The ProductPosMappings API from Distru — 2 operation(s) for productposmappings.
+- aid: distru:distru-payment-api
+  name: Distru Payment API
+  description: The Payment API from Distru — 3 operation(s) for payment.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - ProductPosMappings
+  - Payment
   properties:
   - type: OpenAPI
-    url: openapi/distru-productposmappings-api-openapi.yml
+    url: openapi/distru-payment-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-products-api
-  name: Distru Products API
-  description: The Products API from Distru — 2 operation(s) for products.
+- aid: distru:distru-plantlifecycle-api
+  name: Distru Plant Lifecycle API
+  description: The PlantLifecycle API from Distru — 1 operation(s) for plantlifecycle.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - PlantLifecycle
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-plantlifecycle-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-pricetier-api
+  name: Distru Price Tier API
+  description: The PriceTier API from Distru — 2 operation(s) for pricetier.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - PriceTier
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-pricetier-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-product-api
+  name: Distru Product API
+  description: The Product API from Distru — 4 operation(s) for product.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
   - Product
-  tags_raw:
-  - Products
   properties:
   - type: OpenAPI
-    url: openapi/distru-products-api-openapi.yml
+    url: openapi/distru-product-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-purchases-api
-  name: Distru Purchases API
-  description: The Purchases API from Distru — 3 operation(s) for purchases.
+- aid: distru:distru-productimage-api
+  name: Distru Product Image API
+  description: The ProductImage API from Distru — 2 operation(s) for productimage.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Purchases
+  - ProductImage
   properties:
   - type: OpenAPI
-    url: openapi/distru-purchases-api-openapi.yml
+    url: openapi/distru-productimage-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-returns-api
-  name: Distru Returns API
-  description: The Returns API from Distru — 2 operation(s) for returns.
+- aid: distru:distru-productposmapping-api
+  name: Distru Product Pos Mapping API
+  description: The ProductPosMapping API from Distru — 2 operation(s) for productposmapping.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Returns
+  - ProductPosMapping
   properties:
   - type: OpenAPI
-    url: openapi/distru-returns-api-openapi.yml
+    url: openapi/distru-productposmapping-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-stockadjustments-api
-  name: Distru StockAdjustments API
-  description: The StockAdjustments API from Distru — 3 operation(s) for stockadjustments.
+- aid: distru:distru-productsubcategory-api
+  name: Distru Product Subcategory API
+  description: The ProductSubcategory API from Distru — 2 operation(s) for productsubcategory.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - StockAdjustments
+  - ProductSubcategory
   properties:
   - type: OpenAPI
-    url: openapi/distru-stockadjustments-api-openapi.yml
+    url: openapi/distru-productsubcategory-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-strains-api
-  name: Distru Strains API
-  description: The Strains API from Distru — 2 operation(s) for strains.
+- aid: distru:distru-purchase-api
+  name: Distru Purchase API
+  description: The Purchase API from Distru — 4 operation(s) for purchase.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Purchase
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-purchase-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-purchaseorderhistory-api
+  name: Distru Purchase Order History API
+  description: The PurchaseOrderHistory API from Distru — 1 operation(s) for purchaseorderhistory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - PurchaseOrderHistory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-purchaseorderhistory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-purchasesbycompany-api
+  name: Distru Purchases By Company API
+  description: The PurchasesByCompany API from Distru — 1 operation(s) for purchasesbycompany.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - PurchasesByCompany
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-purchasesbycompany-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-purchasesbyproduct-api
+  name: Distru Purchases By Product API
+  description: The PurchasesByProduct API from Distru — 1 operation(s) for purchasesbyproduct.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - PurchasesByProduct
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-purchasesbyproduct-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-return-api
+  name: Distru Return API
+  description: The Return API from Distru — 2 operation(s) for return.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Return
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-return-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-salesbycompany-api
+  name: Distru Sales By Company API
+  description: The SalesByCompany API from Distru — 1 operation(s) for salesbycompany.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - SalesByCompany
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-salesbycompany-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-salesbyproduct-api
+  name: Distru Sales By Product API
+  description: The SalesByProduct API from Distru — 1 operation(s) for salesbyproduct.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - SalesByProduct
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-salesbyproduct-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-salesbyuser-api
+  name: Distru Sales By User API
+  description: The SalesByUser API from Distru — 1 operation(s) for salesbyuser.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - SalesByUser
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-salesbyuser-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-salesorderhistory-api
+  name: Distru Sales Order History API
+  description: The SalesOrderHistory API from Distru — 1 operation(s) for salesorderhistory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - SalesOrderHistory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-salesorderhistory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-salesorderitemhistory-api
+  name: Distru Sales Order Item History API
+  description: The SalesOrderItemHistory API from Distru — 1 operation(s) for salesorderitemhistory.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - SalesOrderItemHistory
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-salesorderitemhistory-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-salesordertax-api
+  name: Distru Sales Order Tax API
+  description: The SalesOrderTax API from Distru — 1 operation(s) for salesordertax.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - SalesOrderTax
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-salesordertax-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-stockadjustment-api
+  name: Distru Stock Adjustment API
+  description: The StockAdjustment API from Distru — 2 operation(s) for stockadjustment.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - StockAdjustment
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-stockadjustment-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-strain-api
+  name: Distru Strain API
+  description: The Strain API from Distru — 2 operation(s) for strain.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
   - Strain
-  tags_raw:
-  - Strains
   properties:
   - type: OpenAPI
-    url: openapi/distru-strains-api-openapi.yml
+    url: openapi/distru-strain-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-vehicles-api
-  name: Distru Vehicles API
-  description: The Vehicles API from Distru — 1 operation(s) for vehicles.
+- aid: distru:distru-tag-api
+  name: Distru Tag API
+  description: The Tag API from Distru — 2 operation(s) for tag.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Vehicles
+  - Tag
   properties:
   - type: OpenAPI
-    url: openapi/distru-vehicles-api-openapi.yml
+    url: openapi/distru-tag-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-custom-fields-api
-  name: Distru Custom Fields API
-  description: The Custom Fields API from Distru — 2 operation(s) for custom fields.
+- aid: distru:distru-task-api
+  name: Distru Task API
+  description: The Task API from Distru — 2 operation(s) for task.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Custom Fields
+  - Task
   properties:
   - type: OpenAPI
-    url: openapi/distru-custom-fields-api-openapi.yml
+    url: openapi/distru-task-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-file-attachments-api
-  name: Distru File Attachments API
-  description: The File Attachments API from Distru — 1 operation(s) for file attachments.
+- aid: distru:distru-tax-api
+  name: Distru Tax API
+  description: The Tax API from Distru — 2 operation(s) for tax.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - FileAttachments
-  tags_raw:
-  - File Attachments
+  - Tax
   properties:
   - type: OpenAPI
-    url: openapi/distru-file-attachments-api-openapi.yml
+    url: openapi/distru-tax-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-payment-methods-api
-  name: Distru Payment Methods API
-  description: The Payment Methods API from Distru — 2 operation(s) for payment methods.
+- aid: distru:distru-testresult-api
+  name: Distru Test Result API
+  description: The TestResult API from Distru — 3 operation(s) for testresult.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Payment Methods
+  - TestResult
   properties:
   - type: OpenAPI
-    url: openapi/distru-payment-methods-api-openapi.yml
+    url: openapi/distru-testresult-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference
     url: https://apidocs.distru.dev
   - type: Authentication
     url: authentication/distru-authentication.yml
-- aid: distru:distru-test-results-api
-  name: Distru Test Results API
-  description: The Test Results API from Distru — 1 operation(s) for test results.
+- aid: distru:distru-unittype-api
+  name: Distru Unit Type API
+  description: The UnitType API from Distru — 2 operation(s) for unittype.
   humanURL: https://apidocs.distru.dev
   baseURL: https://app.distru.com/public/v1
   tags:
-  - Test Results
+  - UnitType
   properties:
   - type: OpenAPI
-    url: openapi/distru-test-results-api-openapi.yml
+    url: openapi/distru-unittype-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-user-api
+  name: Distru User API
+  description: The User API from Distru — 2 operation(s) for user.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - User
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-user-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-vehicle-api
+  name: Distru Vehicle API
+  description: The Vehicle API from Distru — 2 operation(s) for vehicle.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Vehicle
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-vehicle-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-custom-field-api
+  name: Distru Custom Field API
+  description: The Custom Field API from Distru — 2 operation(s) for custom field.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Custom Field
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-custom-field-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-order-fulfillment-api
+  name: Distru Order Fulfillment API
+  description: The Order Fulfillment API from Distru — 1 operation(s) for order fulfillment.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Order Fulfillment
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-order-fulfillment-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-payment-method-api
+  name: Distru Payment Method API
+  description: The Payment Method API from Distru — 2 operation(s) for payment method.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Payment Method
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-payment-method-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-payment-term-api
+  name: Distru Payment Term API
+  description: The Payment Term API from Distru — 1 operation(s) for payment term.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Payment Term
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-payment-term-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-product-category-api
+  name: Distru Product Category API
+  description: The Product Category API from Distru — 2 operation(s) for product category.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Product Category
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-product-category-api-openapi.yml
+  - type: Documentation
+    url: https://apidocs.distru.dev
+  - type: APIReference
+    url: https://apidocs.distru.dev
+  - type: Authentication
+    url: authentication/distru-authentication.yml
+- aid: distru:distru-product-group-api
+  name: Distru Product Group API
+  description: The Product Group API from Distru — 2 operation(s) for product group.
+  humanURL: https://apidocs.distru.dev
+  baseURL: https://app.distru.com/public/v1
+  tags:
+  - Product Group
+  properties:
+  - type: OpenAPI
+    url: openapi/distru-product-group-api-openapi.yml
   - type: Documentation
     url: https://apidocs.distru.dev
   - type: APIReference

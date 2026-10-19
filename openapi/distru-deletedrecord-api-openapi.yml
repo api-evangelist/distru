@@ -1,0 +1,223 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Deleted Record API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: DeletedRecord
+paths:
+  /public/v1/deleted-records:
+    get:
+      description: 'List the records of one type that were deleted from your company, oldest deletion first. Use it alongside the `updated_datetime` filter of that type''s list endpoint to keep a copy of your data in sync (Incremental Sync): list endpoints leave deleted records out by default, so a copy synced from them never learns of a deletion on its own. Each `record_type` is the type of one endpoint, such as `ORDER` for GET /public/v1/orders or `COMPANY_GROUP` for GET /public/v1/company-groups.
+
+
+        Every deletion is listed, including the ones caused by deleting something else, such as an order''s invoices or a product''s batches; each is listed under its own type. A voided invoice or payment is not deleted; it stays on its list endpoint with its new status. A record that is restored after it was deleted leaves this list and comes back on its list endpoint with a new `updated_datetime`.
+
+
+        Deletions are kept for 90 days. If your copy was last synced longer ago than that, reconcile it as in Incremental Sync step 7 before resuming.
+
+
+        A deletion becomes visible here once its change is committed, which can be shortly after its `deleted_datetime`, and this endpoint is eventually consistent: a deletion can take up to 1 second to appear. When you poll with `deleted_datetime`, use the same lower bound as your list calls (Incremental Sync) and ignore records you already removed.
+
+
+        Results are paginated. Follow the `next_page` URL in the response to fetch the following page.
+
+
+        Required permission: the same as the endpoint of `record_type` (for example `orders_permissions_view` for `ORDER`); tags and unit types need none. Team restrictions do not apply here: every deletion of that type in your company is listed.'
+      operationId: DistruPublic.V1.DeletedRecordController.index
+      parameters:
+      - description: Required. The kind of deleted record to list. Each request lists one kind; make one request per kind you sync.
+        in: query
+        name: record_type
+        required: true
+        schema:
+          type: string
+          enum:
+          - ADJUSTMENT
+          - ASSEMBLY
+          - BATCH
+          - BIN
+          - CHARGE_PRESET
+          - COMPANY
+          - COMPANY_GROUP
+          - CONTACT
+          - COST_TYPE
+          - CREDIT
+          - CUSTOM_FIELD
+          - DRIVER
+          - INVOICE
+          - LICENSE
+          - LOCATION
+          - MENU
+          - ORDER
+          - PACKAGE
+          - PAYMENT
+          - PAYMENT_METHOD
+          - PAYMENT_TERM
+          - PRICE_TIER
+          - PRODUCT
+          - PRODUCT_CATEGORY
+          - PRODUCT_GROUP
+          - PRODUCT_POS_MAPPING
+          - PRODUCT_SUBCATEGORY
+          - PURCHASE
+          - RETURN
+          - STRAIN
+          - TAG
+          - TASK
+          - TAX
+          - TEST_RESULT
+          - UNIT_TYPE
+          - USER
+          - VEHICLE
+      - description: 'Filter by deletion datetime, given as an inclusive `after,before` range of ISO 8601 timestamps separated by a comma. Either bound may be left empty: `after,` keeps only records deleted on or after `after`; `,before` only those deleted on or before `before`; `after,before` keeps those inside the closed range. A range with both bounds empty is rejected.'
+        in: query
+        name: deleted_datetime
+        required: false
+        example: ?deleted_datetime=2022-07-10T00:00:00Z,
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of deleted records
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DeletedRecords'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get deleted records
+      tags:
+      - DeletedRecord
+components:
+  schemas:
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    DeletedRecord:
+      description: A record that was deleted.
+      properties:
+        deleted_datetime:
+          description: When the record was deleted. Each record gets its own time, so records deleted together, like an order and its invoices, can differ by a few milliseconds.
+          type: string
+        record_id:
+          description: ID the record had before it was deleted, the same as its `id` on its type's endpoints (for `CUSTOM_FIELD`, the field's numeric id as a string). IDs are never reused.
+          type: string
+        record_type:
+          description: The kind of record that was deleted.
+          enum:
+          - ADJUSTMENT
+          - ASSEMBLY
+          - BATCH
+          - BIN
+          - CHARGE_PRESET
+          - COMPANY
+          - COMPANY_GROUP
+          - CONTACT
+          - COST_TYPE
+          - CREDIT
+          - CUSTOM_FIELD
+          - DRIVER
+          - INVOICE
+          - LICENSE
+          - LOCATION
+          - MENU
+          - ORDER
+          - PACKAGE
+          - PAYMENT
+          - PAYMENT_METHOD
+          - PAYMENT_TERM
+          - PRICE_TIER
+          - PRODUCT
+          - PRODUCT_CATEGORY
+          - PRODUCT_GROUP
+          - PRODUCT_POS_MAPPING
+          - PRODUCT_SUBCATEGORY
+          - PURCHASE
+          - RETURN
+          - STRAIN
+          - TAG
+          - TASK
+          - TAX
+          - TEST_RESULT
+          - UNIT_TYPE
+          - USER
+          - VEHICLE
+          type: string
+      required:
+      - deleted_datetime
+      - record_type
+      - record_id
+      title: DeletedRecord
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    DeletedRecords:
+      description: A collection of deleted records
+      properties:
+        data:
+          description: Deleted Records
+          items:
+            $ref: '#/components/schemas/DeletedRecord'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Deleted Records
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

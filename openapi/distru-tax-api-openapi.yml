@@ -1,0 +1,277 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Tax API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Tax
+paths:
+  /public/v1/taxes:
+    get:
+      description: 'List the taxes configured for the authenticated company. A tax is a named, reusable tax rate
+
+        (percentage) that gets applied to order and invoice line
+
+        totals. Use this to enumerate the taxes you can reference elsewhere and to read their current
+
+        rates, codes, and QuickBooks Online mappings.
+
+
+        Results are ordered oldest-first (by creation time) and paginated. Soft-deleted taxes are never
+
+        returned. This endpoint is read-only — taxes cannot be created, edited, or deleted through the
+
+        public API — so it has no effect on inventory, compliance, or any other entity.
+
+
+        Required permission: `settings_permissions_taxes`.'
+      operationId: DistruPublic.V1.TaxController.index
+      parameters:
+      - description: Restrict the result to specific taxes by ID (the same ID returned as each tax's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: 'Filter to taxes by their creation datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range: `2022-07-10T00:00:00Z,` matches on or after that instant, `,2022-07-10T00:00:00Z` matches on or before it.'
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter to taxes by their last-updated datetime, given as a comma-separated `start,end` pair of ISO8601 datetimes (inclusive). Either bound may be omitted for an open-ended range.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=2022-07-10T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A list of taxes
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Taxes'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get taxes
+      tags:
+      - Tax
+  /public/v1/taxes/{id}:
+    get:
+      description: 'Fetch a single tax by its ID. A tax is a named, reusable tax rate (percentage) applied to
+
+        order and invoice line totals; use this to resolve a tax id
+
+        seen on those records into its current rate, code, and QuickBooks Online mappings.
+
+
+        Returns 404 when no tax with that ID exists for the authenticated company, or when the tax has
+
+        been deleted. This endpoint is read-only and touches no other data.
+
+
+        Required permission: `settings_permissions_taxes`.'
+      operationId: DistruPublic.V1.TaxController.show
+      parameters:
+      - description: The tax's ID, as returned in the `id` field of a tax response.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single tax
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TaxResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a tax
+      tags:
+      - Tax
+components:
+  schemas:
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    Tag:
+      description: A tag
+      properties:
+        id:
+          description: ID for this tag.
+          type: string
+        name:
+          description: The tag's display name. May be null when the tag was created without one.
+          type: string
+      required:
+      - id
+      title: Tag
+      type: object
+    Taxes:
+      description: A collection of taxes
+      properties:
+        data:
+          description: Taxes
+          items:
+            $ref: '#/components/schemas/Tax'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when there is no next page
+          type: string
+      title: Taxes
+      type: object
+    TaxResponse:
+      description: A single tax envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Tax'
+      title: Tax Response
+      type: object
+    Tax:
+      description: A tax
+      properties:
+        description:
+          description: Free-text note describing the tax. Null when no description was set.
+          type: string
+        id:
+          description: ID for this tax.
+          type: string
+        inserted_datetime:
+          description: When the tax was created, as a UTC ISO-8601 timestamp (e.g. 2024-01-15T09:30:00Z).
+          type: string
+        name:
+          description: The tax's display name, unique within the company.
+          type: string
+        qb_account_id:
+          description: The linked QuickBooks Online account ID. Null when the company is not connected to QuickBooks Online or the tax has not been mapped to an account.
+          type: string
+        qb_product_id:
+          description: The linked QuickBooks Online product ID. Null when the company is not connected to QuickBooks Online or the tax has not been mapped to a product.
+          type: string
+        tags:
+          description: The tags associated with this tax, each rendered with only its `id` and `name`. Always present; an empty array when the tax has no tags.
+          items:
+            $ref: '#/components/schemas/Tag'
+          type: array
+        tax_applied_after_charges:
+          description: Controls the base amount this tax is applied to on every [order](#model-order) and [invoice](#model-invoice) line it covers. When true, the tax is calculated on the line amount after other charges (fees/discounts) are added; when false, on the pre-charge amount. Always present. Fixed at creation and never changes for an existing tax, so an integrator can cache it safely.
+          type: boolean
+        tax_applied_after_price_tiers:
+          description: Controls whether this tax is applied before or after price tier (tiered/volume) pricing adjustments on the [order](#model-order) and [invoice](#model-invoice) lines it covers. When true, the tax is calculated after those adjustments; when false, before them. Independent of `tax_applied_after_charges`. Always present. Fixed at creation and never changes for an existing tax.
+          type: boolean
+        tax_code:
+          description: The tax code, unique within the company.
+          type: string
+        tax_rate_percent:
+          description: The tax rate as a percentage applied to the [order](#model-order) and [invoice](#model-invoice) line totals this tax covers, e.g. 8.25 means 8.25%. Always present; never null.
+          type: number
+        updated_datetime:
+          description: When the tax was last updated, as a UTC ISO-8601 timestamp (e.g. 2024-01-15T09:30:00Z).
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - tags
+      - tax_applied_after_price_tiers
+      - tax_applied_after_charges
+      - tax_rate_percent
+      - tax_code
+      - name
+      - id
+      title: Tax
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

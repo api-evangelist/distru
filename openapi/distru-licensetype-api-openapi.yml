@@ -1,0 +1,475 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru License Type API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: LicenseType
+paths:
+  /public/v1/license-types:
+    get:
+      description: 'Returns every `license_type` value that is valid for your company''s US state, sorted alphabetically. Use it to discover the exact strings accepted by the `license_type` field when upserting a license on one of your companies; any other value is rejected with a 400. The set is fixed per state — it changes only when Distru adds support for new state license types — so it is safe to cache for the duration of a session.
+
+
+        The full listing per state is reproduced below. States not listed use the values under **All other states**.
+
+
+        **CA**
+
+        • Medium Indoor
+
+        • Medium Mixed-Light Tier 1
+
+        • Medium Mixed-Light Tier 2
+
+        • Medium Outdoor
+
+        • Nursery
+
+        • Other
+
+        • Processor
+
+        • Small Indoor
+
+        • Small Mixed-Light Tier 1
+
+        • Small Mixed-Light Tier 2
+
+        • Small Outdoor
+
+        • Specialty Cottage Indoor
+
+        • Specialty Cottage Mixed-Light Tier 1
+
+        • Specialty Cottage Mixed-Light Tier 2
+
+        • Specialty Cottage Outdoor
+
+        • Specialty Indoor
+
+        • Specialty Mixed-Light Tier 1
+
+        • Specialty Mixed-Light Tier 2
+
+        • Specialty Outdoor
+
+        • Type 10 Retailer
+
+        • Type 11 Distributor
+
+        • Type 12 Microbusiness
+
+        • Type 13 Distributor-Transport Only
+
+        • Type 6 Non Volatile Solvent Extraction
+
+        • Type 7 Volatile Solvent Extraction
+
+        • Type 8 Testing
+
+        • Type 9 Non-Storefront
+
+        • Type N Infusions
+
+        • Type P Packaging and Labeling
+
+
+        **CO**
+
+        • Cultivation
+
+        • Delivery
+
+        • Operator
+
+        • Other
+
+        • Product Manufacturer
+
+        • R&D Cultivation
+
+        • Store
+
+        • Testing Facility
+
+        • Transporter
+
+        • Transporter- NP
+
+
+        **CT**
+
+        • Cultivator
+
+        • Delivery Service
+
+        • Food And Beverage
+
+        • Hybrid Retailer
+
+        • Medical Marijuana Dispensary
+
+        • Medical Marijuana Producer
+
+        • Micro Cultivator
+
+        • Product Manufacturer
+
+        • Product Packager
+
+        • Retailer
+
+        • Transporter
+
+
+        **GA**
+
+        • Class 1 Production
+
+        • Class 2 Production
+
+        • Dispensing
+
+        • Independent Laboratory
+
+        • Other
+
+
+        **MA**
+
+        • Cultivator
+
+        • Microbusiness
+
+        • Other
+
+        • Product Manufacturer
+
+        • Retailer
+
+        • Testing Laboratory
+
+        • Transporter (Existing Licensee)
+
+        • Transporter (Third Party)
+
+
+        **ME**
+
+        • Cultivation Tier 1
+
+        • Cultivation Tier 2
+
+        • Cultivation Tier 3
+
+        • Cultivation Tier 4
+
+        • Distributor
+
+        • Marijuana Store
+
+        • Marijuana Testing Facility
+
+        • Nursery Cultivation
+
+        • Other
+
+        • Product Manufacturing Facility
+
+
+        **MI**
+
+        • Class A Grower
+
+        • Class B Grower
+
+        • Class C Grower
+
+        • Designated Consumption Establishment
+
+        • Entity Prequalification
+
+        • Entity Registration
+
+        • Event Organizer
+
+        • Excess Grower
+
+        • Individual Prequalification
+
+        • Microbusiness
+
+        • Other
+
+        • Processor
+
+        • Provisioning Center
+
+        • Retailer
+
+        • Safety Compliance
+
+        • Secure Transporter
+
+        • Sole Proprietor
+
+        • Temporary Event
+
+
+        **MO**
+
+        • Cultivation Facility
+
+        • Dispensary Facility
+
+        • Infused Product Manufacturing Facility
+
+        • Laboratory Testing Facility
+
+        • Other
+
+        • Transportation Facility
+
+
+        **MT**
+
+        • Canopy
+
+        • Chemical Manufacturing Endorsement
+
+        • Dispensary Location
+
+        • MIPP Location
+
+        • Other
+
+        • Provider Location
+
+        • Testing Laboratory
+
+
+        **NM**
+
+        • Adult Use Retail
+
+        • Cannabis Courier
+
+        • Commercial Retail
+
+        • Micro Producer Processor
+
+        • Micro Retail
+
+        • Processor only
+
+        • Producer Tier 1
+
+        • Producer Tier 1 + Processor
+
+        • Producer Tier 2
+
+        • Producer Tier 2 + Processor
+
+        • Producer Tier 3
+
+        • Producer Tier 3 + Processor
+
+        • Retailer
+
+        • Third-party Transporter
+
+
+        **NV**
+
+        • Cultivation Facility
+
+        • Distributor Facility
+
+        • Other
+
+        • Product Manufacturing Facility
+
+        • Retail Store
+
+        • Testing Facility
+
+
+        **NY**
+
+        • AU Cultivator
+
+        • AU Dispensary
+
+        • AU Distributor
+
+        • AU Processor
+
+        • DUAL Cultivator
+
+        • DUAL Dispensary
+
+        • DUAL Distributor
+
+        • DUAL Processor
+
+        • MED Cultivator
+
+        • MED Dispensary
+
+        • MED Distributor
+
+        • MED Processor
+
+        • Other
+
+        • Testing Lab
+
+
+        **OH**
+
+        • Dispensary
+
+        • Distributor
+
+        • Laboratory
+
+        • Level I Cultivator
+
+        • Level II Cultivator
+
+        • Other
+
+        • Plant-only Processor
+
+        • Processor
+
+        • Vertically Integrated Processor
+
+
+        **OK**
+
+        • Dispensary - DA
+
+        • Grower - GA
+
+        • Lab - LA
+
+        • Other
+
+        • Processor - PA
+
+        • Transporter - TA
+
+
+        **OR**
+
+        • Laboratory
+
+        • Other
+
+        • Recreational Processor
+
+        • Recreational Producer
+
+        • Recreational Retailer
+
+        • Recreational Wholesaler
+
+        • Research Certificate
+
+
+        **All other states**
+
+        • Cultivator
+
+        • Distributor
+
+        • Lab
+
+        • Manufacturer
+
+        • Other
+
+        • Retail'
+      operationId: DistruPublic.V1.LicenseTypeController.index
+      responses:
+        '200':
+          description: The license types valid for your company's state
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/LicenseTypes'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get license types
+      tags:
+      - LicenseType
+components:
+  schemas:
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    LicenseTypes:
+      description: The license type values valid for your company's state
+      properties:
+        data:
+          description: The valid `license_type` strings, sorted alphabetically
+          items:
+            type: string
+          type: array
+      required:
+      - data
+      title: License Types
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'

@@ -1,0 +1,292 @@
+openapi: 3.2.0
+info:
+  license:
+    name: Proprietary
+    url: https://www.distru.com/legal/terms-of-service
+  title: Distru Menu API
+  version: '1.0'
+servers:
+- url: https://app.distru.com
+security:
+- Bearer: []
+tags:
+- name: Menu
+paths:
+  /public/v1/menus:
+    get:
+      description: 'List menus for the authenticated company, ordered oldest-first by creation time.
+
+
+        A menu is a shareable product catalog and price list you send to customers. It controls who can view the catalog (`visibility`), which weekday delivery windows and minimum-order rules apply at checkout, and the status new orders receive when a customer checks out through it. Each returned menu also carries `product_count` — the number of active products currently on it — and `url`, its primary public link (null when the menu has no primary URL).
+
+
+        Results are paginated: the response wraps the menus in `data` and sets `next_page` to the URL of the following page, or null on the last page. Use `active`, `visibility`, and the `inserted_datetime` / `updated_datetime` windows to narrow the list; omit them all to return every menu in the company regardless of state. When several filters are supplied a menu must satisfy all of them (AND).
+
+
+        Required permission: `products_permissions_view`.'
+      operationId: DistruPublic.V1.MenuController.index
+      parameters:
+      - description: Restrict the result to specific menus by ID (the same ID returned as each menu's `id`). Repeat the bracketed key once per ID. Unknown IDs simply match nothing; an empty list is treated as no filter. At most 200 IDs may be given.
+        in: query
+        name: ids
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Filter by active state. `?active=true` returns only active menus, `?active=false` only inactive ones. Omit to return menus regardless of active state. Any other value is rejected. DEPRECATED comma form `?active=true,false` still works but is equivalent to omitting the filter and will be removed in a future version.
+        in: query
+        name: active
+        required: false
+        schema:
+          type: boolean
+      - description: Filter by creation datetime (the menu's `inserted_datetime`). Comma-separated `from,to` range in ISO-8601 UTC; both bounds inclusive and either side may be omitted. `2022-07-10T00:00:00Z,` returns menus created on or after that instant, `,2022-07-10T00:00:00Z` those created on or before it. Omit to apply no creation-time filter.
+        in: query
+        name: inserted_datetime
+        required: false
+        example: ?inserted_datetime=2022-07-01T00:00:00Z,2022-07-31T00:00:00Z
+        schema:
+          type: string
+      - description: Filter by last-modified datetime (the menu's `updated_datetime`). Same comma-separated `from,to` ISO-8601 range format as `inserted_datetime`, with either bound optional.
+        in: query
+        name: updated_datetime
+        required: false
+        example: ?updated_datetime=,2022-07-10T00:00:00Z
+        schema:
+          type: string
+      - description: 'Filter by menu visibility. Repeat the bracketed key with SCREAMING_CASE values: `PUBLIC` (viewable by anyone, no login required), `PRIVATE` (only logged-in users from the menu''s own company), `PASSCODE_PROTECTED` (that company''s users plus anyone holding the passcode). A subset returns only menus with those visibilities; listing all three, or omitting the param, applies no filter. Any unrecognized value is rejected. At most 200 values may be given.'
+        in: query
+        name: visibilities
+        required: false
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            enum:
+            - PUBLIC
+            - PRIVATE
+            - PASSCODE_PROTECTED
+            type: string
+      - description: 'DEPRECATED — use `visibilities[]` instead; the comma form will be removed in a future version. Comma-separated SCREAMING_CASE list of `PUBLIC`, `PRIVATE`, `PASSCODE_PROTECTED`. Same matching as `visibilities[]`: a subset filters to those visibilities, listing all three (or omitting) applies no filter. Any unrecognized value is rejected.'
+        in: query
+        name: visibility
+        required: false
+        example: ?visibility=PUBLIC,PASSCODE_PROTECTED
+        schema:
+          type: string
+      - description: Page selector. Page size is fixed by the server; paginate by following the `next_page` URL in each response rather than building page selectors yourself — it is null on the last page. `next_page` uses `page[after]=<cursor>`, an opaque token marking where the next page resumes; pass it back exactly as given, and only to the endpoint that issued it. This is seek-based, so every page stays fast no matter how deep you page.
+        in: query
+        name: page
+        required: false
+        example: ?page[after]=cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Menus index
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Menus'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too Many Requests — the account's list rate limit (3000 calls, refilling at 5 per minute, one per page) was exceeded. Retry after the period in the Retry-After header. Calls with an `updated_datetime` lower bound within the last 30 days are free and never refused; see [Incremental Sync](#incremental-sync).
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get menus
+      tags:
+      - Menu
+  /public/v1/menus/{id}:
+    get:
+      description: 'Fetch a single menu by its ID, scoped to the authenticated company. Returns the same shape as an entry in the list endpoint, including `product_count` (the number of active products on the menu) and `url` (its primary public link, null when the menu has no primary URL). Returns 404 when no menu with that ID exists in the company, and 403 when your team restrictions hide it.
+
+
+        Required permission: `products_permissions_view` (admins are always allowed).'
+      operationId: DistruPublic.V1.MenuController.show
+      parameters:
+      - description: The menu's ID, as returned in the `id` field of the list and show responses.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A single menu
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MenuResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API token
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The API token lacks the required permission
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get a menu
+      tags:
+      - Menu
+components:
+  schemas:
+    Menu:
+      properties:
+        active:
+          description: Whether the menu is active. Inactive menus stay configured but are not served to customers. Always present.
+          type: boolean
+        available_delivery_days:
+          description: Weekdays a customer may pick for delivery at checkout, as SCREAMING_CASE names drawn from MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY. Defaults to all seven days. Always present.
+          items:
+            type: string
+          type: array
+        default_order_status:
+          description: Status assigned to every order a customer places through this menu. One of PENDING or PROCESSING. Always present.
+          enum:
+          - PENDING
+          - PROCESSING
+          type: string
+        discoverable:
+          description: Whether the menu is listed on the DistruCommerce marketplace. Can only be true when `visibility` is PUBLIC. Always present.
+          type: boolean
+        external_name:
+          description: The customer-facing menu name shown to people viewing the menu. Always present (may be an empty string if never set).
+          type: string
+        id:
+          description: The menu's ID. Use it as the `{id}` path segment of the show endpoint.
+          type: string
+        inserted_datetime:
+          description: When the menu was created, as a UTC ISO-8601 timestamp. Always present.
+          type: string
+        internal_name:
+          description: The menu's name used internally in Distru; never shown to customers. Unique within the company, so it can be used as a stable business key. Always present.
+          type: string
+        minimum_order_lead_time_days:
+          description: Number of days after order placement that are blocked for delivery (0–999); 0 means same-day delivery is allowed. Defaults to 0. Always present.
+          type: integer
+        minimum_order_subtotal:
+          description: Minimum order subtotal a customer must reach to check out through this menu, as a positive decimal string (e.g. `"250.00"`); null when no minimum is set.
+          type: string
+        product_count:
+          description: Number of active products currently on the menu; inactive and deleted products are excluded. Always present (0 when the menu has no active products).
+          type: integer
+        updated_datetime:
+          description: When the menu was last updated, as a UTC ISO-8601 timestamp. Always present.
+          type: string
+        url:
+          description: The menu's primary public URL; null when the menu has no primary URL configured.
+          type: string
+        visibility:
+          description: Who can view the menu. One of PUBLIC (anyone, no login required), PRIVATE (only logged-in users from the menu's own company), or PASSCODE_PROTECTED (that company's users plus anyone holding the passcode).
+          enum:
+          - PUBLIC
+          - PRIVATE
+          - PASSCODE_PROTECTED
+          type: string
+      required:
+      - updated_datetime
+      - inserted_datetime
+      - minimum_order_lead_time_days
+      - available_delivery_days
+      - default_order_status
+      - discoverable
+      - active
+      - visibility
+      - product_count
+      - external_name
+      - internal_name
+      - id
+      title: Menu
+      type: object
+    Error:
+      description: A single error describing one problem with the request.
+      properties:
+        message:
+          description: Human-readable, customer-facing description of what went wrong.
+          type: string
+        pointer:
+          description: 'Path to the offending field in the request: field names and, for items in a list, their integer position — e.g. ["items", 0, "quantity"]. ["base"] means the error applies to the request as a whole rather than one field.'
+          items: {}
+          type: array
+      required:
+      - message
+      - pointer
+      title: Error
+      type: object
+    MenuResponse:
+      description: A single menu wrapped in a data envelope
+      properties:
+        data:
+          $ref: '#/components/schemas/Menu'
+      title: Menu Response
+      type: object
+    ErrorResponse:
+      description: The envelope returned by every failed request (400, 401, 403, 404, 429). `errors` always holds at least one entry.
+      properties:
+        errors:
+          description: One or more errors describing why the request failed.
+          items:
+            $ref: '#/components/schemas/Error'
+          type: array
+      required:
+      - errors
+      title: ErrorResponse
+      type: object
+    Menus:
+      description: A collection of menus
+      properties:
+        data:
+          description: The menus on this page, ordered oldest-first by creation time. An empty array when the company has no matching menus.
+          items:
+            $ref: '#/components/schemas/Menu'
+          type: array
+        next_page:
+          description: URL for the next page of results; null when this is the last page.
+          type: string
+      required:
+      - data
+      title: Get menus
+      type: object
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'
