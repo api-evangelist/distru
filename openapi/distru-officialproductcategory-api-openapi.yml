@@ -131,3 +131,9 @@ components:
       type: http
       scheme: bearer
       description: 'API token generated in Distru (Settings → Distru API). Send it on every request as `Authorization: Bearer YOUR_API_TOKEN`.'
+x-provenance:
+  method: harvested
+  publisher: Distru
+  source: https://apidocs.distru.dev/openapi.json
+  note: split by refine-openapis from the provider's own published document, verified by fetch (openapi/_original/*.fetch.json);
+    stamped by stamp-openapi-provenance.py (roadmap#793)
