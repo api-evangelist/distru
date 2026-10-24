@@ -13,29 +13,29 @@ artifacts:
     method: searched
     evidence: declared in the artifact
   collections/distru-assemblies-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-assemblies-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-assemblies-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-assemblies-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-batches-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-batches-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-batches-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-batches-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-companies-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-companies-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-companies-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-companies-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-contacts-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-contacts-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-contacts-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-contacts-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-customfields-api.opencollection.json:
     method: unknown
     evidence: no authorship recorded
@@ -55,35 +55,35 @@ artifacts:
     method: derived
     evidence: openapi/distru-inventory-api
   collections/distru-invoices-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-invoices-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-invoices-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-invoices-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-locations-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-locations-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-locations-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-locations-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-menus-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-menus-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-menus-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-menus-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-orders-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-orders-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-orders-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-orders-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-packages-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-packages-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-packages-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-packages-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-paymentmethods-api.opencollection.json:
     method: unknown
     evidence: no authorship recorded
@@ -91,41 +91,41 @@ artifacts:
     method: unknown
     evidence: no authorship recorded
   collections/distru-productposmappings-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-productposmappings-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-productposmappings-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-productposmappings-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-products-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-products-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-products-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-products-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-purchases-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-purchases-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-purchases-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-purchases-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-returns-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-returns-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-returns-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-returns-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-stockadjustments-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-stockadjustments-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-stockadjustments-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-stockadjustments-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-strains-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-strains-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-strains-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-strains-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-testresults-api.opencollection.json:
     method: unknown
     evidence: no authorship recorded
@@ -133,11 +133,11 @@ artifacts:
     method: unknown
     evidence: no authorship recorded
   collections/distru-vehicles-api.opencollection.json:
-    method: derived
-    evidence: openapi/distru-vehicles-api
+    method: unknown
+    evidence: no authorship recorded
   collections/distru-vehicles-api.postman_collection.json:
-    method: derived
-    evidence: openapi/distru-vehicles-api
+    method: unknown
+    evidence: no authorship recorded
   conformance/distru-conformance.yml:
     method: derived
     evidence: declared in the artifact
@@ -153,127 +153,13 @@ artifacts:
   front-door-ai/2026-09-17.yml:
     method: unknown
     evidence: no authorship recorded
-  kin/checks-2026-09-24T161608.yml:
+  integrations/_index.yml:
     method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-25T125852.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-25T133943.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-25T143147.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-25T154045.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-26T215308.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-27T094438.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-27T103455.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-27T123021.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-27T132314.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-27T140727.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-28T221322.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-29T213958.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-29T230545.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-30T203505.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-30T220315.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-08-31T223420.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-01T063623.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-01T210448.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-01T222808.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-02T211804.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-02T224043.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-03T161828.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-03T174231.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-04T062714.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-04T212454.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-04T224856.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-05T055819.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-05T072335.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-05T144739.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-05T195450.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-05T211839.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-06T011047.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-06T211804.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-06T224210.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-07T200636.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-07T213054.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-08T214843.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-08T232836.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-10T204815.yml:
-    method: generated
-    evidence: Kin Score snapshot written by score.rb
-  kin/score-2026-09-10T222408.yml:
+    evidence: carries an API Evangelist house phrase
+  integrations/distru-integration-edges.yml:
+    method: searched
+    evidence: declared in the artifact
+  kin/checks-2026-10-11T110117.yml:
     method: generated
     evidence: Kin Score snapshot written by score.rb
   kin/score-2026-09-12T062655.yml:
@@ -357,6 +243,21 @@ artifacts:
   kin/score-2026-09-24T161608.yml:
     method: generated
     evidence: Kin Score snapshot written by score.rb
+  kin/score-2026-09-25T210408.yml:
+    method: generated
+    evidence: Kin Score snapshot written by score.rb
+  kin/score-2026-09-25T232841.yml:
+    method: generated
+    evidence: Kin Score snapshot written by score.rb
+  kin/score-2026-10-03T000835.yml:
+    method: generated
+    evidence: Kin Score snapshot written by score.rb
+  kin/score-2026-10-03T024842.yml:
+    method: generated
+    evidence: Kin Score snapshot written by score.rb
+  kin/score-2026-10-11T110117.yml:
+    method: generated
+    evidence: Kin Score snapshot written by score.rb
   lifecycle/distru-lifecycle.yml:
     method: searched
     evidence: declared in the artifact
@@ -366,75 +267,202 @@ artifacts:
   mcp/distru-mcp.yml:
     method: derived
     evidence: declared in the artifact
-  openapi/_original/distru-openapi.yml:
-    method: generated
-    evidence: carries an API Evangelist house phrase
-  openapi/distru-assemblies-api-openapi.yml:
+  openapi/_original/distru-openapi.json:
+    method: harvested
+    evidence: byte-identical to https://apidocs.distru.dev/openapi.json (sha256 656392f2bd9c, fetched
+      2026-10-19)
+  openapi/distru-assembly-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-batches-api-openapi.yml:
+  openapi/distru-batch-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-companies-api-openapi.yml:
+  openapi/distru-bin-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-contacts-api-openapi.yml:
+  openapi/distru-chargepreset-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-custom-fields-api-openapi.yml:
+  openapi/distru-cogs-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-file-attachments-api-openapi.yml:
+  openapi/distru-company-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-companygroup-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-contact-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-cost-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-costtype-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-credit-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-cultivationtransactionhistory-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-custom-field-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-deletedrecord-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-driver-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-fileattachment-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-harvestoutputs-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
   openapi/distru-inventory-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-invoices-api-openapi.yml:
+  openapi/distru-inventoryassets-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-locations-api-openapi.yml:
+  openapi/distru-inventorytransactionhistory-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-menus-api-openapi.yml:
+  openapi/distru-inventoryvaluation-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-orders-api-openapi.yml:
+  openapi/distru-invoice-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-packages-api-openapi.yml:
+  openapi/distru-invoicehistory-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-payment-methods-api-openapi.yml:
+  openapi/distru-license-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-productposmappings-api-openapi.yml:
+  openapi/distru-licensetype-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-products-api-openapi.yml:
+  openapi/distru-location-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-purchases-api-openapi.yml:
+  openapi/distru-menu-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-returns-api-openapi.yml:
+  openapi/distru-metrc-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-stockadjustments-api-openapi.yml:
+  openapi/distru-officialproductcategory-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-strains-api-openapi.yml:
+  openapi/distru-order-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-test-results-api-openapi.yml:
+  openapi/distru-order-fulfillment-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
-  openapi/distru-vehicles-api-openapi.yml:
+  openapi/distru-package-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-payment-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-payment-method-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-payment-term-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-plantlifecycle-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-pricetier-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-product-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-product-category-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-product-group-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-productimage-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-productposmapping-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-productsubcategory-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-purchase-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-purchaseorderhistory-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-purchasesbycompany-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-purchasesbyproduct-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-return-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-salesbycompany-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-salesbyproduct-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-salesbyuser-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-salesorderhistory-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-salesorderitemhistory-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-salesordertax-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-stockadjustment-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-strain-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-tag-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-task-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-tax-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-testresult-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-unittype-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-user-api-openapi.yml:
+    method: derived
+    evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
+  openapi/distru-vehicle-api-openapi.yml:
     method: derived
     evidence: paths are a subset of openapi/_original/ (split from the harvested spec)
   overlays/distru-openapi-overlay.yaml:
-    method: unknown
-    evidence: no authorship recorded
+    method: derived
+    evidence: an API Evangelist overlay (title) over the provider's contract
   security/distru-domain-security.yml:
     method: unknown
     evidence: no authorship recorded
